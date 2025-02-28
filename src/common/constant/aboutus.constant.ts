@@ -1,0 +1,1 @@
+export const FEISHU_DOCUMENT_URL = "https://bcn290wiug78.feishu.cn/wiki/FDF5wNR2AiVj8Jkqvw7czV5RnWf"
