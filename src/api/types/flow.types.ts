@@ -34,9 +34,3 @@ export interface TaskVO {
   convId: number;
   userId: number;
 }
-
-export interface GeometryRequest {
-  userId: number;
-  convId: number;
-  question: string;
-}

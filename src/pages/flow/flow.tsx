@@ -31,16 +31,16 @@ function Flow() {
   };
 
   const handleSubmit = async () => {
-    if (!question || selectedNodeId === null) return;
+    if (!question) return;
 
     try {
-      const response = await createAiTask(1, selectedNodeId, question); // 假设 convId 为 1
+      const response = await createAiTask(null, selectedNodeId, question);
       const newNodes = await getNodes(response.convId);
       setNodes(newNodes);
       // 构造边
       const newEdges = newNodes.map((node) => ({
         id: `e1-${node.id}`,
-        source: "1",
+        source: node.parentId ? node.parentId.toString() : "0",
         target: node.id.toString(),
       }));
       setEdges(newEdges);
