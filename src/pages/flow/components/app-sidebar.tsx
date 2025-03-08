@@ -1,15 +1,15 @@
 import * as React from "react";
 import {
-  BookOpen,
-  Bot,
-  Command,
-  Frame,
-  LifeBuoy,
-  Map,
-  PieChart,
-  Send,
-  Settings2,
-  SquareTerminal,
+  // BookOpen,
+  // Bot,
+  // Command,
+  // Frame,
+  // LifeBuoy,
+  // Map,
+  // PieChart,
+  // Send,
+  // Settings2,
+  // SquareTerminal,
   Sparkles,
   ChevronRight,
   MessageCirclePlus
@@ -23,18 +23,18 @@ import {
 
 import DrawSeeIcon from '@/assets/svg/昭析.svg';
 
-import { NavMain } from "@/pages/flow/components/nav-main.tsx";
-import { NavProjects } from "@/pages/flow/components/nav-projects.tsx";
-import { NavSecondary } from "@/pages/flow/components/nav-secondary.tsx";
+// import { NavMain } from "@/pages/flow/components/nav-main.tsx";
+// import { NavProjects } from "@/pages/flow/components/nav-projects.tsx";
+// import { NavSecondary } from "@/pages/flow/components/nav-secondary.tsx";
 import { NavUser } from "@/pages/flow/components/nav-user.tsx";
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
   SidebarHeader,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
+  // SidebarMenu,
+  // SidebarMenuButton,
+  // SidebarMenuItem,
 } from "@/pages/flow/components/ui/sidebar.tsx";
 import { toast } from "sonner";
 import { createAiTask, getConversations } from "@/api/methods/flow.methods";
@@ -43,55 +43,54 @@ import { ConversationVO } from "@/api/types/flow.types.ts";
 const data = {
   user: {
     name: "shadcn",
-    email: "m@example.com",
     avatar: "/avatars/shadcn.jpg",
-  },
-  navMain: [
-    {
-      title: "Settings",
-      url: "#",
-      icon: Settings2,
-      items: [
-        {
-          title: "General",
-          url: "#",
-        },
-        {
-          title: "Limits",
-          url: "#",
-        },
-      ],
-    },
-  ],
-  navSecondary: [
-    {
-      title: "Support",
-      url: "#",
-      icon: LifeBuoy,
-    },
-    {
-      title: "Feedback",
-      url: "#",
-      icon: Send,
-    },
-  ],
-  projects: [
-    {
-      name: "Design Engineering",
-      url: "#",
-      icon: Frame,
-    },
-    {
-      name: "Sales & Marketing",
-      url: "#",
-      icon: PieChart,
-    },
-    {
-      name: "Travel",
-      url: "#",
-      icon: Map,
-    },
-  ],
+  }
+  // navMain: [
+  //   {
+  //     title: "Settings",
+  //     url: "#",
+  //     icon: Settings2,
+  //     items: [
+  //       {
+  //         title: "General",
+  //         url: "#",
+  //       },
+  //       {
+  //         title: "Limits",
+  //         url: "#",
+  //       },
+  //     ],
+  //   },
+  // ],
+  // navSecondary: [
+  //   {
+  //     title: "Support",
+  //     url: "#",
+  //     icon: LifeBuoy,
+  //   },
+  //   {
+  //     title: "Feedback",
+  //     url: "#",
+  //     icon: Send,
+  //   },
+  // ],
+  // projects: [
+  //   {
+  //     name: "Design Engineering",
+  //     url: "#",
+  //     icon: Frame,
+  //   },
+  //   {
+  //     name: "Sales & Marketing",
+  //     url: "#",
+  //     icon: PieChart,
+  //   },
+  //   {
+  //     name: "Travel",
+  //     url: "#",
+  //     icon: Map,
+  //   },
+  // ],
 };
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
@@ -128,21 +127,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
       <Sidebar className="pr-4" variant="inset" {...props}>
         <SidebarHeader>
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton size="lg" asChild>
-                <a href="#">
-                  <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-                    <Command className="size-4" />
-                  </div>
-                  <div className="grid flex-1 text-left text-sm leading-tight">
-                    <span className="truncate font-semibold">Acme Inc</span>
-                    <span className="truncate text-xs">Enterprise</span>
-                  </div>
-                </a>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
           <div className="cursor-pointer relative m-3 mb-3 hidden transition-all md:flex justify-start items-center shrink-0">
             <div className="pointer-events-none select-none relative flex items-center gap-1 h-5">
               <img className="h-[28px]" src={DrawSeeIcon} alt="DrawSee" />
@@ -153,9 +137,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           </div>
         </SidebarHeader>
         <SidebarContent>
-          <NavMain items={data.navMain} />
-          <NavProjects projects={data.projects} />
-          <NavSecondary items={data.navSecondary} className="mt-auto" />
+          {/*<NavMain items={data.navMain} />*/}
+          {/*<NavProjects projects={data.projects} />*/}
+          {/*<NavSecondary items={data.navSecondary} className="mt-auto" />*/}
 
           <div className="pl-4 pr-1.5 mt-6">
             <button

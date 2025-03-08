@@ -1,48 +1,43 @@
-import React from "react";
-import { Handle, Position } from "reactflow";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import React, { useState } from "react";
+import {useSSE} from "@/api/sse/useSSE.ts";
 
 interface KnowledgeDetailProps {
+    id: string;
     data: {
         title: string;
         text: string;
-        media?: string[];
+        media?: {
+            animationObjectKeys?: string[];
+            bilibiliUrls?: string[];
+        };
     };
 }
 
-const KnowledgeDetail: React.FC<KnowledgeDetailProps> = ({ data }) => {
+const KnowledgeDetailNode: React.FC<KnowledgeDetailProps> = ({ id, data }) => {
+    const [text, setText] = useState(data.text);
+
+    useSSE(`/knowledge-detail/stream?nodeId=${id}`, (parsedData: { type: string; data: { nodeId: string; content: string; }; }) => {
+        if (parsedData.type === "text" && parsedData.data.nodeId === id) {
+            setText((prevText) => prevText + parsedData.data.content);
+        }
+    });
+
     return (
-        <div className="bg-green-100 shadow-md p-4 rounded-lg border border-green-300 w-96">
-            <h3 className="font-bold text-lg text-black">{data.title}</h3>
-
-            <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                components={{
-                    p: ({ children }) => <p className="mt-2 text-gray-800">{children}</p>,
-                }}
-            >
-                {data.text}
-            </ReactMarkdown>
-
-            {data.media && data.media.length > 0 && (
-                <div className="mt-2 text-blue-600">
-                    <h4 className="font-bold">相关资源：</h4>
-                    <ul className="text-sm">
-                        {data.media.map((url, idx) => (
-                            <li key={idx}>
-                                <a href={url} target="_blank" rel="noopener noreferrer" className="underline text-blue-500">
-                                    {url}
-                                </a>
-                            </li>
-                        ))}
-                    </ul>
+        <div className="knowledge-detail-node">
+            <h3>{data.title}</h3>
+            <p>{text}</p>
+            {data.media?.bilibiliUrls && (
+                <div>
+                    <h4>相关视频：</h4>
+                    {data.media.bilibiliUrls.map((url, index) => (
+                        <a key={index} href={url} target="_blank" rel="noopener noreferrer">
+                            观看视频 {index + 1}
+                        </a>
+                    ))}
                 </div>
             )}
-
-            <Handle type="source" position={Position.Bottom} />
         </div>
     );
 };
 
-export default KnowledgeDetail;
+export default KnowledgeDetailNode;

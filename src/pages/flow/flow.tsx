@@ -1,43 +1,42 @@
 import { useState } from "react";
 import { AppSidebar } from "@/pages/flow/components/app-sidebar";
 import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
+  Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator
 } from "@/pages/flow/components/ui/breadcrumb";
 import { Separator } from "@/pages/flow/components/ui/separator";
 import {
-  SidebarInset,
-  SidebarProvider,
-  SidebarTrigger,
+  SidebarInset, SidebarProvider, SidebarTrigger
 } from "@/pages/flow/components/ui/sidebar";
 import ChatFlow from "@/pages/flow/components/chat-flow";
-import { Input } from "@/pages/flow/components/ui/input";
-import { Button } from "@/pages/flow/components/ui/button";
 import { createAiTask, getNodes } from "@/api/methods/flow.methods";
-import { NodeVO } from "@/api/types/flow.types";
+import {CreateAiTaskDTO, NodeVO} from "@/api/types/flow.types";
+import ChatInput from "@/pages/flow/components/chat-input";
 
 function Flow() {
-  const [question, setQuestion] = useState("");
+  const [question] = useState("");
   const [nodes, setNodes] = useState<NodeVO[]>([]);
   const [edges, setEdges] = useState<{ id: string; source: string; target: string; }[]>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<number | null>(null);
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setQuestion(e.target.value);
-  };
-
+  const [mode] = useState<string>("general");
+  const [conversationId, setConversationId] = useState<number | null>(null);
   const handleSubmit = async () => {
-    if (!question) return;
+    if (!question || (!conversationId && selectedNodeId !== null)) return;
 
     try {
-      const response = await createAiTask(null, selectedNodeId, question);
+      const requestBody = {
+        convI: conversationId,
+        parentId: selectedNodeId,
+        prompt: question,
+        promptParams: { key: "" },
+        type: mode,
+      };
+
+      const response = await createAiTask(requestBody as CreateAiTaskDTO);
+      setConversationId(response.convId);
+
       const newNodes = await getNodes(response.convId);
       setNodes(newNodes);
-      // 构造边
+
       const newEdges = newNodes.map((node) => ({
         id: `e1-${node.id}`,
         source: node.parentId ? node.parentId.toString() : "0",
@@ -64,13 +63,11 @@ function Flow() {
               <Breadcrumb>
                 <BreadcrumbList>
                   <BreadcrumbItem className="hidden md:block">
-                    <BreadcrumbLink href="#">
-                      Building Your Application
-                    </BreadcrumbLink>
+                    <BreadcrumbLink href="#">Choose Answer Mode</BreadcrumbLink>
                   </BreadcrumbItem>
                   <BreadcrumbSeparator className="hidden md:block" />
                   <BreadcrumbItem>
-                    <BreadcrumbPage>Data Fetching</BreadcrumbPage>
+                    <BreadcrumbPage>Continue AITask</BreadcrumbPage>
                   </BreadcrumbItem>
                 </BreadcrumbList>
               </Breadcrumb>
@@ -78,23 +75,7 @@ function Flow() {
           </header>
           <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
             <ChatFlow nodes={nodes} edges={edges} onSelectNode={handleSelectNode} />
-            <div className="mt-4 flex">
-              <Input
-                  type="text"
-                  placeholder="请输入内容..."
-                  className="w-full"
-                  value={question}
-                  onChange={handleInputChange}
-              />
-              <Button
-                  onClick={handleSubmit}
-                  variant="default"
-                  size="default"
-                  className="ml-2"
-              >
-                提交
-              </Button>
-            </div>
+            <ChatInput onSubmit={handleSubmit} disabled={!conversationId && selectedNodeId === null} />
           </div>
         </SidebarInset>
       </SidebarProvider>
