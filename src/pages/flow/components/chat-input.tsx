@@ -13,7 +13,7 @@ interface ChatInputProps {
     disabled?: boolean
 }
 
-const ChatInput: React.FC<ChatInputProps> = ({onSubmit}) => {
+export default function ChatInput({ onSubmit }: ChatInputProps) {
     const [question, setQuestion] = useState("");
     const [mode, setMode] = useState("general");
     const [isDisabled] = useState(false);
@@ -28,6 +28,7 @@ const ChatInput: React.FC<ChatInputProps> = ({onSubmit}) => {
                 value={question}
                 onChange={(e) => setQuestion(e.target.value)}
             />
+            {/* !可以考虑换成昭析的主题色 */}
             <Button
                 onClick={() => onSubmit(question, mode)}
                 variant="default"
@@ -40,4 +41,3 @@ const ChatInput: React.FC<ChatInputProps> = ({onSubmit}) => {
     );
 };
 
-export default ChatInput;

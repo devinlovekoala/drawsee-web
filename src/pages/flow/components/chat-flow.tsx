@@ -26,7 +26,7 @@ interface ChatFlowProps {
     onSelectNode: (nodeId: number) => void;
 }
 
-const ChatFlow: React.FC<ChatFlowProps> = ({ convId, edges}) => {
+export default function ChatFlow({ convId, edges }: ChatFlowProps) {
     const [streamingNodes, setStreamingNodes] = useState<NodeVO[]>([]);
 
     useEffect(() => {
@@ -66,4 +66,3 @@ const ChatFlow: React.FC<ChatFlowProps> = ({ convId, edges}) => {
     );
 };
 
-export default ChatFlow;

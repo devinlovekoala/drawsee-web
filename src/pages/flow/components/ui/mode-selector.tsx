@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { cn } from "@/lib/utils";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface Mode {
     label: string;
@@ -14,21 +15,42 @@ interface ModeSelectorProps {
 }
 
 const ModeSelector: React.FC<ModeSelectorProps> = ({ options, value, onChange, disabled = false }) => {
-    const [isOpen, setIsOpen] = useState(false);
-    const [openUpwards, setOpenUpwards] = useState(false);
-    const buttonRef = useRef<HTMLButtonElement>(null);
+    // const [isOpen, setIsOpen] = useState(false);
+    // const [openUpwards, setOpenUpwards] = useState(false);
+    // const buttonRef = useRef<HTMLButtonElement>(null);
 
-    useEffect(() => {
-        if (buttonRef.current) {
-            const rect = buttonRef.current.getBoundingClientRect();
-            const spaceBelow = window.innerHeight - rect.bottom;
-            setOpenUpwards(spaceBelow < 150);
-        }
-    }, [isOpen]);
+    // useEffect(() => {
+    //     if (buttonRef.current) {
+    //         const rect = buttonRef.current.getBoundingClientRect();
+    //         const spaceBelow = window.innerHeight - rect.bottom;
+    //         setOpenUpwards(spaceBelow < 150);
+    //     }
+    // }, [isOpen]);
 
     return (
-        <div className="relative">
-            <button
+        <Select onValueChange={(value) => { onChange(value) }}>
+            <SelectTrigger
+                className={cn(
+                    "flex items-center justify-between px-3 py-2 border rounded-lg w-36 bg-white",
+                    disabled ? "cursor-not-allowed opacity-50" : "hover:bg-gray-100"
+                )}
+                disabled={disabled}
+            >
+                <SelectValue placeholder="选择模式" />
+            </SelectTrigger>
+            <SelectContent>
+                {options.map((mode) => (
+                    <SelectItem
+                        // key={mode.value}
+                        value={mode.value}
+                        className="px-3 py-2 hover:bg-gray-100 cursor-pointer"
+                    >
+                        {mode.label}
+                    </SelectItem>
+                ))}
+            </SelectContent>
+            {/* 原版本 */}
+            {/* <button
                 ref={buttonRef}
                 className={cn(
                     "flex items-center justify-between px-3 py-2 border rounded-lg w-36 bg-white",
@@ -37,7 +59,7 @@ const ModeSelector: React.FC<ModeSelectorProps> = ({ options, value, onChange, d
                 onClick={() => !disabled && setIsOpen(!isOpen)}
             >
                 <span>{options.find((m) => m.value === value)?.label || "选择模式"}</span>
-                <span>▼</span>
+                <span className={cn("block transition-[transform] duration-300", isOpen ? "rotate-180" : "rotate-0")}>▼</span>
             </button>
             {isOpen && !disabled && (
                 <ul
@@ -59,8 +81,8 @@ const ModeSelector: React.FC<ModeSelectorProps> = ({ options, value, onChange, d
                         </li>
                     ))}
                 </ul>
-            )}
-        </div>
+            )} */}
+        </Select>
     );
 };
 
