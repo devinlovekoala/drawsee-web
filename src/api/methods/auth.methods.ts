@@ -1,18 +1,16 @@
 import alova from "@/api";
+import {LoginVO, UserSignUpDTO} from "@/api/types/auth.types.ts";
 
 export const login =
   (username: string, password: string) =>
-    alova.Post('/user/login', {
+    alova.Post<LoginVO>('/user/login', {
       username: username,
       password: password
     });
 
 export const signup =
-  (username: string, password: string) =>
-    alova.Post('/user/signup', {
-      username: username,
-      password: password
-    });
+  (userSignUpDTO: UserSignUpDTO) =>
+    alova.Post<LoginVO>('/user/signup', userSignUpDTO);
 
 export const checkLogin =
   () => alova.Get('/user/check_login');

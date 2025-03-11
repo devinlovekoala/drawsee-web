@@ -2,44 +2,29 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import './main.css';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
-import App from './pages/app.tsx';
-import Auth from '@/pages/auth/auth.tsx';
-import LoginForm from '@/pages/auth/components/login-form.tsx';
-import SignUpForm from '@/pages/auth/components/signup-form.tsx';
-import Flow from '@/pages/flow/flow.tsx';
-import Knowledgenode from '@/pages/admin/components/knowledgenode.tsx';
-import About from '@/pages/about/about.tsx';
+import App from './app/app.tsx';
+import About from '@/app/pages/about/about.tsx';
+import Blank from "@/app/pages/blank/blank.tsx";
+import Flow from "@/app/pages/flow/flow.tsx";
 
 const router = createBrowserRouter([
   {
     path: '/',
-    element: <App />
-  },
-  {
-    path: '/auth',
-    element: <Auth />,
+    element: <App />,
     children: [
       {
-        path: 'login',
-        element: <LoginForm />
+        path: '/blank',
+        element: <Blank />
       },
       {
-        path: 'signup',
-        element: <SignUpForm />
+        path: '/flow',
+        element: <Flow />
+      },
+      {
+        path: '/about',
+        element: <About />
       }
     ]
-  },
-  {
-    path: '/flow',
-    element: <Flow />
-  },
-  {
-    path: '/admin',
-    element: <Knowledgenode />
-  },
-  {
-    path: '/about',
-    element: <About />
   }
 ]);
 

@@ -1,7 +1,7 @@
 import {useState} from "react";
-import {Input} from "@/pages/flow/components/ui/input";
-import {Button} from "@/pages/flow/components/ui/button";
-import ModeSelector from "@/pages/flow/components/ui/mode-selector.tsx";
+import {Input} from "@/app/components/ui/input.tsx";
+import {Button} from "@/app/components/ui/button.tsx";
+import ModeSelector from "@/app/components/ui/mode-selector.tsx";
 
 const MODES = [
     {label: "简单问答", value: "general"},

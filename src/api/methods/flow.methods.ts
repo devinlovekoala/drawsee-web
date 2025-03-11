@@ -5,20 +5,23 @@ import {
     CreateAiTaskDTO,
     CreateAiTaskVO,
     NodeVO,
-    UpdatePositionNode
+    nodeToUpdate
 } from "@/api/types/flow.types.ts";
 
 export const getConversations =
   () => alova.Get<Array<ConversationVO>>('/flow/conversations');
 
 export const getNodes =
-    (convId: number) => alova.Get<Array<NodeVO>>(`/flow/nodes?convId=${convId}`);
+    (convId: number) => alova.Get<Array<NodeVO>>('/flow/nodes', {params: {convId}});
 
 export const updateNodesPosition =
-  (nodes: Array<UpdatePositionNode>) => alova.Post('/flow/nodes', { nodes });
+  (nodes: Array<nodeToUpdate>) => alova.Post('/flow/nodes', { nodes });
 
-export const createAiTask = (data: CreateAiTaskDTO) =>
-    alova.Post<CreateAiTaskVO>('/flow/tasks', data);
+export const getProcessingAiTasks =
+  (convId: number) => alova.Get<AiTaskVO>('/flow/tasks', {params: {convId}});
 
-export const getRunningTasks =
-  () => alova.Get<AiTaskVO>('/flow/tasks');
+export const createAiTask =
+  (createAiTaskDTO: CreateAiTaskDTO) => alova.Post<CreateAiTaskVO>('/flow/tasks', createAiTaskDTO);
+
+export const getResourceUrl =
+  (objectName: string) => alova.Get<string>(`/flow/resources/${objectName}`);

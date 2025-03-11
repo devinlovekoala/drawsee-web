@@ -1,19 +1,18 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Handle, Position } from "reactflow";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { FaGlobe, FaChevronDown, FaChevronUp } from "react-icons/fa";
+import {type Node, NodeProps} from "@xyflow/react";
 
-interface AnswerNodeProps {
-    data: {
-        title: string;
-        text: string;
-        search?: string[];
-        think?: string;
-    };
-}
+type AnswerNodeData = {
+  title: string;
+  text: string;
+  search?: string[];
+  think?: string;
+};
 
-const AnswerNode: React.FC<AnswerNodeProps> = ({ data }) => {
+function AnswerNode ({data}: NodeProps<Node<AnswerNodeData, 'answer'>>) {
     const [thinkOpen, setThinkOpen] = useState(false);
     const [searchOpen, setSearchOpen] = useState(false);
 
@@ -57,6 +56,6 @@ const AnswerNode: React.FC<AnswerNodeProps> = ({ data }) => {
             <Handle type="source" position={Position.Bottom} />
         </div>
     );
-};
+}
 
 export default AnswerNode;

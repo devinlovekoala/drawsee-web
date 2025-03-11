@@ -13,7 +13,7 @@ import {
   Avatar,
   AvatarFallback,
   AvatarImage,
-} from "@/pages/flow/components/ui/avatar.tsx"
+} from "@/app/components/ui/avatar.tsx"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,29 +22,29 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/pages/flow/components/ui/dropdown-menu.tsx"
+} from "@/app/components/ui/dropdown-menu.tsx"
 import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
   useSidebar,
-} from "@/pages/flow/components/ui/sidebar.tsx"
+} from "@/app/components/ui/sidebar.tsx"
 
-export function NavUser({
-  user,
-}: {
+interface Props {
   user: {
-    name: string
-    // email: string
-    avatar: string
+    name: string;
+    avatar: string;
   }
-}) {
+}
+
+export function NavUser({user}: Props) {
   const { isMobile } = useSidebar()
 
   return (
     <SidebarMenu>
       <SidebarMenuItem>
         <DropdownMenu>
+          {/* nav-bar */}
           <DropdownMenuTrigger asChild>
             <SidebarMenuButton
               size="lg"
@@ -56,14 +56,12 @@ export function NavUser({
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-semibold">{user.name}</span>
-                {/*<span className="truncate text-xs">{user.email}</span>*/}
               </div>
               <ChevronsUpDown className="ml-auto size-4" />
             </SidebarMenuButton>
           </DropdownMenuTrigger>
+          {/* 打开的菜单 */}
           <DropdownMenuContent
-            onInteractOutside={() => console.log("onInteractOutside")}
-            onCloseAutoFocus={() => console.log("onCloseAutoFocus")}
             className="w-[--radix-dropdown-menu-trigger-width] min-w-56 rounded-lg"
             side={isMobile ? "bottom" : "right"}
             align="end"

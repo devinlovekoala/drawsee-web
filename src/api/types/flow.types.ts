@@ -1,24 +1,26 @@
+export type NodeType = "root" | "query" | "answer" | "knowledge-head" | "knowledge-detail" | "animation";
+
 export interface ConversationVO {
-  createdAt: number;
   id: number;
   title: string;
-  updatedAt: number;
   userId: number;
+  createdAt: number;
+  updatedAt: number;
 }
 
 export interface NodeVO {
-  convId: number;
-  createdAt: number;
-  data: MapObject;
   id: number;
-  parentId: number;
+  type: NodeType;
+  data: MapObject;
   position: XYPosition;
-  type: string;
-  updatedAt: number;
+  parentId: number;
+  convId: number;
   userId: number;
+  createdAt: number;
+  updatedAt: number;
 }
 
-export interface UpdatePositionNode {
+export interface nodeToUpdate {
   id: number;
   position: XYPosition;
 }
@@ -33,29 +35,27 @@ export interface XYPosition {
   y: number;
 }
 
+export type AiTaskType = "general" | "knowledge" | "knowledge-detail";
+
 export interface CreateAiTaskVO {
-  convId: number;
   taskId: number;
+  conversation: ConversationVO;
 }
 
 export interface AiTaskVO {
+  id: number;
+  type: AiTaskType;
+  status: string;
+  userId: number;
   convId: number;
   createdAt: number;
-  id: number;
-  status: string;
-  type: string;
   updatedAt: number;
-  userId: number;
 }
 
 export interface CreateAiTaskDTO {
-  convI: number;
-  parentId: number;
-  prompt: string;
-  promptParams: MapString;
-  type: string;
-}
-
-export interface MapString {
-  key: string;
+  type: AiTaskType;
+  prompt: string | null;
+  promptParams: Record<string, string> | null;
+  convId: number | null;
+  parentId: number | null;
 }

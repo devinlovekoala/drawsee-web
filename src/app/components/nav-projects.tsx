@@ -12,7 +12,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/pages/flow/components/ui/dropdown-menu.tsx"
+} from "@/app/components/ui/dropdown-menu.tsx"
 import {
   SidebarGroup,
   SidebarGroupLabel,
@@ -21,7 +21,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   useSidebar,
-} from "@/pages/flow/components/ui/sidebar.tsx"
+} from "@/app/components/ui/sidebar.tsx"
 
 export function NavProjects({
   projects,

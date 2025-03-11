@@ -1,10 +1,9 @@
-import { useState, useRef, useEffect } from "react";
-import { cn } from "@/lib/utils";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { cn } from "@/lib/utils.ts";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
 
 interface Mode {
-    label: string;
-    value: string;
+  label: string;
+  value: string;
 }
 
 interface ModeSelectorProps {

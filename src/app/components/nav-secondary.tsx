@@ -7,7 +7,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "@/pages/flow/components/ui/sidebar.tsx"
+} from "@/app/components/ui/sidebar.tsx"
 
 export function NavSecondary({
   items,
