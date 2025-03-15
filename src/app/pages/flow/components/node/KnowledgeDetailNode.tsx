@@ -5,7 +5,6 @@ import { BaseNode, ExtendedNodeProps } from './base/BaseNode';
 import { FaVideo } from 'react-icons/fa';
 import { getResourceUrl } from '@/api/methods/flow.methods';
 import MarkdownWithLatex from '../markdown/MarkdownWithLatex';
-import ReactPlayer from 'react-player'
 
 /**
  * 知识详情节点组件
@@ -18,11 +17,12 @@ function KnowledgeDetailNode({ showSourceHandle, showTargetHandle, ...props }: E
   const [isLoading, setIsLoading] = useState(false);
   const [videoErrors, setVideoErrors] = useState<Record<number, boolean>>({});
   const [playerReady, setPlayerReady] = useState<Record<number, boolean>>({});
-  const [displayMode, setDisplayMode] = useState<'native' | 'react-player' | 'iframe'>('iframe'); // 默认使用iframe
+  const [displayMode, setDisplayMode] = useState<'native' | 'iframe'>('iframe');
   
   // 渲染计数器（用于调试）
   const renderCountRef = useRef<Record<number, number>>({});
   const isMountedRef = useRef(true);
+  
   useEffect(() => {
     console.log('KnowledgeDetailNode 组件已挂载');
     isMountedRef.current = true;
@@ -42,7 +42,6 @@ function KnowledgeDetailNode({ showSourceHandle, showTargetHandle, ...props }: E
       setPlayerReady({});
       
       try {
-        // 获取资源 URLs
         const urls = await Promise.all(
           props.data.media.animationObjectNames.map(async (objectName) => {
             const response = await getResourceUrl(objectName).send();
@@ -51,7 +50,6 @@ function KnowledgeDetailNode({ showSourceHandle, showTargetHandle, ...props }: E
         );
         console.log('获取到的资源 URLs: ', urls);
         
-        // 只有组件仍然挂载时才更新状态
         if (isMountedRef.current) {
           setVideoUrls(urls);
           setIsLoading(false);
@@ -76,22 +74,14 @@ function KnowledgeDetailNode({ showSourceHandle, showTargetHandle, ...props }: E
       errorMessage: error?.message,
       errorTarget: error?.target?.src
     });
-    setVideoErrors(prev => ({ ...prev, [index]: true }));
-  }, [videoUrls]);
-
-  // 处理ReactPlayer准备就绪 - 使用useCallback避免重渲染
-  const handlePlayerReady = useCallback((index: number) => {
-    console.log(`ReactPlayer ${index + 1} 准备就绪`);
-    setPlayerReady(prev => ({ ...prev, [index]: true }));
-  }, []);
+    if (!videoErrors[index]) {
+      setVideoErrors(prev => ({ ...prev, [index]: true }));
+    }
+  }, [videoUrls, videoErrors]);
 
   // 切换显示模式 - 使用useCallback避免重渲染
   const toggleDisplayMode = useCallback(() => {
-    setDisplayMode(prev => {
-      if (prev === 'native') return 'react-player';
-      if (prev === 'react-player') return 'iframe';
-      return 'native';
-    });
+    setDisplayMode(prev => prev === 'native' ? 'iframe' : 'native');
     setVideoErrors({});
     setPlayerReady({});
   }, []);
@@ -128,8 +118,7 @@ function KnowledgeDetailNode({ showSourceHandle, showTargetHandle, ...props }: E
                 onClick={toggleDisplayMode}
                 className="text-xs px-2 py-1 bg-purple-100 text-purple-700 rounded hover:bg-purple-200"
               >
-                {displayMode === 'native' ? "使用ReactPlayer" : 
-                 displayMode === 'react-player' ? "使用iframe嵌入" : "使用原生播放器"}
+                {displayMode === 'native' ? "使用iframe嵌入" : "使用原生播放器"}
               </button>
             </div>
             
@@ -167,37 +156,6 @@ function KnowledgeDetailNode({ showSourceHandle, showTargetHandle, ...props }: E
                             <source src={url} type="video/mp4" />
                             您的浏览器不支持视频播放
                           </video>
-                        ) : displayMode === 'react-player' ? (
-                          // ReactPlayer
-                          <div className="relative pt-[56.25%]"> {/* 16:9 宽高比 */}
-                            <ReactPlayer
-                              key={`react-player-${index}`} // 使用稳定的key
-                              url={url}
-                              width="100%"
-                              height="100%"
-                              controls
-                              playing={false}
-                              onReady={() => handlePlayerReady(index)}
-                              onError={(e) => handleVideoError(index, e)}
-                              style={{ position: 'absolute', top: 0, left: 0 }}
-                              config={{
-                                file: {
-                                  attributes: {
-                                    crossOrigin: "anonymous",
-                                    controlsList: "nodownload",
-                                    preload: "metadata"
-                                  },
-                                  forceVideo: true
-                                }
-                              }}
-                            />
-                            {!playerReady[index] && (
-                              <div className="absolute inset-0 flex items-center justify-center bg-purple-50 bg-opacity-70">
-                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
-                                <span className="ml-3 text-purple-700">加载中...</span>
-                              </div>
-                            )}
-                          </div>
                         ) : (
                           // iframe嵌入
                           <iframe
@@ -284,7 +242,7 @@ function KnowledgeDetailNode({ showSourceHandle, showTargetHandle, ...props }: E
         )}
       </div>
     );
-  }, [displayMode, hasAnimations, hasBilibiliUrls, isLoading, videoUrls, videoErrors, playerReady, props.data.media?.bilibiliUrls, handleVideoError, handlePlayerReady, toggleDisplayMode, extractBilibiliInfo]);
+  }, [displayMode, hasAnimations, hasBilibiliUrls, isLoading, videoUrls, videoErrors, playerReady, props.data.media?.bilibiliUrls, handleVideoError, toggleDisplayMode, extractBilibiliInfo]);
   
   // 自定义内容，包括文本和媒体
   const customContent = (
