@@ -1,5 +1,5 @@
 import { NodeProps } from '@xyflow/react';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import type { KnowledgeDetailNode as KnowledgeDetailNodeType } from './types/node.types';
 import { BaseNode, ExtendedNodeProps } from './base/BaseNode';
 import { FaVideo } from 'react-icons/fa';
@@ -14,31 +14,37 @@ import ReactPlayer from 'react-player'
 function KnowledgeDetailNode({ showSourceHandle, showTargetHandle, ...props }: ExtendedNodeProps<'knowledge-detail'>) {
   const hasBilibiliUrls = props.data.media?.bilibiliUrls?.length > 0;
   const hasAnimations = props.data.media?.animationObjectNames?.length > 0;
-  
-  // 存储动画资源 URL 和下载后的视频 Blob URL
-  const [animationUrls, setAnimationUrls] = useState<string[]>([]);
-  const [videoBlobUrls, setVideoBlobUrls] = useState<string[]>([]);
+  const [videoUrls, setVideoUrls] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [downloadProgress, setDownloadProgress] = useState<number[]>([]);
-  /*
-  // 清理函数，用于组件卸载时释放 Blob URL
+  const [videoErrors, setVideoErrors] = useState<Record<number, boolean>>({});
+  const [playerReady, setPlayerReady] = useState<Record<number, boolean>>({});
+  const [displayMode, setDisplayMode] = useState<'native' | 'react-player' | 'iframe'>('iframe'); // 默认使用iframe
+  
+  // 渲染计数器（用于调试）
+  const renderCountRef = useRef<Record<number, number>>({});
+  
+  // 组件挂载标志
+  const isMountedRef = useRef(true);
   useEffect(() => {
+    console.log('KnowledgeDetailNode 组件已挂载');
+    isMountedRef.current = true;
     return () => {
-      // 释放所有创建的 Blob URL
-      videoBlobUrls.forEach(url => URL.revokeObjectURL(url));
+      console.log('KnowledgeDetailNode 组件已卸载');
+      isMountedRef.current = false;
     };
-  }, [videoBlobUrls]);
+  }, []);
 
-  // 获取动画资源 URL 并下载视频
+  // 获取视频资源URL
   useEffect(() => {
-    const fetchAnimationUrls = async () => {
-      console.log('fetchAnimationUrls');
-
-      if (!hasAnimations) return;
+    const fetchVideoUrls = async () => {
+      if (!hasAnimations || !props.data.media?.animationObjectNames?.length) return;
       
       setIsLoading(true);
+      setVideoErrors({});
+      setPlayerReady({});
+      
       try {
-        // 获取资源 URL
+        // 获取资源 URLs
         const urls = await Promise.all(
           props.data.media.animationObjectNames.map(async (objectName) => {
             const response = await getResourceUrl(objectName).send();
@@ -46,144 +52,241 @@ function KnowledgeDetailNode({ showSourceHandle, showTargetHandle, ...props }: E
           })
         );
         console.log('获取到的资源 URLs: ', urls);
-        setAnimationUrls(urls);
         
-        // 初始化下载进度数组
-        setDownloadProgress(new Array(urls.length).fill(0));
-        
-        // 下载视频
-        const blobUrls = await Promise.all(
-          urls.map((url, index) => downloadVideo(url, index))
-        );
-        
-        setVideoBlobUrls(blobUrls.filter(Boolean) as string[]);
+        // 只有组件仍然挂载时才更新状态
+        if (isMountedRef.current) {
+          setVideoUrls(urls);
+          setIsLoading(false);
+        }
       } catch (error) {
-        console.error('获取或下载动画失败:', error);
-      } finally {
-        setIsLoading(false);
+        console.error('获取视频URL失败:', error);
+        if (isMountedRef.current) {
+          setIsLoading(false);
+        }
       }
     };
     
-    fetchAnimationUrls();
+    fetchVideoUrls();
   }, [hasAnimations, props.data.media?.animationObjectNames]);
-  
-  // 下载视频并创建 Blob URL
-  const downloadVideo = async (url: string, index: number): Promise<string | null> => {
-    try {
-      const response = await fetch(url);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      // 获取响应体的 reader
-      const reader = response.body?.getReader();
-      if (!reader) {
-        throw new Error('无法获取响应体的 reader');
-      }
-      
-      // 获取内容长度（如果有）
-      const contentLength = Number(response.headers.get('Content-Length') || '0');
-      
-      // 读取数据块
-      let receivedLength = 0;
-      const chunks: Uint8Array[] = [];
-      
-      while (true) {
-        const { done, value } = await reader.read();
-        
-        if (done) {
-          break;
-        }
-        
-        chunks.push(value);
-        receivedLength += value.length;
-        
-        // 更新下载进度
-        if (contentLength) {
-          const progress = Math.round((receivedLength / contentLength) * 100);
-          setDownloadProgress(prev => {
-            const newProgress = [...prev];
-            newProgress[index] = progress;
-            return newProgress;
-          });
-        }
-      }
-      
-      // 合并所有块并创建 Blob
-      const blob = new Blob(chunks, { type: 'video/mp4' });
-      const blobUrl = URL.createObjectURL(blob);
-      
-      console.log(`视频 ${index + 1} 下载完成，创建 Blob URL:`, blobUrl);
-      return blobUrl;
-      
-    } catch (error) {
-      console.error(`下载视频 ${index + 1} 失败:`, error);
-      return null;
+
+  // 处理视频错误 - 使用useCallback避免重渲染
+  const handleVideoError = useCallback((index: number, error: any) => {
+    console.error(`视频 ${index + 1} 加载失败:`, error);
+    console.error(`错误详情:`, {
+      url: videoUrls[index],
+      errorType: error?.type,
+      errorMessage: error?.message,
+      errorTarget: error?.target?.src
+    });
+    setVideoErrors(prev => ({ ...prev, [index]: true }));
+  }, [videoUrls]);
+
+  // 处理ReactPlayer准备就绪 - 使用useCallback避免重渲染
+  const handlePlayerReady = useCallback((index: number) => {
+    console.log(`ReactPlayer ${index + 1} 准备就绪`);
+    setPlayerReady(prev => ({ ...prev, [index]: true }));
+  }, []);
+
+  // 切换显示模式 - 使用useCallback避免重渲染
+  const toggleDisplayMode = useCallback(() => {
+    setDisplayMode(prev => {
+      if (prev === 'native') return 'react-player';
+      if (prev === 'react-player') return 'iframe';
+      return 'native';
+    });
+    setVideoErrors({});
+    setPlayerReady({});
+  }, []);
+
+  // 从B站URL中提取BV号
+  const extractBilibiliInfo = useCallback((url: string) => {
+    // 尝试匹配BV号
+    const bvMatch = url.match(/BV\w+/);
+    if (bvMatch) {
+      return {
+        bvid: bvMatch[0],
+        page: url.match(/p=(\d+)/) ? url.match(/p=(\d+)/)?.[1] || '1' : '1'
+      };
     }
-  };
-  */
+    // 如果是完整的iframe URL，直接返回
+    if (url.includes('player.bilibili.com')) {
+      return { fullUrl: url };
+    }
+    return null;
+  }, []);
  
-  // 媒体内容组件
-  const MediaContent = () => (
-    <div className="mt-4 space-y-4">
-      {/* 动画视频 */}
-      {hasAnimations && false && (
-        <div className="space-y-3">
-          <h4 className="text-sm font-medium text-gray-700">相关动画</h4>
+  // 媒体内容组件 - 使用useMemo避免重渲染
+  const MediaContent = useMemo(() => {
+    console.log('MediaContent 重新渲染, 模式:', displayMode);
+    
+    return () => (
+      <div className="mt-4 space-y-4">
+        {/* 动画视频 */}
+        {hasAnimations && (
           <div className="space-y-3">
-            {videoBlobUrls.length > 0 ? (
-              // 显示已下载的视频
-              videoBlobUrls.map((blobUrl, index) => (
-                <div key={`animation-${index}`} className="rounded-lg overflow-hidden border border-purple-200 bg-purple-50">
-                  <ReactPlayer url={blobUrl} width="100%" height="200" controls />
+            <div className="flex justify-between items-center">
+              <h4 className="text-sm font-medium text-gray-700">相关动画</h4>
+              <button 
+                onClick={toggleDisplayMode}
+                className="text-xs px-2 py-1 bg-purple-100 text-purple-700 rounded hover:bg-purple-200"
+              >
+                {displayMode === 'native' ? "使用ReactPlayer" : 
+                 displayMode === 'react-player' ? "使用iframe嵌入" : "使用原生播放器"}
+              </button>
+            </div>
+            
+            <div className="space-y-3">
+              {isLoading ? (
+                // 加载中状态
+                <div className="flex justify-center items-center py-8 rounded-lg border border-purple-200 bg-purple-50">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
+                  <span className="ml-3 text-purple-700">加载视频中...</span>
                 </div>
-              ))
-            ) : (
-              // 显示下载进度
-              animationUrls.map((_, index) => (
-                <div key={`animation-progress-${index}`} className="rounded-lg overflow-hidden border border-purple-200 bg-purple-50 p-4">
-                  <div className="flex flex-col items-center justify-center h-[150px]">
-                    <div className="w-full bg-gray-200 rounded-full h-2.5 mb-2">
-                      <div 
-                        className="bg-purple-600 h-2.5 rounded-full" 
-                        style={{ width: `${downloadProgress[index]}%` }}
-                      ></div>
+              ) : videoUrls.length > 0 ? (
+                // 显示视频
+                videoUrls.map((url, index) => {
+                  // 跟踪渲染次数
+                  renderCountRef.current[index] = (renderCountRef.current[index] || 0) + 1;
+                  console.log(`视频 ${index + 1} 渲染次数: ${renderCountRef.current[index]}`);
+                  
+                  return (
+                    <div key={`animation-${index}`} className="rounded-lg overflow-hidden border border-purple-200 bg-purple-50">
+                      {!videoErrors[index] ? (
+                        displayMode === 'native' ? (
+                          // 原生视频播放器
+                          <video
+                            key={`video-${index}`} // 使用稳定的key
+                            src={url}
+                            controls
+                            width="100%"
+                            height="200"
+                            className="w-full"
+                            onError={(e) => handleVideoError(index, e)}
+                            crossOrigin="anonymous"
+                            preload="metadata"
+                            playsInline
+                          >
+                            <source src={url} type="video/mp4" />
+                            您的浏览器不支持视频播放
+                          </video>
+                        ) : displayMode === 'react-player' ? (
+                          // ReactPlayer
+                          <div className="relative pt-[56.25%]"> {/* 16:9 宽高比 */}
+                            <ReactPlayer
+                              key={`react-player-${index}`} // 使用稳定的key
+                              url={url}
+                              width="100%"
+                              height="100%"
+                              controls
+                              playing={false}
+                              onReady={() => handlePlayerReady(index)}
+                              onError={(e) => handleVideoError(index, e)}
+                              style={{ position: 'absolute', top: 0, left: 0 }}
+                              config={{
+                                file: {
+                                  attributes: {
+                                    crossOrigin: "anonymous",
+                                    controlsList: "nodownload",
+                                    preload: "metadata"
+                                  },
+                                  forceVideo: true
+                                }
+                              }}
+                            />
+                            {!playerReady[index] && (
+                              <div className="absolute inset-0 flex items-center justify-center bg-purple-50 bg-opacity-70">
+                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
+                                <span className="ml-3 text-purple-700">加载中...</span>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          // iframe嵌入
+                          <iframe
+                            key={`iframe-${index}`} // 使用稳定的key
+                            src={url}
+                            width="100%"
+                            height="200"
+                            frameBorder="0"
+                            allowFullScreen
+                            title={`视频 ${index + 1}`}
+                            className="w-full"
+                            sandbox="allow-same-origin allow-scripts"
+                            loading="lazy"
+                          />
+                        )
+                      ) : (
+                        // 错误状态
+                        <div className="flex flex-col items-center justify-center h-[200px] bg-red-50 text-red-500 p-4">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          <p className="text-center">视频加载失败</p>
+                          <div className="flex mt-2 space-x-2">
+                            <button 
+                              className="px-3 py-1 bg-red-100 rounded-md hover:bg-red-200 text-sm"
+                              onClick={() => window.open(url, '_blank')}
+                            >
+                              在新窗口打开
+                            </button>
+                            <button 
+                              className="px-3 py-1 bg-red-100 rounded-md hover:bg-red-200 text-sm"
+                              onClick={() => {
+                                setVideoErrors(prev => ({...prev, [index]: false}));
+                              }}
+                            >
+                              重试
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <p className="text-sm text-gray-600">
-                      正在下载动画 {index + 1}: {downloadProgress[index]}%
-                    </p>
-                  </div>
+                  );
+                })
+              ) : (
+                // 无视频状态
+                <div className="flex justify-center items-center py-8 rounded-lg border border-purple-200 bg-purple-50">
+                  <span className="text-purple-700">无法加载视频资源</span>
                 </div>
-              ))
-            )}
+              )}
+            </div>
           </div>
-        </div>
-      )}
-      
-      {/* Bilibili 视频 */}
-      {hasBilibiliUrls && false && (
-        <div className="space-y-3">
-          <h4 className="text-sm font-medium text-gray-700">B站视频</h4>
+        )}
+        
+        {/* Bilibili 视频 */}
+        {hasBilibiliUrls && (
           <div className="space-y-3">
-            {props.data.media.bilibiliUrls.map((url, index) => (
-              <div key={`bilibili-${index}`} className="rounded-lg overflow-hidden border border-pink-200 bg-pink-50">
-                <iframe
-                  src={url+"&autoplay=0"}
-                  width="100%"
-                  height="200"
-                  frameBorder="0"
-                  allowFullScreen
-                  title={`Bilibili Video ${index + 1}`}
-                  className="w-full"
-                />
-              </div>
-            ))}
+            <h4 className="text-sm font-medium text-gray-700">B站视频</h4>
+            <div className="space-y-3">
+              {props.data.media.bilibiliUrls.map((url, index) => {
+                const biliInfo = extractBilibiliInfo(url);
+                if (!biliInfo) return null;
+                
+                const iframeSrc = biliInfo.fullUrl || 
+                  `//player.bilibili.com/player.html?bvid=${biliInfo.bvid}&page=${biliInfo.page}&high_quality=1&danmaku=0&autoplay=0`;
+                
+                return (
+                  <div key={`bilibili-${index}`} className="rounded-lg overflow-hidden border border-pink-200 bg-pink-50">
+                    <iframe
+                      src={iframeSrc}
+                      width="100%"
+                      height="200"
+                      frameBorder="0"
+                      allowFullScreen
+                      title={`Bilibili Video ${index + 1}`}
+                      className="w-full"
+                      sandbox="allow-top-navigation allow-same-origin allow-forms allow-scripts"
+                      loading="lazy"
+                    />
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      )}
-    </div>
-  );
+        )}
+      </div>
+    );
+  }, [displayMode, hasAnimations, hasBilibiliUrls, isLoading, videoUrls, videoErrors, playerReady, props.data.media?.bilibiliUrls, handleVideoError, handlePlayerReady, toggleDisplayMode, extractBilibiliInfo]);
   
   // 自定义内容，包括文本和媒体
   const customContent = (
@@ -198,13 +301,6 @@ function KnowledgeDetailNode({ showSourceHandle, showTargetHandle, ...props }: E
       {/* 媒体内容 */}
       {(hasBilibiliUrls || hasAnimations) && (
         <MediaContent />
-      )}
-      
-      {/* 加载中状态 */}
-      {isLoading && !videoBlobUrls.length && !downloadProgress.some(p => p > 0) && (
-        <div className="flex justify-center items-center py-4">
-          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-500"></div>
-        </div>
       )}
     </>
   );
