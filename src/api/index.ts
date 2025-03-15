@@ -3,9 +3,11 @@ import adapterFetch from 'alova/fetch';
 import ReactHook from 'alova/react';
 import {TOKEN_KEY} from "@/common/constant/storage-key.constant.ts";
 
+export const BASE_URL = 'http://42.193.107.127:6868';
+
 const alova = createAlova({
   requestAdapter: adapterFetch(),
-  baseURL: 'http://42.193.107.127:6868',
+  baseURL: BASE_URL,
   statesHook: ReactHook,
   // 请求拦截器
   beforeRequest(method) {
@@ -16,7 +18,6 @@ const alova = createAlova({
   // 响应拦截器，解包
   responded: async (response) => {
     const json = await response.json();
-    console.log(json)
     if (response.status !== 200) {
       throw new Error(json.message);
     } else {

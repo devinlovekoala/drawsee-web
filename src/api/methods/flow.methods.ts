@@ -11,7 +11,7 @@ import {
 export const getConversations =
   () => alova.Get<Array<ConversationVO>>('/flow/conversations');
 
-export const getNodes =
+export const getNodesByConvId =
     (convId: number) => alova.Get<Array<NodeVO>>('/flow/nodes', {params: {convId}});
 
 export const updateNodesPosition =
@@ -24,4 +24,4 @@ export const createAiTask =
   (createAiTaskDTO: CreateAiTaskDTO) => alova.Post<CreateAiTaskVO>('/flow/tasks', createAiTaskDTO);
 
 export const getResourceUrl =
-  (objectName: string) => alova.Get<string>(`/flow/resources/${objectName}`);
+  (objectName: string) => alova.Get<{url: string}>(`/flow/resources`, {params: {objectName}});

@@ -6,6 +6,7 @@ import App from './app/app.tsx';
 import About from '@/app/pages/about/about.tsx';
 import Blank from "@/app/pages/blank/blank.tsx";
 import Flow from "@/app/pages/flow/flow.tsx";
+import { ReactFlowProvider } from '@xyflow/react';
 
 const router = createBrowserRouter([
   {
@@ -29,7 +30,9 @@ const router = createBrowserRouter([
 ]);
 
 createRoot(document.getElementById('root')!).render(
-    <StrictMode>
+  <StrictMode>
+    <ReactFlowProvider>
       <RouterProvider router={router} />
-    </StrictMode>
+    </ReactFlowProvider>
+  </StrictMode>
 );

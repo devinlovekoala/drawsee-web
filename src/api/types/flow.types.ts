@@ -8,12 +8,50 @@ export interface ConversationVO {
   updatedAt: number;
 }
 
+interface BaseNodeData {
+  title: string;
+  text: string;
+  parentId: number | null;
+  convId: number;
+  userId: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
+interface RootNodeData extends Omit<BaseNodeData, 'title' | 'text'> {}
+
+interface QueryNodeData extends BaseNodeData {
+  mode: string;
+}
+
+interface AnswerNodeData extends BaseNodeData {}
+
+interface KnowledgeHeadNodeData extends BaseNodeData {}
+
+interface KnowledgeDetailNodeData extends BaseNodeData {
+  media: {
+    bilibiliUrls: string[];
+    animationObjectNames: string[];
+  };
+}
+
+interface AnimationNodeData extends BaseNodeData {}
+
+export type NodeData = {
+  root: RootNodeData;
+  query: QueryNodeData;
+  answer: AnswerNodeData;
+  'knowledge-head': KnowledgeHeadNodeData;
+  'knowledge-detail': KnowledgeDetailNodeData;
+  'animation': AnimationNodeData;
+}
+
 export interface NodeVO {
   id: number;
   type: NodeType;
-  data: MapObject;
+  data: NodeData[keyof NodeData];
   position: XYPosition;
-  parentId: number;
+  parentId: number | null;
   convId: number;
   userId: number;
   createdAt: number;
@@ -25,17 +63,16 @@ export interface nodeToUpdate {
   position: XYPosition;
 }
 
-export interface MapObject {
-  text: string;
-  key: { [key: string]: unknown };
-}
-
 export interface XYPosition {
   x: number;
   y: number;
 }
 
-export type AiTaskType = "general" | "knowledge" | "knowledge-detail";
+export type AiTaskType = 
+  | 'general'      // 常规问答模式
+  | 'knowledge'    // 知识问答模式
+  | 'knowledge-detail' // 知识详情
+  | 'animation';    // 动画模式
 
 export interface CreateAiTaskVO {
   taskId: number;

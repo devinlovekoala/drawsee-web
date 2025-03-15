@@ -12,6 +12,9 @@ export default {
   			md: 'calc(var(--radius) - 2px)',
   			sm: 'calc(var(--radius) - 4px)'
   		},
+      fontFamily: {
+        //'geist-mono': ['Geist Mono', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'Liberation Mono', 'Courier New', 'monospace'],
+      },
   		colors: {
   			background: 'hsl(var(--background))',
   			foreground: 'hsl(var(--foreground))',
@@ -63,12 +66,16 @@ export default {
   				border: 'hsl(var(--sidebar-border))',
   				ring: 'hsl(var(--sidebar-ring))'
   			}
-  		}
+  		},
+  		animation: {
+  			'spin-slow': 'spin 2s linear infinite',
+  		},
   	}
   },
   plugins: [
     require('@tailwindcss/typography'),
-		require("tailwindcss-animate")
-	],
+    require("tailwindcss-animate"),
+    require('tailwind-scrollbar-hide'),
+  ],
 }
 
