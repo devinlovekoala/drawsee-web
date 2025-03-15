@@ -22,8 +22,6 @@ function KnowledgeDetailNode({ showSourceHandle, showTargetHandle, ...props }: E
   
   // 渲染计数器（用于调试）
   const renderCountRef = useRef<Record<number, number>>({});
-  
-  // 组件挂载标志
   const isMountedRef = useRef(true);
   useEffect(() => {
     console.log('KnowledgeDetailNode 组件已挂载');
