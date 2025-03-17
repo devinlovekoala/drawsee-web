@@ -22,7 +22,7 @@ function KnowledgeHeadNode({ showSourceHandle, showTargetHandle, ...props }: Ext
       toast.success("问题已发送");
       // 发送聊天请求
       setTimeout(() => {
-        chat(convId, response.taskId);
+        chat(response.taskId);
       }, 200);
     });
   }

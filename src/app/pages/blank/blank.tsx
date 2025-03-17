@@ -1,14 +1,13 @@
-import {useOutletContext} from "react-router-dom";
-import {AppContext} from "@/app/app.tsx";
-import {useCallback, useState} from "react";
+import {AppContext, AppContextType} from "@/app/app.tsx";
+import {useCallback, useContext, useState} from "react";
 import {createAiTask} from "@/api/methods/flow.methods.ts";
 import {AiTaskType, CreateAiTaskDTO} from "@/api/types/flow.types.ts";
 import {toast} from "sonner";
-import { MicrophoneIcon, ArrowRightIcon, ChevronDownIcon, ArrowTurnDownLeftIcon } from '@heroicons/react/24/outline';
+import { ArrowTurnDownLeftIcon } from '@heroicons/react/24/outline';
 import ModeSelector from '@/app/components/ui/mode-selector';
 
 function Blank() {
-  const {handleBlankQuery} = useOutletContext<AppContext>();
+  const {handleBlankQuery} = useContext<AppContextType>(AppContext);
 
   interface QueryForm {
     type: AiTaskType;

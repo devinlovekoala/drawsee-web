@@ -5,7 +5,7 @@ import {
     CreateAiTaskDTO,
     CreateAiTaskVO,
     NodeVO,
-    nodeToUpdate
+    NodeToUpdate
 } from "@/api/types/flow.types.ts";
 
 export const getConversations =
@@ -14,8 +14,8 @@ export const getConversations =
 export const getNodesByConvId =
     (convId: number) => alova.Get<Array<NodeVO>>('/flow/nodes', {params: {convId}});
 
-export const updateNodesPosition =
-  (nodes: Array<nodeToUpdate>) => alova.Post('/flow/nodes', { nodes });
+export const updateNodesPositionAndHeight =
+  (nodes: Array<NodeToUpdate>) => alova.Post('/flow/nodes', { nodes });
 
 export const getProcessingAiTasks =
   (convId: number) => alova.Get<AiTaskVO>('/flow/tasks', {params: {convId}});

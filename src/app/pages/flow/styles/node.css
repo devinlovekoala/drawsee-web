@@ -1,0 +1,149 @@
+/* 节点选中样式 */
+@keyframes pulseHighlight {
+  0% {
+    box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(79, 70, 229, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(79, 70, 229, 0);
+  }
+}
+
+.node-selected {
+  border: 2px solid #4F46E5 !important;
+  box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.2), 0 4px 12px rgba(0, 0, 0, 0.08) !important;
+  transform: translateY(-2px);
+  transition: all 0.2s ease-in-out;
+}
+
+.node-selected-pulse {
+  animation: pulseHighlight 2s infinite;
+}
+
+/* 根节点选中样式 */
+@keyframes pulseRootHighlight {
+  0% {
+    box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.6);
+  }
+  70% {
+    box-shadow: 0 0 0 15px rgba(79, 70, 229, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(79, 70, 229, 0);
+  }
+}
+
+.root-node-selected {
+  border: 4px solid #4F46E5 !important;
+  box-shadow: 0 0 0 6px rgba(79, 70, 229, 0.3), 0 8px 16px rgba(0, 0, 0, 0.1) !important;
+  transform: scale(1.05);
+  transition: all 0.3s ease-in-out;
+}
+
+.root-node-pulse {
+  animation: pulseRootHighlight 2s infinite;
+}
+
+/* 基础节点样式 */
+.base-node {
+  background-color: white;
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e5e7eb;
+  overflow: hidden;
+  transition: all 0.2s ease-in-out;
+}
+
+.base-node-header {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #e5e7eb;
+  transition: background-color 0.2s ease-in-out;
+}
+
+.base-node-header.selected {
+  background-color: #eef2ff;
+}
+
+.base-node-header.default {
+  background-color: #f9fafb;
+}
+
+.base-node-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  transition: color 0.2s ease-in-out;
+}
+
+.base-node-title.selected {
+  color: #3730a3;
+}
+
+.base-node-title.default {
+  color: #1f2937;
+}
+
+.base-node-content {
+  padding: 0.75rem 1rem;
+}
+
+.base-node-footer {
+  padding: 0.5rem 1rem;
+  border-top: 1px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.875rem;
+  color: #6b7280;
+  transition: background-color 0.2s ease-in-out;
+}
+
+.base-node-footer.selected {
+  background-color: #eef2ff;
+}
+
+.base-node-footer.default {
+  background-color: #f9fafb;
+}
+
+/* 根节点样式 */
+.root-node {
+  width: 6rem;
+  height: 6rem;
+  border-radius: 9999px;
+  background: linear-gradient(to right, #60a5fa, #3b82f6);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border: 4px solid white;
+  transition: all 0.3s ease-in-out;
+}
+
+.root-node-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  transition: all 0.3s ease-in-out;
+}
+
+.root-node-icon.selected {
+  color: white;
+  transform: scale(1.25);
+}
+
+.root-node-icon.default {
+  color: #4338ca;
+}
+
+/* 节点句柄样式 */
+.node-handle {
+  width: 0.75rem;
+  height: 0.75rem;
+  background-color: #3b82f6;
+  transition: background-color 0.2s ease-in-out;
+}
+
+.node-handle.selected {
+  background-color: #4f46e5;
+} 
