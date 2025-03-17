@@ -1,5 +1,3 @@
-import { NodeProps } from '@xyflow/react';
-import type { KnowledgeHeadNode as KnowledgeHeadNodeType } from './types/node.types';
 import { BaseNode, ExtendedNodeProps } from './base/BaseNode';
 import { FlowContext, FlowContextType } from '../../flow';
 import { useContext } from 'react';

@@ -1,14 +1,14 @@
-import {Background, BackgroundVariant, ReactFlow, type Node, Panel, OnNodesChange, applyNodeChanges, applyEdgeChanges, OnEdgesChange, useOnSelectionChange, SelectionMode} from "@xyflow/react";
+import {Background, BackgroundVariant, ReactFlow, type Node, Panel, OnNodesChange, applyNodeChanges, applyEdgeChanges, OnEdgesChange} from "@xyflow/react";
 import RootNode from "@/app/pages/flow/components/node/RootNode";
 import QueryNode from "@/app/pages/flow/components/node/QueryNode";
 import AnswerNode from "@/app/pages/flow/components/node/AnswerNode";
 import KnowledgeHeadNode from "@/app/pages/flow/components/node/KnowledgeHeadNode";
 import KnowledgeDetailNode from "@/app/pages/flow/components/node/KnowledgeDetailNode";
-import {useCallback, useState, useEffect, createContext, useRef} from "react";
+import {useCallback, useState, useEffect, createContext} from "react";
 import {useLocation} from "react-router-dom";
 import {useWatcher} from "alova/client";
 import {getNodesByConvId} from "@/api/methods/flow.methods.ts";
-import type { NodeVO as ApiNodeVO, NodeToUpdate } from '@/api/types/flow.types';
+import type { NodeVO as ApiNodeVO } from '@/api/types/flow.types';
 import type { NodeData } from './components/node/types/node.types';
 import { LoadingSpinner } from './components/loading/LoadingSpinner';
 import useFlowState from './hooks/useFlowState';
@@ -64,7 +64,7 @@ function Flow() {
 
   const {executeLayout, executeFitView} = useFlowTools();
 
-  const onSelectionChange = useCallback(({ nodes }: { nodes: Node[] }) => {
+  const onSelectionChange = useCallback(() => {
   }, []);
 
   const onNodesChange: OnNodesChange = useCallback((changes) => {
@@ -151,7 +151,7 @@ function Flow() {
         edges: newEdges,
       };
     });
-  },[setElements]);
+  },[executeFitView, executeLayout, nodesAndEdgesNoneTempQueryNode, selectedNode?.id, setElements]);
 
   const onEdgesChange: OnEdgesChange = useCallback((changes) => {
     setElements(({nodes, edges}) => {

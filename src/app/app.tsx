@@ -63,7 +63,7 @@ function App() {
     } else {
       getConvData();
     }
-  }, [navigate]);
+  }, [getConvData, navigate]);
 
   const handleLoginSuccess = useCallback((token?: string) => {
     setIsLogin(true);
@@ -73,7 +73,7 @@ function App() {
     sessionStorage.setItem(LOGIN_FLAG_KEY, JSON.stringify(true));
     navigate("/blank");
     getConvData();
-  }, [navigate, send]);
+  }, [getConvData, navigate]);
 
   const handleTitleUpdate = useCallback((convId: number, title: string) => {
     setConversations((prev) =>

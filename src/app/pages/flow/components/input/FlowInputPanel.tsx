@@ -3,7 +3,7 @@ import { toast } from "sonner";
 import { CubeTransparentIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
 import { BookOpenIcon } from 'lucide-react';
 import { createAiTask } from "@/api/methods/flow.methods.ts";
-import type { AiTaskType, CreateAiTaskDTO, NodeType } from '@/api/types/flow.types.ts';
+import type { AiTaskType, CreateAiTaskDTO } from '@/api/types/flow.types.ts';
 import { FlowContext, FlowContextType } from "../../flow";
 import { TempQueryNodeTask } from "../../hooks/useTempQueryNode";
 
@@ -154,7 +154,7 @@ export function FlowInputPanel({
     }).catch((error) => {
       toast.error(`请求失败, ${error.message}`);
     });
-  }, [chat, convId, prompt, selectedType, addTempQueryNodeTask, parentIdOfTempQueryNode, canInput, canNotInputReason]);
+  }, [canInput, prompt, parentIdOfTempQueryNode, selectedType, convId, canNotInputReason, setPrompt, chat]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {

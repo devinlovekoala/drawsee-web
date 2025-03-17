@@ -1,4 +1,4 @@
-import {useCallback, useState} from "react";
+import {useState} from "react";
 import {toast} from "sonner";
 import {login, signup} from "@/api/methods/auth.methods.ts";
 import {UserSignUpDTO} from "@/api/types/auth.types.ts";

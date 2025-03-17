@@ -86,7 +86,7 @@ function useFlowState(convId: number) {
             // 执行布局
             const layoutedNodes = isUserQueryNode ? currentNodes : executeLayout(currentNodes, currentEdges, false);
             // 调整视口以显示最新内容
-            executeFitView([newNode.id], 300);
+            executeFitView([newNode.id], 250);
             // 更新节点和边
             return {
               nodes: layoutedNodes,
@@ -179,7 +179,8 @@ function useFlowState(convId: number) {
           }, 400);
           // 执行fitView
           if (lastFocusNodeId.current) {
-            executeFitView([lastFocusNodeId.current], 350);
+            console.log('最终布局执行fitView', lastFocusNodeId.current);
+            executeFitView([lastFocusNodeId.current], 400);
           }
           break;
         }
@@ -195,7 +196,7 @@ function useFlowState(convId: number) {
     }
     // 释放锁
     isChatTaskProcessing.current = false;
-  }, [adjustViewportToShowLatestContent, handleTitleUpdate, executeLayout, executeFitView]);
+  }, [executeLayout, executeFitView, adjustViewportToShowLatestContent, handleTitleUpdate, convId]);
 
   /**
    * 添加消息到队列

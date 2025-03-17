@@ -5,7 +5,7 @@ import { Edge, Node, useReactFlow } from "@xyflow/react";
 // 默认的fitView配置
 const DEFAULT_FIT_VIEW_CONFIG = {
   duration: 400,
-  maxZoom: 0.7,
+  maxZoom: 0.8,
   padding: 0.2
 };
 
@@ -42,7 +42,7 @@ function useFlowTools() {
     // 获取当前视口
     const viewport = getViewport();
     // 计算节点在视口中的位置
-    const nodeX = node.position.x * viewport.zoom + viewport.x;
+    //const nodeX = node.position.x * viewport.zoom + viewport.x;
     const nodeY = node.position.y * viewport.zoom + viewport.y;
     // 获取视口尺寸
     const viewportHeight = window.innerHeight;
