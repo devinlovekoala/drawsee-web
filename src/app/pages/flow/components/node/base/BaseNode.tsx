@@ -4,6 +4,7 @@ import { format } from 'date-fns';
 import type { NodeData } from '../types/node.types';
 import { NODE_WIDTH, NODE_MIN_HEIGHT } from '../../../constants';
 import MarkdownWithLatex from '../../markdown/MarkdownWithLatex';
+import React, { useMemo } from 'react';
 
 // 定义节点选中样式的CSS
 const selectedNodeStyles = `
@@ -31,6 +32,13 @@ const selectedNodeStyles = `
 }
 `;
 
+// 用于类型检查的接口
+interface HasTitleText {
+  title?: string;
+  text?: string;
+  createdAt: number;
+}
+
 // 扩展 NodeProps 的接口
 export interface ExtendedNodeProps<T extends NodeType> extends Omit<NodeProps, 'data'> {
   data: NodeData<T>;
@@ -41,13 +49,41 @@ export interface ExtendedNodeProps<T extends NodeType> extends Omit<NodeProps, '
   showTargetHandle?: boolean;
 }
 
-interface HasTitleText {
-  title?: string;
-  text?: string;
-  createdAt: number;
+/**
+ * 自定义比较函数，用于React.memo
+ * 只有当关键属性发生变化时才重新渲染
+ */
+function arePropsEqual<T extends NodeType>(
+  prevProps: ExtendedNodeProps<T>,
+  nextProps: ExtendedNodeProps<T>
+): boolean {
+  // 检查选中状态变化
+  if (prevProps.selected !== nextProps.selected) return false;
+  
+  // 检查数据变化
+  const prevData = prevProps.data;
+  const nextData = nextProps.data;
+  
+  // 检查关键属性
+  if (prevData.title !== nextData.title) return false;
+  if (prevData.text !== nextData.text) return false;
+  if (prevData.updatedAt !== nextData.updatedAt) return false;
+  
+  // 检查自定义内容
+  if (prevProps.customContent !== nextProps.customContent) return false;
+  if (prevProps.headerContent !== nextProps.headerContent) return false;
+  if (prevProps.footerContent !== nextProps.footerContent) return false;
+  
+  // 检查句柄显示状态
+  if (prevProps.showSourceHandle !== nextProps.showSourceHandle) return false;
+  if (prevProps.showTargetHandle !== nextProps.showTargetHandle) return false;
+  
+  // 其他属性变化不重要，返回true表示不需要重新渲染
+  return true;
 }
 
-export function BaseNode<T extends NodeType>({
+// 使用React.memo包装BaseNode组件，避免不必要的重新渲染
+export const BaseNode = React.memo(function BaseNode<T extends NodeType>({
   data,
   headerContent,
   footerContent,
@@ -58,59 +94,69 @@ export function BaseNode<T extends NodeType>({
   ...props
 }: ExtendedNodeProps<T>) {
   const nodeData = data as unknown as HasTitleText;
-  const hasTitle = nodeData.title !== undefined;
-  const hasText = nodeData.text !== undefined;
+  
+  // 使用useMemo缓存计算结果
+  const { hasTitle, hasText, formattedDate } = useMemo(() => {
+    return {
+      hasTitle: nodeData.title !== undefined,
+      hasText: nodeData.text !== undefined,
+      formattedDate: format(new Date(nodeData.createdAt), 'yyyy-MM-dd HH:mm')
+    };
+  }, [nodeData.title, nodeData.text, nodeData.createdAt]);
+  
+  // 使用useMemo缓存样式计算
+  const nodeStyles = useMemo(() => ({
+    width: NODE_WIDTH,
+    minHeight: NODE_MIN_HEIGHT
+  }), []);
   
   return (
-    <>
-      <style>{selectedNodeStyles}</style>
-      <div 
-        className={`bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden transition-all duration-200 ${selected ? 'node-selected' : ''}`} 
-        style={{ width: NODE_WIDTH, minHeight: NODE_MIN_HEIGHT }}
-      >
-        {/* Header */}
-        <div className={`px-4 py-3 ${selected ? 'bg-indigo-50' : 'bg-gray-50'} border-b border-gray-200 transition-colors duration-200`}>
-          {hasTitle && <h3 className={`node-title text-lg font-semibold ${selected ? 'text-indigo-800' : 'text-gray-800'}`}>{nodeData.title}</h3>}
-          {headerContent}
-        </div>
+    <div 
+      className={`base-node ${selected ? 'node-selected' : ''}`} 
+      style={nodeStyles}
+    >
+      {/* Header */}
+      <div className={`base-node-header ${selected ? 'selected' : 'default'}`}>
+        {hasTitle && <h3 className={`base-node-title ${selected ? 'selected' : 'default'}`}>{nodeData.title}</h3>}
+        {headerContent}
+      </div>
 
-        {/* Content */}
-        <div className="px-4 py-3">
-          {customContent ? (
-            customContent
-          ) : (
-            hasText && (
-              <article className="node-content select-text prose prose-sm max-w-none">
-                <MarkdownWithLatex className="scrollbar-hide">{nodeData.text || ''}</MarkdownWithLatex>
-              </article>
-            )
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className={`node-footer px-4 py-2 ${selected ? 'bg-indigo-50' : 'bg-gray-50'} border-t border-gray-200 flex items-center justify-between text-sm text-gray-600 transition-colors duration-200`}>
-          <div>{footerContent}</div>
-          <div className="node-timestamp">
-            {format(new Date(nodeData.createdAt), 'yyyy-MM-dd HH:mm')}
-          </div>
-        </div>
-
-        {/* Handles */}
-        {showTargetHandle && (
-          <Handle
-            type="target"
-            position={Position.Top}
-            className={`w-3 h-3 ${selected ? 'bg-indigo-500' : 'bg-blue-500'} transition-colors duration-200`}
-          />
-        )}
-        {showSourceHandle && (
-          <Handle
-            type="source"
-            position={Position.Bottom}
-            className={`w-3 h-3 ${selected ? 'bg-indigo-500' : 'bg-blue-500'} transition-colors duration-200`}
-          />
+      {/* Content */}
+      <div className={`base-node-content nodrag nopan`}>
+        {customContent ? (
+          customContent
+        ) : (
+          hasText && (
+            <article className="node-content select-text prose prose-sm max-w-none px-3">
+              <MarkdownWithLatex className="scrollbar-hide" text={nodeData.text || ''}></MarkdownWithLatex>
+            </article>
+          )
         )}
       </div>
-    </>
+
+      {/* Footer */}
+      <div className={`base-node-footer ${selected ? 'selected' : 'default'}`}>
+        <div>{footerContent}</div>
+        <div className="node-timestamp">
+          {formattedDate}
+        </div>
+      </div>
+
+      {/* Handles */}
+      {showSourceHandle && (
+        <Handle
+          type="source"
+          position={Position.Bottom}
+          className={`node-handle ${selected ? 'selected' : ''}`}
+        />
+      )}
+      {showTargetHandle && (
+        <Handle
+          type="target"
+          position={Position.Top}
+          className={`node-handle ${selected ? 'selected' : ''}`}
+        />
+      )}
+    </div>
   );
-} 
+}, arePropsEqual); 

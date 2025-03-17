@@ -11,8 +11,8 @@ import MarkdownWithLatex from '../markdown/MarkdownWithLatex';
  * 支持显示 Bilibili 视频和自定义动画
  */
 function KnowledgeDetailNode({ showSourceHandle, showTargetHandle, ...props }: ExtendedNodeProps<'knowledge-detail'>) {
-  const hasBilibiliUrls = props.data.media?.bilibiliUrls?.length > 0;
-  const hasAnimations = props.data.media?.animationObjectNames?.length > 0;
+  const hasBilibiliUrls = props.data.media?.bilibiliUrls?.length ? true : false;
+  const hasAnimations = props.data.media?.animationObjectNames?.length ? true : false;
   const [videoUrls, setVideoUrls] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [videoErrors, setVideoErrors] = useState<Record<number, boolean>>({});
@@ -111,9 +111,9 @@ function KnowledgeDetailNode({ showSourceHandle, showTargetHandle, ...props }: E
       <div className="mt-4 space-y-4">
         {/* 动画视频 */}
         {hasAnimations && (
-          <div className="space-y-3">
+          <div className="space-y-3 mt-4">
             <div className="flex justify-between items-center">
-              <h4 className="text-sm font-medium text-gray-700">相关动画</h4>
+              <h4 className="text-3xl font-medium text-gray-700">相关动画</h4>
               <button 
                 onClick={toggleDisplayMode}
                 className="text-xs px-2 py-1 bg-purple-100 text-purple-700 rounded hover:bg-purple-200"
@@ -211,20 +211,14 @@ function KnowledgeDetailNode({ showSourceHandle, showTargetHandle, ...props }: E
         
         {/* Bilibili 视频 */}
         {hasBilibiliUrls && (
-          <div className="space-y-3">
-            <h4 className="text-sm font-medium text-gray-700">B站视频</h4>
+          <div className="space-y-3 mt-10">
+            <h4 className="text-3xl font-medium text-gray-700">B站视频</h4>
             <div className="space-y-3">
-              {props.data.media.bilibiliUrls.map((url, index) => {
-                const biliInfo = extractBilibiliInfo(url);
-                if (!biliInfo) return null;
-                
-                const iframeSrc = biliInfo.fullUrl || 
-                  `//player.bilibili.com/player.html?bvid=${biliInfo.bvid}&page=${biliInfo.page}&high_quality=1&danmaku=0&autoplay=0`;
-                
+              {props.data.media?.bilibiliUrls?.map((url, index) => {
                 return (
                   <div key={`bilibili-${index}`} className="rounded-lg overflow-hidden border border-pink-200 bg-pink-50">
                     <iframe
-                      src={iframeSrc}
+                      src={url+'&autoplay=0'}
                       width="100%"
                       height="200"
                       frameBorder="0"
@@ -249,8 +243,8 @@ function KnowledgeDetailNode({ showSourceHandle, showTargetHandle, ...props }: E
     <>
       {/* 文本内容 */}
       {props.data.text && (
-        <article className="node-content select-text prose prose-sm max-w-none">
-          <MarkdownWithLatex className="scrollbar-hide">{props.data.text || ''}</MarkdownWithLatex>
+        <article className="node-content select-text prose prose-sm max-w-none px-3">
+          <MarkdownWithLatex className="scrollbar-hide" text={props.data.text || ''}></MarkdownWithLatex>
         </article>
       )}
       
@@ -272,12 +266,12 @@ function KnowledgeDetailNode({ showSourceHandle, showTargetHandle, ...props }: E
           {hasBilibiliUrls && (
             <div className="inline-flex items-center px-2 py-1 text-xs font-medium text-pink-700 bg-pink-100 rounded">
               <FaVideo className="mr-1" />
-              {props.data.media.bilibiliUrls.length} 个视频
+              {props.data.media?.bilibiliUrls?.length} 个视频
             </div>
           )}
           {hasAnimations && (
             <div className="inline-flex items-center px-2 py-1 text-xs font-medium text-purple-700 bg-purple-100 rounded">
-              {props.data.media.animationObjectNames.length} 个动画
+              {props.data.media?.animationObjectNames?.length} 个动画
             </div>
           )}
         </div>

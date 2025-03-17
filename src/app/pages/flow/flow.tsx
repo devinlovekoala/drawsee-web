@@ -1,22 +1,25 @@
-import {Background, BackgroundVariant, ReactFlow, type Node, type Edge, NodeTypes, XYPosition, Panel, useReactFlow, OnNodesChange, applyNodeChanges, applyEdgeChanges, OnEdgesChange, useOnSelectionChange, SelectionMode} from "@xyflow/react";
+import {Background, BackgroundVariant, ReactFlow, type Node, Panel, OnNodesChange, applyNodeChanges, applyEdgeChanges, OnEdgesChange, useOnSelectionChange, SelectionMode} from "@xyflow/react";
 import RootNode from "@/app/pages/flow/components/node/RootNode";
 import QueryNode from "@/app/pages/flow/components/node/QueryNode";
 import AnswerNode from "@/app/pages/flow/components/node/AnswerNode";
 import KnowledgeHeadNode from "@/app/pages/flow/components/node/KnowledgeHeadNode";
 import KnowledgeDetailNode from "@/app/pages/flow/components/node/KnowledgeDetailNode";
-import {useCallback, useState, useEffect, useMemo, createContext} from "react";
+import {useCallback, useState, useEffect, createContext, useRef} from "react";
 import {useLocation} from "react-router-dom";
 import {useWatcher} from "alova/client";
 import {getNodesByConvId} from "@/api/methods/flow.methods.ts";
-import type { NodeVO as ApiNodeVO, NodeType } from '@/api/types/flow.types';
+import type { NodeVO as ApiNodeVO, NodeToUpdate } from '@/api/types/flow.types';
 import type { NodeData } from './components/node/types/node.types';
-import { layoutNodes } from './utils/layoutNodes';
-import { animateLayoutTransition } from './utils/nodePositionAnimator';
 import { LoadingSpinner } from './components/loading/LoadingSpinner';
 import useFlowState from './hooks/useFlowState';
 import { FlowInputPanel } from './components/input/FlowInputPanel';
-
 import '@xyflow/react/dist/style.css';
+import useTempQueryNode from "./hooks/useTempQueryNode";
+import useFlowTools from "./hooks/useFlowTools";
+import { toast } from "sonner";
+// 导入优化后的CSS样式
+import './styles/index.css';
+import { TEMP_QUERY_NODE_ID_PREFIX } from "./constants";
 
 const nodeTypes = {
   'root': RootNode,
@@ -31,11 +34,8 @@ export type FlowLocationState = {
   taskId?: number;
 };
 
-// 定义允许用户追问的节点类型
-const ALLOWED_PARENT_TYPES: NodeType[] = ['root', 'answer', 'knowledge-detail'];
-
 export type FlowContextType = {
-  chat: (convId: number, taskId: number) => void;
+  chat: (taskId: number) => void;
   convId: number;
 }
 export const FlowContext = createContext<FlowContextType>({
@@ -44,141 +44,141 @@ export const FlowContext = createContext<FlowContextType>({
 });
 
 function Flow() {
-  const {nodes, edges, chat, setNodes, setEdges} = useFlowState();
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  // 当前选中的节点
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
-  const [tempQueryNode, setTempQueryNode] = useState<Node | null>(null);
-  const location = useLocation();
-  const {convId, taskId: taskIdFromLocation} = location.state as FlowLocationState;
-  const {fitView} = useReactFlow();
+  // 用户输入
+  const [userInput, setUserInput] = useState<string>('');
+  // 获取location中的convId和taskId
+  const {convId, taskId: taskIdFromLocation} = useLocation().state as FlowLocationState;
+  // 使用FlowState Hook
+  const {elements, setElements, isChatting, rootNodeId, chat} = useFlowState(convId);
+  // 使用临时查询节点Hook
+  const {
+    canInput,
+    canNotInputReason,
+    parentIdOfTempQueryNode,
+    addTempQueryNodeTask,
+    nodesAndEdgesNoneTempQueryNode
+  } = useTempQueryNode(convId, isChatting, selectedNode, rootNodeId, elements, setElements);
 
-  // 监听节点选择变化
-  useOnSelectionChange({
-    onChange: ({ nodes }) => {
-      if (nodes.length === 1) {
-        setSelectedNode(nodes[0]);
-      } else {
+  const {executeLayout, executeFitView} = useFlowTools();
+
+  const onSelectionChange = useCallback(({ nodes }: { nodes: Node[] }) => {
+  }, []);
+
+  const onNodesChange: OnNodesChange = useCallback((changes) => {
+    console.log('onNodesChange', changes);
+    
+    setElements(({nodes, edges}) => {
+      let newNodes = nodes;
+      let newEdges = edges;
+
+      // 处理节点选择变化
+      let selectedNodeId: string | null = null;
+      let unselectedNodeId: string | null = null;
+      let fitViewNodeId: string | null = null;
+      changes.forEach((change) => {
+        if (change.type === 'select') {
+          if (change.selected) {
+            selectedNodeId = change.id;
+          } else {
+            unselectedNodeId = change.id;
+          }
+        }
+      });
+      if (selectedNodeId) {
+        // 如果选中节点发生变化，则更新选中节点
+        if (selectedNodeId !== selectedNode?.id) {
+          setSelectedNode(newNodes.find(node => node.id === selectedNodeId) || null);
+          // 如果存在临时提问节点则删除临时提问节点
+          const tempQueryNode = newNodes.find(node => node.id.startsWith(TEMP_QUERY_NODE_ID_PREFIX));
+          if (tempQueryNode) {
+            newNodes = nodesAndEdgesNoneTempQueryNode.current?.nodes || newNodes;
+            newEdges = nodesAndEdgesNoneTempQueryNode.current?.edges || newEdges;
+            fitViewNodeId = selectedNodeId;
+          }
+          setUserInput('');
+        }
+      } else if (unselectedNodeId) {
+        // 如果取消选中节点，则取消选中
         setSelectedNode(null);
+        // 如果存在临时提问节点则删除临时提问节点
+        const tempQueryNode = newNodes.find(node => node.id.startsWith(TEMP_QUERY_NODE_ID_PREFIX));
+        if (tempQueryNode) {
+          newNodes = nodesAndEdgesNoneTempQueryNode.current?.nodes || newNodes;
+          newEdges = nodesAndEdgesNoneTempQueryNode.current?.edges || newEdges;
+          fitViewNodeId = unselectedNodeId;
+        }
+        setUserInput('');
       }
-    },
-  });
 
-  // 获取根节点ID
-  const rootNodeId = useMemo(() => {
-    const rootNode = nodes.find(node => node.type === 'root');
-    return rootNode ? rootNode.id : null;
-  }, [nodes]);
+      newNodes = applyNodeChanges(changes, newNodes);
 
-  // 判断当前是否可以输入（根据选中节点类型）
-  const canInput = useMemo(() => {
-    if (!selectedNode) {
-      // 没有选中节点，但有根节点时可以输入
-      return rootNodeId !== null;
-    }
-    return ALLOWED_PARENT_TYPES.includes(selectedNode.type as NodeType);
-  }, [selectedNode, rootNodeId]);
-
-  // 获取当前父节点ID
-  const getParentNodeId = useCallback(() => {
-    if (selectedNode && ALLOWED_PARENT_TYPES.includes(selectedNode.type as NodeType)) {
-      return selectedNode.id;
-    }
-    return rootNodeId;
-  }, [selectedNode, rootNodeId]);
-
-  // 创建临时查询节点
-  const createTempQueryNode = useCallback((text: string) => {
-    if (!canInput) return;
-    
-    const parentId = getParentNodeId();
-    if (!parentId) return;
-
-    // 如果已经有临时节点，先删除
-    if (tempQueryNode) {
-      setNodes(nodes => nodes.filter(node => node.id !== tempQueryNode.id));
-    }
-
-    // 创建新的临时节点
-    const newTempNode: Node = {
-      id: `temp-query-${Date.now()}`,
-      type: 'query',
-      position: { x: 0, y: 0 },
-      data: {
-        title: '用户提问',
-        text,
-        parentId,
-        convId,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      },
-    };
-
-    // 创建新的边
-    const newTempEdge: Edge = {
-      id: `e${parentId}-${newTempNode.id}`,
-      source: parentId,
-      target: newTempNode.id,
-      type: 'smoothstep',
-    };
-
-    // 更新节点和边
-    const updatedNodes = [...nodes, newTempNode];
-    const updatedEdges = [...edges, newTempEdge];
-
-    // 使用布局函数计算新的节点位置
-    layoutNodes(updatedNodes, updatedEdges, false).then(layoutedNodes => {
-      // 使用动画过渡
-      animateLayoutTransition(updatedNodes, layoutedNodes, setNodes, 300).then(() => {
-        setTempQueryNode(newTempNode);
-        setEdges(updatedEdges);
-        
-        // 聚焦到新节点
-        setTimeout(() => {
-          fitView({
-            nodes: [{ id: newTempNode.id }],
-            duration: 500,
-            maxZoom: 0.7,
+      // 处理节点高度变化
+      let updateHeightNodeCount = 0;
+      changes.forEach((change) => {
+        if (change.type === 'dimensions') {
+          // 修改newNodes中id相同的节点
+          newNodes.forEach((node) => {
+            if (node.id === change.id) {
+              const curHeight = node.data.height as number | undefined;
+              const newHeight = change.dimensions?.height;
+              //console.log('curHeight', curHeight, 'newHeight', newHeight);
+              if (!node.id.startsWith(TEMP_QUERY_NODE_ID_PREFIX) && (
+                ( curHeight === undefined && newHeight !== undefined ) ||
+                ( curHeight !== undefined && newHeight !== undefined && 
+                  Math.abs(newHeight - curHeight) > 5 )
+              )) {
+                node.data.height = newHeight;
+                updateHeightNodeCount++;
+              }
+            }
           });
-        }, 50);
+        }
       });
+      if (updateHeightNodeCount > 0) {
+        console.log('实际渲染时height变化了', updateHeightNodeCount, '次，进行布局');
+        // 进行布局
+        executeLayout(newNodes, edges, true);
+      }
+      if (fitViewNodeId) {
+        console.log('执行fitView', fitViewNodeId);
+        executeFitView([fitViewNodeId], 350);
+      }
+      return {
+        nodes: newNodes,
+        edges: newEdges,
+      };
     });
-  }, [canInput, getParentNodeId, tempQueryNode, nodes, edges, setNodes, setEdges, convId, fitView]);
+  },[setElements]);
 
-  // 更新临时查询节点文本
-  const updateTempQueryNodeText = useCallback((text: string) => {
-    if (!tempQueryNode) return;
-
-    setNodes(nodes => 
-      nodes.map(node => 
-        node.id === tempQueryNode.id 
-          ? { ...node, data: { ...node.data, text } } 
-          : node
-      )
-    );
-  }, [tempQueryNode, setNodes]);
-
-  // 删除临时查询节点
-  const removeTempQueryNode = useCallback(() => {
-    if (!tempQueryNode) return;
-
-    // 先从节点和边列表中移除临时节点
-    const updatedNodes = nodes.filter(node => node.id !== tempQueryNode.id);
-    const updatedEdges = edges.filter(edge => edge.target !== tempQueryNode.id);
-    
-    // 先进行布局，再更新节点和边
-    layoutNodes(updatedNodes, updatedEdges, false).then(layoutedNodes => {
-      // 使用动画过渡
-      animateLayoutTransition(updatedNodes, layoutedNodes, setNodes, 300).then(() => {
-        setNodes(updatedNodes);
-        setEdges(updatedEdges);
-        setTempQueryNode(null);
-      });
+  const onEdgesChange: OnEdgesChange = useCallback((changes) => {
+    setElements(({nodes, edges}) => {
+      return {
+        nodes,
+        edges: applyEdgeChanges(changes, edges),
+      };
     });
-  }, [tempQueryNode, nodes, edges, setNodes, setEdges]);
+  }, [setElements]);
 
-  useWatcher(getNodesByConvId(convId), [convId], {immediate: true})
-    .onSuccess((event) => {
+  // 监听convId变化，立即重置状态
+  useEffect(() => {
+    setIsLoading(true);
+    setSelectedNode(null);
+    setUserInput('');
+  }, [convId]);
+
+  useWatcher(getNodesByConvId(convId), [convId], {immediate: true, force: true})
+    .onSuccess(async (event) => {
       const apiNodes = event.data as ApiNodeVO[];
+      // 如果没有节点数据，直接设置为空并结束加载
+      if (!apiNodes || apiNodes.length === 0) {
+        setElements({nodes: [], edges: []});
+        setIsLoading(false);
+        return;
+      }
+      // 将apiNodes转换为flowNodes
       const flowNodes = apiNodes.map((node) => {
         const data = {
           parentId: node.parentId,
@@ -186,6 +186,8 @@ function Flow() {
           userId: node.userId,
           createdAt: node.createdAt,
           updatedAt: node.updatedAt,
+          // 如果节点有height属性，将其添加到data中
+          ...(node.height !== null ? { height: node.height } : {}),
           ...(node.type !== 'root' ? node.data : {})
         } as NodeData<typeof node.type>;
   
@@ -194,91 +196,103 @@ function Flow() {
           type: node.type,
           position: node.position,
           data,
-          draggable: true,
+          draggable: false,
           connectable: false,
           selectable: true, // 确保节点可选择
         } as Node<NodeData<typeof node.type>>;
       });
-  
       // 创建边
       const flowEdges = flowNodes
-        .filter(node => node.data.parentId !== null)
-        .map(node => ({
-          id: `e${node.data.parentId!}-${node.id}`,
-          source: node.data.parentId!.toString(),
-          target: node.id,
-          type: 'smoothstep',
-        }));
-        
-      console.log('flowNodes', flowNodes);
-      console.log('flowEdges', flowEdges);
+      .filter(node => node.data.parentId !== null)
+      .map(node => ({
+        id: `e${node.data.parentId!}-${node.id}`,
+        source: node.data.parentId!.toString(),
+        target: node.id,
+        type: 'smoothstep',
+      }));
 
-      // 使用布局函数计算新的节点位置，并更新服务器
-      layoutNodes(flowNodes, flowEdges, true).then(layoutedNodes => {
-        // 使用动画过渡
-        animateLayoutTransition(flowNodes, layoutedNodes, setNodes, 500).then(() => {
-          setEdges(flowEdges);
-          setIsLoading(false);
-          
-          // fitview
-          setTimeout(() => {
-            // 找到id最小的前两个节点
-            const minIdNodes = flowNodes.sort((a, b) => parseInt(a.id) - parseInt(b.id)).slice(0, 2);
-            fitView({
-              nodes: minIdNodes.map(node => ({id: node.id})),
-              duration: 1000
-            });
-          }, 350);
-          
-          // 如果是新创建的conv，那么就chat
-          setTimeout(() => {
-            if (taskIdFromLocation) {
-              chat(convId, taskIdFromLocation);
-            }
-          }, 300);
-        });
-      }).catch((error) => {
-        console.error('Failed to layout nodes:', error);
-        setNodes(flowNodes);
-        setEdges(flowEdges);
-        setIsLoading(false);
-      });
+      // 执行布局 - 但不使用动画，提高性能
+      const layoutedNodes = executeLayout(flowNodes, flowEdges, true);
+      setElements({nodes: layoutedNodes, edges: flowEdges});
+      setIsLoading(false);
+      
+      executeFitView(layoutedNodes.sort((a, b) => parseInt(a.id) - parseInt(b.id)).slice(0, 1).map(node => node.id), 500);
+      // 如果是新创建的conv，那么就chat
+      if (taskIdFromLocation) {
+        setTimeout(() => {
+          chat(taskIdFromLocation);
+        }, 100);
+      }
+    })
+    .onError(() => {
+      // 出错时设置加载状态为false
+      setIsLoading(false);
+      toast.error('获取节点数据失败');
     });
-
-  const onNodesChange: OnNodesChange = useCallback(
-    (changes) => setNodes((nds) => applyNodeChanges(changes, nds)),
-    [setNodes],
-  );
-  const onEdgesChange: OnEdgesChange = useCallback(
-    (changes) => setEdges((eds) => applyEdgeChanges(changes, eds)),
-    [setEdges],
-  );
 
   if (isLoading) {
     return <LoadingSpinner />;
   }
 
   return (
-    <FlowContext.Provider value={{chat, convId} as FlowContextType}>
+    <FlowContext.Provider value={{
+      convId,
+      chat: (taskId: number) => {
+        // 将当前选中的节点的selected设置为false
+        setSelectedNode(null);
+        setElements(({nodes, edges}) => {
+          return {
+            nodes: nodes.map(node => ({
+              ...node,
+              selected: false
+            })),
+            edges
+          };
+        });
+        chat(taskId);
+      }
+    } as FlowContextType}>
       <ReactFlow 
-        nodes={nodes} 
-        edges={edges} 
-        nodeTypes={nodeTypes} 
-        onNodesChange={onNodesChange} 
+        nodes={elements.nodes} 
+        edges={elements.edges} 
+        onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
+        onSelectionChange={onSelectionChange}
+        nodeTypes={nodeTypes} 
         style={{backgroundColor: "#EEEBE8"}}
-        selectionOnDrag={true}
-        selectionMode={SelectionMode.Partial}
-        multiSelectionKeyCode="Control"
+        nodesDraggable={false}
+        draggable={false}
+        selectionKeyCode={null}
+        multiSelectionKeyCode={null}
+        deleteKeyCode={null}
+        //onlyRenderVisibleElements={true} 会很卡
+        maxZoom={2}
+        minZoom={0.01}
+        defaultViewport={{ x: 0, y: 0, zoom: 0.5 }}
+        defaultEdgeOptions={{
+          type: 'smoothstep',
+          animated: false,
+          selectable: false,
+          style: {
+            stroke: '#999', // 灰色
+            strokeWidth: 2,
+            strokeLinecap: 'round',
+            strokeLinejoin: 'round',
+            strokeDasharray: '10 10',
+            strokeDashoffset: 0,
+            strokeOpacity: 1,
+          }
+        }}
       >
         <Background variant={BackgroundVariant.Lines} size={10}/>
         <Panel position={"bottom-center"}>
           <FlowInputPanel
+            prompt={userInput}
+            setPrompt={setUserInput}
             canInput={canInput}
-            createTempQueryNode={createTempQueryNode}
-            updateTempQueryNodeText={updateTempQueryNodeText}
-            removeTempQueryNode={removeTempQueryNode}
-            getParentNodeId={getParentNodeId}
+            canNotInputReason={canNotInputReason}
+            addTempQueryNodeTask={addTempQueryNodeTask}
+            parentIdOfTempQueryNode={parentIdOfTempQueryNode}
           />
         </Panel>
       </ReactFlow>

@@ -51,6 +51,7 @@ export interface NodeVO {
   type: NodeType;
   data: NodeData[keyof NodeData];
   position: XYPosition;
+  height: number;
   parentId: number | null;
   convId: number;
   userId: number;
@@ -58,9 +59,10 @@ export interface NodeVO {
   updatedAt: number;
 }
 
-export interface nodeToUpdate {
+export interface NodeToUpdate {
   id: number;
   position: XYPosition;
+  height: number;
 }
 
 export interface XYPosition {

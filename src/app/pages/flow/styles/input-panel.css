@@ -1,0 +1,324 @@
+/* 输入面板动画样式 */
+@keyframes slideInFromTop {
+  from {
+    transform: translateY(-10px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideInFromBottom {
+  from {
+    transform: translateY(10px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes expandWidth {
+  from {
+    width: 60%;
+  }
+  to {
+    width: 100%;
+  }
+}
+
+@keyframes shrinkWidth {
+  from {
+    width: 100%;
+  }
+  to {
+    width: 60%;
+  }
+}
+
+.animate-slide-in-top {
+  animation: slideInFromTop 0.2s ease-in-out, fadeIn 0.2s ease-in-out;
+}
+
+.animate-slide-in-bottom {
+  animation: slideInFromBottom 0.2s ease-in-out, fadeIn 0.2s ease-in-out;
+}
+
+.animate-expand-width {
+  animation: expandWidth 0.3s ease-out forwards;
+}
+
+.animate-shrink-width {
+  animation: shrinkWidth 0.3s ease-out forwards;
+}
+
+/* 输入面板容器样式 */
+.input-panel-container {
+  position: fixed;
+  z-index: 50;
+  overflow: visible;
+  margin: 0;
+  width: 100%;
+  will-change: content;
+  transition-duration: 200ms;
+  bottom: env(safe-area-inset-bottom);
+  transform: translateY(-0%) translateX(-50%);
+  pointer-events: all;
+}
+
+@media (min-width: 640px) {
+  .input-panel-container {
+    width: 24rem;
+    position: absolute;
+    margin-left: 0;
+    margin-right: 0;
+    margin-bottom: 0.5rem;
+  }
+}
+
+/* 模式选择按钮样式 */
+.mode-selector-wrapper {
+  position: absolute;
+  top: -3rem;
+  left: 0;
+  display: flex;
+  width: 100%;
+  justify-content: center;
+  transition-property: transform;
+  transition-duration: 200ms;
+}
+
+.mode-selector-wrapper.open {
+  transform: translateY(-1rem);
+}
+
+.mode-selector-wrapper.closed {
+  transform: translateY(0);
+}
+
+.mode-selector-button {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.75rem;
+  background-color: #f5f5f5;
+  transition-property: background-color;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+  outline: none;
+  ring: 1px #e5e5e5;
+}
+
+.mode-selector-button:hover {
+  background-color: #e5e5e5;
+}
+
+.mode-selector-icon-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  color: #4b5563;
+}
+
+.mode-selector-text {
+  font-size: 0.75rem;
+  color: #4b5563;
+}
+
+.mode-selector-chevron {
+  width: 1rem;
+  height: 1rem;
+  color: #6b7280;
+  transition-property: transform;
+  transition-duration: 200ms;
+}
+
+.mode-selector-chevron.open {
+  transform: rotate(180deg);
+}
+
+/* 输入框样式 */
+.input-container {
+  border: 1px solid rgba(229, 231, 235, 0.4);
+  background-color: white;
+  color: #171717;
+  display: flex;
+  gap: 0.25rem;
+  align-items: center;
+  position: relative;
+  padding: 0.5rem 0.625rem;
+  transition-duration: 200ms;
+  border-radius: 0.75rem;
+  transform: none;
+  box-shadow: rgba(99, 102, 241, 0) 0px 0px 0px 1px;
+  opacity: 1;
+}
+
+.input-container.expanded {
+  width: 100%;
+}
+
+.input-container.collapsed {
+  width: 60%;
+}
+
+.input-textarea {
+  margin-left: 0.5rem;
+  color: #171717;
+  background-color: transparent;
+  width: 100%;
+  resize: none;
+  outline: none;
+  font-size: 0.875rem;
+}
+
+.input-textarea::placeholder {
+  color: #9ca3af;
+  font-size: 0.875rem;
+}
+
+.input-send-button {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 2rem;
+  aspect-ratio: 1;
+}
+
+.input-send-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.input-send-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  color: #9ca3af;
+  transition-property: color;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+.input-send-button:hover .input-send-icon {
+  color: #6366f1;
+}
+
+/* 模式选择下拉菜单样式 */
+.mode-dropdown {
+  position: absolute;
+  bottom: 100%;
+  margin-bottom: 0.5rem;
+  left: 0;
+  width: 100%;
+  z-index: 10;
+}
+
+.mode-dropdown-content {
+  background-color: white;
+  border-radius: 0.75rem;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  ring: 1px #e5e5e5;
+  overflow: hidden;
+}
+
+.mode-dropdown-header {
+  padding: 0.5rem;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.mode-dropdown-title {
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-align: center;
+  color: #1f2937;
+}
+
+.mode-dropdown-body {
+  padding: 0.5rem;
+}
+
+.mode-option {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition-property: background-color;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+.mode-option.selected {
+  background-color: #f5f5f5;
+}
+
+.mode-option:not(.selected):hover {
+  background-color: #f9fafb;
+}
+
+.mode-option-icon-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 9999px;
+  background-color: #e5e5e5;
+}
+
+.mode-option-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  color: #4b5563;
+}
+
+.mode-option-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.mode-option-name {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #1f2937;
+}
+
+.mode-option-description {
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+.mode-option-check {
+  margin-left: auto;
+}
+
+.mode-option-check-wrapper {
+  width: 1.25rem;
+  height: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background-color: #e0e7ff;
+}
+
+.mode-option-check-icon {
+  color: #4f46e5;
+} 

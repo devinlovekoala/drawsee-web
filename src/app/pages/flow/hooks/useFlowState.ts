@@ -1,207 +1,220 @@
 import { NodeVO } from "@/api/types/flow.types";
-import { Edge, Node, useReactFlow } from "@xyflow/react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Edge, Node } from "@xyflow/react";
+import { useCallback, useContext, useMemo, useRef, useState } from "react";
 import { NodeData } from "../components/node/types/node.types";
-import { layoutNodes } from "../utils/layoutNodes";
-import { animateLayoutTransition } from "../utils/nodePositionAnimator";
-import { ChatMessage, MediaData, TextData } from "../types/ChatMessage.types";
-import { AppContext } from "@/app/app";
-import { useOutletContext } from "react-router-dom";
+import { ChatTask, MediaData, TextData } from "../types/ChatTask.types";
+import { AppContext, AppContextType } from "@/app/app";
 import { toast } from "sonner";
 import { BASE_URL } from "@/api";
 import {SSE} from "sse.js";
 import { TOKEN_KEY } from "@/common/constant/storage-key.constant";
-import { NODE_WIDTH } from "../constants";
+import useFlowTools from "./useFlowTools";
+import { TEMP_QUERY_NODE_ID_PREFIX } from "../constants";
 
-function useFlowState() {
-	const [nodes, setNodes] = useState<Node[]>([]);
-	const [edges, setEdges] = useState<Edge[]>([]);
+/**
+ * 流程图状态管理Hook
+ * 负责管理节点、边、消息处理和临时节点操作
+ */
+function useFlowState(convId: number) {
 
-	// nodes和edges的副本，同步更新，可实时获取最新值
-  const nodesRef = useRef<Node[]>([]);
-  const edgesRef = useRef<Edge[]>([]);
-  // SSE处理消息缓冲队列
-  const processingQueue = useRef<ChatMessage[]>([]);
-  // 是否正在处理消息（锁）
-  const isProcessing = useRef(false);
-  // 当前正在更新文本的节点ID
-  const currentTextNodeId = useRef<string | null>(null);
+  // 工具函数
+  const {executeFitView, adjustViewportToShowLatestContent, executeLayout} = useFlowTools();
+  const {handleTitleUpdate} = useContext<AppContextType>(AppContext);
 
-	const {fitView, getNodes, setViewport, getViewport} = useReactFlow();
-	const {handleTitleUpdate} = useOutletContext<AppContext>();
+  // 节点和边的状态
+  const [elements, setElements] = useState<{nodes: Node[], edges: Edge[]}>(
+    { nodes: [], edges: [] }
+  );
 
-  useEffect(() => {
-    nodesRef.current = nodes;
-  }, [nodes]);
+  // 获取根节点ID
+  const rootNodeId = useMemo(() => {
+    const rootNode = elements.nodes.find(node => node.type === 'root');
+    return rootNode ? rootNode.id : null;
+  }, [elements.nodes]);
 
-  useEffect(() => {
-    edgesRef.current = edges;
-  }, [edges]);
+  // 是否正在处理SSE消息
+  const [isChatting, setIsChatting] = useState<boolean>(false);
+  // 消息处理状态
+  const chatTaskQueue = useRef<ChatTask[]>([]);
+  const isChatTaskProcessing = useRef(false);
+  // 最后需要聚焦的节点id
+  const lastFocusNodeId = useRef<string | null>(null);
 
-	// 处理消息缓冲队列
-  const processQueue = async (convId: number) => {
-    if (isProcessing.current) return;
-    isProcessing.current = true;
-
-    while (processingQueue.current.length > 0) {
-      const message = processingQueue.current.shift();
-      if (!message) continue;
-      switch (message.type) {
+  /**
+   * 处理聊天消息
+   */
+  const processChatTask = useCallback(() => {
+    if (isChatTaskProcessing.current) return;
+    // 加锁
+    isChatTaskProcessing.current = true;
+    while (chatTaskQueue.current.length > 0) {
+      const task = chatTaskQueue.current.shift();
+      if (!task) continue;
+      switch (task.type) {
         // 新增节点
         case 'node': {
-          // 将NodeVO转变为reactflow的Node，先进行布局，再插入新节点和新边
-          const nodeVO = message.data as NodeVO;
-          const newNode = {
-            id: nodeVO.id.toString(),
-            type: nodeVO.type,
-            position: nodeVO.position,
-            data: {
-              ...nodeVO.data,
-              parentId: nodeVO.parentId,
-              convId: nodeVO.convId,
-              userId: nodeVO.userId,
-              createdAt: nodeVO.createdAt,
-              updatedAt: nodeVO.updatedAt,
-            },
-          } as Node<NodeData<typeof nodeVO.type>>;
-          const newEdge = {
-            id: `e${nodeVO.parentId!}-${nodeVO.id}`,
-            source: nodeVO.parentId!.toString(),
-            target: nodeVO.id.toString(),
-            type: 'smoothstep',
-          } as Edge;
-          
-          console.log('新增节点：', newNode);
-          console.log('新增边：', newEdge);
-          const currentNodes = [...nodesRef.current, newNode];
-          const currentEdges = [...edgesRef.current, newEdge];
-          
-          // 进行布局
-          const layoutedNodes = await layoutNodes(currentNodes, currentEdges, false);
-          
-          // 使用动画过渡
-          const animatedNodes = await animateLayoutTransition(
-            currentNodes, 
-            layoutedNodes, 
-            setNodes,
-            500
-          );
-          
-          // 更新edges
-          setEdges(currentEdges);
-          edgesRef.current = currentEdges;
-          
-          // 移动视角
-          fitView({
-            nodes: [{id: newNode.id}],
-            duration: 1000
+          const nodeVO = task.data as NodeVO;
+          if (nodeVO.type === 'answer' || nodeVO.type === 'knowledge-detail') {
+            lastFocusNodeId.current = nodeVO.id.toString();
+          }
+          setElements(({nodes, edges}) => {
+            const tempQueryNode = nodes.find(node => node.id.startsWith(TEMP_QUERY_NODE_ID_PREFIX));
+            const isUserQueryNode = nodeVO.type === 'query' && tempQueryNode;
+            const newNode = {
+              id: nodeVO.id.toString(),
+              type: nodeVO.type,
+              position: isUserQueryNode ? tempQueryNode.position : nodeVO.position,
+              data: {
+                ...nodeVO.data,
+                parentId: nodeVO.parentId,
+                convId: nodeVO.convId,
+                userId: nodeVO.userId,
+                createdAt: nodeVO.createdAt,
+                updatedAt: nodeVO.updatedAt,
+                ...(nodeVO.height !== null ? { height: nodeVO.height } : {}),
+              },
+            } as Node<NodeData<typeof nodeVO.type>>;
+            const newEdge = {
+              id: `e${nodeVO.parentId!}-${nodeVO.id}`,
+              source: nodeVO.parentId!.toString(),
+              target: nodeVO.id.toString(),
+              type: 'smoothstep',
+            } as Edge;
+            // 添加新节点和边，去除临时查询节点
+            const currentNodes = [...nodes.filter(node => !node.id.startsWith(TEMP_QUERY_NODE_ID_PREFIX)), newNode];
+            const currentEdges = [...edges.filter(edge => !edge.target.startsWith(TEMP_QUERY_NODE_ID_PREFIX)), newEdge];
+            // 执行布局
+            const layoutedNodes = isUserQueryNode ? currentNodes : executeLayout(currentNodes, currentEdges, false);
+            // 调整视口以显示最新内容
+            executeFitView([newNode.id], 300);
+            // 更新节点和边
+            return {
+              nodes: layoutedNodes,
+              edges: currentEdges,
+            };
           });
-          
-          // 记录当前正在更新文本的节点ID
-          currentTextNodeId.current = newNode.id;
           break;
         }
         // 新增文本
         case 'text': {
-          const textData = message.data as TextData;
-          // 将特定id的节点文本更新
-          const currentNodes = nodesRef.current.map(node =>
-            node.id === textData.nodeId.toString() ? 
-            {...node, data: {...node.data, text: node.data.text + textData.content}} : node
-          );
-          setNodes(currentNodes);
-          nodesRef.current = currentNodes;
-          
-          // 更新当前正在更新文本的节点ID
-          currentTextNodeId.current = textData.nodeId.toString();
-          
-          // 如果节点文本更新，调整视角以显示最新内容
-          if (currentTextNodeId.current) {
-            adjustViewportToShowLatestText(currentTextNodeId.current);
-          }
+          const textData = task.data as TextData;
+          const nodeId = textData.nodeId.toString();
+          setElements(({nodes, edges}) => {
+            const targetNode = nodes.find(node => node.id === nodeId);
+            if (!targetNode) return {nodes, edges};
+            // 更新节点数据
+            const updatedNodes = nodes.map(node =>
+              node.id === nodeId ? 
+              {
+                ...node, 
+                data: {
+                  ...node.data, 
+                  text: node.data.text + textData.content
+                }
+              } : node
+            );
+            // 调整视口以显示最新内容
+            setTimeout(() => {
+              adjustViewportToShowLatestContent(targetNode);
+            }, 200);
+            return {
+              nodes: updatedNodes,
+              edges,
+            };
+          });
           break;
         }
         // 新增媒体
         case 'media': {
-          const mediaData = message.data as MediaData;
-          // 将特定id的节点媒体更新
-          const currentNodes = nodesRef.current.map(node => 
-            node.id === mediaData.nodeId.toString() ? 
-            {...node, data: {...node.data, media: {
-              animationObjectNames: mediaData.animationObjectNames,
-              bilibiliUrls: mediaData.bilibiliUrls,
-            }}} : node
-          );
-          setNodes(currentNodes);
-          nodesRef.current = currentNodes;
+          const mediaData = task.data as MediaData;
+          const nodeId = mediaData.nodeId.toString();
+          setElements(({nodes, edges}) => {
+            const targetNode = nodes.find(node => node.id === nodeId);
+            if (!targetNode) return {nodes, edges};
+            // 更新节点数据
+            const updatedNodes = nodes.map(node =>
+              node.id === nodeId ? 
+              {
+                ...node, 
+                data: {
+                  ...node.data, 
+                  media: {
+                    animationObjectNames: mediaData.animationObjectNames,
+                    bilibiliUrls: mediaData.bilibiliUrls,
+                  }
+                }
+              } : node
+            );
+            // 调整视口以显示最新内容
+            setTimeout(() => {
+              adjustViewportToShowLatestContent(targetNode);
+            }, 200);
+            return {
+              nodes: updatedNodes,
+              edges,
+            };
+          });
           break;
         }
         // 新增标题
-        case 'title':
-          const title = message.data as string;
+        case 'title': {
+          const title = task.data as string;
+          // 直接更新标题，不需要通过任务队列
           handleTitleUpdate(convId, title);
           break;
+        }
         // 完成
         case 'done': {
-          // 进行重新布局，并更新服务器
-          console.log('完成对话，进行重新布局: ', nodesRef.current, edgesRef.current);
-          const layoutedNodes = await layoutNodes(nodesRef.current, edgesRef.current, true);
-          console.log('重新布局完成: ', layoutedNodes);
-          
-          // 使用动画过渡
-          const animatedNodes = await animateLayoutTransition(
-            nodesRef.current, 
-            layoutedNodes, 
-            setNodes,
-            800
-          );
-          
-          // 重置当前正在更新文本的节点ID
-          currentTextNodeId.current = null;
+          // 延时执行布局
+          setTimeout(() => {
+            setElements(({nodes, edges}) => {
+              const layoutedNodes = executeLayout(nodes, edges, true);
+              return {
+                nodes: layoutedNodes,
+                edges,
+              };
+            });
+            // 设置聊天状态为false
+            setIsChatting(false);
+          }, 400);
+          // 执行fitView
+          if (lastFocusNodeId.current) {
+            executeFitView([lastFocusNodeId.current], 350);
+          }
           break;
         }
         // 错误
         case 'error': {
-          const errorMessage = message.data as string;
+          const errorMessage = task.data as string;
           toast.error(`对话出错：${errorMessage}`);
+          // 设置聊天状态为false
+          setIsChatting(false);
           break;
         }
       }
     }
+    // 释放锁
+    isChatTaskProcessing.current = false;
+  }, [adjustViewportToShowLatestContent, handleTitleUpdate, executeLayout, executeFitView]);
 
-    isProcessing.current = false;
-  }
+  /**
+   * 添加消息到队列
+   */
+  const addChatTask = useCallback((task: ChatTask) => {
+    chatTaskQueue.current.push(task);
+    // 如果没有正在处理的消息，启动处理
+    processChatTask();
+  }, [processChatTask]);
 
-  // 调整视角以显示最新文本
-  const adjustViewportToShowLatestText = useCallback((nodeId: string) => {
-    const node = nodesRef.current.find(n => n.id === nodeId);
-    if (!node) return;
+  /**
+   * 启动聊天
+   */
+  const chat = useCallback((taskId: number) => {
+    // 设置处理SSE状态为true
+    setIsChatting(true);
+    // 设置最后需要聚焦的节点id
+    lastFocusNodeId.current = null;
     
-    // 获取当前视口
-    const viewport = getViewport();
-    
-		console.log('当前viewport: ', viewport);
-
-    // 计算节点在视口中的位置
-    const nodeX = node.position.x * viewport.zoom + viewport.x;
-    const nodeY = node.position.y * viewport.zoom + viewport.y;
-    
-    // 获取视口尺寸
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
-    
-    // 计算节点底部位置
-    const nodeHeight = node.measured?.height ?? 200; // 估计节点高度
-    const nodeBottom = nodeY + nodeHeight * viewport.zoom;
-    
-    // 如果节点底部超出视口，调整视口位置
-    if (nodeBottom > viewportHeight - 100) {
-      const newY = viewport.y - (nodeBottom - viewportHeight + 150);
-      setViewport({ x: viewport.x, y: newY, zoom: viewport.zoom }, { duration: 300 });
-    }
-  }, [getViewport, setViewport]);
-
-  const chat = useCallback((convId: number, taskId: number) => {
     // SSE请求
     const source = new SSE(
       `${BASE_URL}/flow/completion?taskId=${taskId}`,
@@ -213,36 +226,40 @@ function useFlowState() {
           }
       }
     );
+    
     // 流式获取响应
     source.addEventListener("message", async (event: MessageEvent<string>) => {
-      const message = JSON.parse(event.data) as ChatMessage;
-      // 将新消息入队
-      processingQueue.current.push(message);
-      // 触发处理流程
-      processQueue(convId);
+      const task = JSON.parse(event.data) as ChatTask;
+      // 添加消息到队列
+      addChatTask(task);
     });
+    
     // 处理错误情况
     source.addEventListener("error", (event: MessageEvent<string>) => {
       if (event.data === "waiting") {
         // 1秒后重试
         setTimeout(() => {
-          chat(convId, taskId);
+          chat(taskId);
         }, 1000);
       } else {
         // 错误处理
         toast.error(`请求出错了：${event.data}`);
+        // 设置聊天状态为false
+        setIsChatting(false);
       }
     });
-  }, []);
+  }, [addChatTask]);
 
-	return {
-		nodes,
-		setNodes,
-		edges,
-		setEdges,
-		chat,
-	};
+  return {
+    // 状态
+    elements,
+    isChatting,
+    rootNodeId,
 
+    // 方法
+    chat,
+    setElements,
+  };
 }
 
 export default useFlowState;

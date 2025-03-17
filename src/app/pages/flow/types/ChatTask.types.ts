@@ -1,6 +1,6 @@
 import { NodeVO } from "@/api/types/flow.types";
 
-export type ChatMessageType = 'node' | 'text' | 'title' | 'media' | 'done' | 'error';
+export type ChatTaskType = 'node' | 'text' | 'title' | 'media' | 'done' | 'error';
 
 export type TextData = {
 	nodeId: number;
@@ -20,9 +20,9 @@ export type MediaData = {
 // 当type=done时，data为""
 // 当type=error时，data为string
 
-export type ChatMessageData = NodeVO | TextData | string | MediaData;
+export type ChatTaskData = NodeVO | TextData | string | MediaData;
 
-export type ChatMessage = {
-	type: ChatMessageType;
-	data: ChatMessageData;
+export type ChatTask = {
+	type: ChatTaskType;
+	data: ChatTaskData;
 }

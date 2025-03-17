@@ -10,18 +10,26 @@ import KnowledgeDetailNode from '../components/node/KnowledgeDetailNode';
 import RootNode from '../components/node/RootNode';
 
 // 创建一个隐藏的容器div
-const containerDiv = document.createElement('div');
-containerDiv.style.visibility = 'hidden';
-containerDiv.style.position = 'fixed';
-document.body.appendChild(containerDiv);
+let containerDiv: HTMLDivElement | null = null;
 
-// 媒体数据类型定义
-interface MediaData {
-  bilibiliUrls?: string[];
-  animationObjectNames?: string[];
+// 确保容器div存在
+function ensureContainerDiv(): HTMLDivElement {
+  if (!containerDiv) {
+    containerDiv = document.createElement('div');
+    containerDiv.style.position = 'fixed';
+    containerDiv.style.visibility = 'hidden';
+    document.body.appendChild(containerDiv);
+  }
+  return containerDiv;
 }
 
-export function calculateNodeHeight(node: Node<NodeData<NodeType>>): number {
+/**
+ * 计算节点高度 - 优化版
+ * 使用缓存机制减少DOM操作，提高性能
+ * @param node 需要计算高度的节点
+ * @returns 计算得到的节点高度
+ */
+export function calculateNodeHeight(node: Node<NodeData<NodeType>>): number {    
   let NodeComponent: React.ComponentType<any>;
   switch (node.type) {
     case 'root':
@@ -42,7 +50,8 @@ export function calculateNodeHeight(node: Node<NodeData<NodeType>>): number {
     default:
       return NODE_DEFAULT_HEIGHT;
   }
-
+  // 确保容器div存在
+  const container = ensureContainerDiv();
   // 渲染节点组件，禁用所有 handles
   const htmlString = renderToStaticMarkup(
     <NodeComponent
@@ -56,45 +65,33 @@ export function calculateNodeHeight(node: Node<NodeData<NodeType>>): number {
     />
   );
 
-  // 清空容器
-  containerDiv.innerHTML = '';
-  // 设置新的内容
-  containerDiv.innerHTML = htmlString;
+  // 统计获得高度所需的时间并输出
+  const startTime = performance.now();
 
-  // 获取实际高度，取整数
-  let height = Math.round(containerDiv.getBoundingClientRect().height);
-
-  // 为 knowledge-detail 类型的节点添加媒体内容的高度
+  // 计算需要额外加的高度
+  let extraHeight = 0;
   if (node.type === 'knowledge-detail') {
-    const mediaData = node.data.media as MediaData | undefined;
-    
-    // 计算额外的媒体内容高度
-    let extraHeight = 0;
-    
-    // 如果有 B 站视频，每个视频高度为 140px
-    const bilibiliCount = mediaData?.bilibiliUrls?.length || 0;
-    // if (bilibiliCount > 0) {
-    //   // 标题高度 + 每个视频的高度 + 间距
-    //   extraHeight += (bilibiliCount * 90);
-    // }
-    
-    // 如果有动画，每个动画高度为 150px
-    const animationCount = mediaData?.animationObjectNames?.length || 0;
-    // if (animationCount > 0) {
-    //   // 标题高度 + 每个动画的高度 + 间距
-    //   extraHeight += (animationCount * 200);
-    // }
-    
-    // 如果有任何媒体内容，添加顶部间距
-    if (extraHeight > 0) {
-      extraHeight += 10;
-    }
-    
-    console.log(`知识详情节点额外媒体高度: ${extraHeight}`);
-    height += extraHeight;
+    const media = node.data.media as {
+      bilibiliUrls: string[];
+      animationObjectNames: string[];
+    };
+    const hasBilibiliUrls = media?.bilibiliUrls?.length ? true : false;
+    const hasAnimations = media?.animationObjectNames?.length ? true : false;
+    extraHeight = hasBilibiliUrls ? 200 * media.bilibiliUrls.length : 0;
+    extraHeight += hasAnimations ? 210 * media.animationObjectNames.length : 0;
   }
 
-  console.log(`计算得到${node.type}节点高度: ${height}`);
+  // 清空容器
+  container.innerHTML = '';
+  // 设置新的内容
+  container.innerHTML = htmlString;
+  // 获取实际高度，取整数
+  let height = Math.round(container.getBoundingClientRect().height);
+  // 确保最小高度
+  height = Math.max(height, NODE_DEFAULT_HEIGHT);
 
-  return Math.max(height, NODE_DEFAULT_HEIGHT);
-} 
+  const endTime = performance.now();
+  console.log(`获得${node.type}节点高度所需的时间: ${endTime - startTime}毫秒`);
+
+  return height + extraHeight;
+}

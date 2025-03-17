@@ -1,0 +1,18 @@
+/* 自定义滚动条样式 */
+textarea::-webkit-scrollbar {
+    width: 8px; /* 滚动条的宽度 */
+}
+
+textarea::-webkit-scrollbar-track {
+    background: #f1f1f1; /* 滚动条轨道的背景色 */
+    border-radius: 10px; /* 轨道的圆角 */
+}
+
+textarea::-webkit-scrollbar-thumb {
+    background: #888; /* 滚动条的颜色 */
+    border-radius: 10px; /* 滚动条的圆角 */
+}
+
+textarea::-webkit-scrollbar-thumb:hover {
+    background: #555; /* 鼠标悬停时的颜色 */
+}
