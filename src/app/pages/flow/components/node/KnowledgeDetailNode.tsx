@@ -167,7 +167,7 @@ function KnowledgeDetailNode({ showSourceHandle, showTargetHandle, ...props }: E
                             allowFullScreen
                             title={`视频 ${index + 1}`}
                             className="w-full"
-                            sandbox="allow-same-origin allow-scripts"
+                            sandbox="allow-same-origin allow-scripts allow-popups"
                             loading="lazy"
                           />
                         )
@@ -231,7 +231,7 @@ function KnowledgeDetailNode({ showSourceHandle, showTargetHandle, ...props }: E
                       allowFullScreen
                       title={`Bilibili Video ${index + 1}`}
                       className="w-full"
-                      sandbox="allow-top-navigation allow-same-origin allow-forms allow-scripts"
+                      sandbox="allow-top-navigation allow-same-origin allow-forms allow-scripts allow-popups"
                       loading="lazy"
                     />
                   </div>
