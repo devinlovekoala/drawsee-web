@@ -1,6 +1,4 @@
-import { NodeProps } from '@xyflow/react';
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import type { KnowledgeDetailNode as KnowledgeDetailNodeType } from './types/node.types';
 import { BaseNode, ExtendedNodeProps } from './base/BaseNode';
 import { FaVideo } from 'react-icons/fa';
 import { getResourceUrl } from '@/api/methods/flow.methods';
@@ -16,7 +14,6 @@ function KnowledgeDetailNode({ showSourceHandle, showTargetHandle, ...props }: E
   const [videoUrls, setVideoUrls] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [videoErrors, setVideoErrors] = useState<Record<number, boolean>>({});
-  const [playerReady, setPlayerReady] = useState<Record<number, boolean>>({});
   const [displayMode, setDisplayMode] = useState<'native' | 'iframe'>('iframe');
   
   // 渲染计数器（用于调试）
@@ -39,7 +36,6 @@ function KnowledgeDetailNode({ showSourceHandle, showTargetHandle, ...props }: E
       
       setIsLoading(true);
       setVideoErrors({});
-      setPlayerReady({});
       
       try {
         const urls = await Promise.all(
@@ -66,13 +62,13 @@ function KnowledgeDetailNode({ showSourceHandle, showTargetHandle, ...props }: E
   }, [hasAnimations, props.data.media?.animationObjectNames]);
 
   // 处理视频错误 - 使用useCallback避免重渲染
-  const handleVideoError = useCallback((index: number, error: any) => {
-    console.error(`视频 ${index + 1} 加载失败:`, error);
+  const handleVideoError = useCallback((index: number, event: React.SyntheticEvent<HTMLVideoElement, Event>) => {
+    console.error(`视频 ${index + 1} 加载失败:`, event);
     console.error(`错误详情:`, {
       url: videoUrls[index],
-      errorType: error?.type,
-      errorMessage: error?.message,
-      errorTarget: error?.target?.src
+      errorType: event.type,
+      errorMessage: event.eventPhase,
+      errorTarget: event.target
     });
     if (!videoErrors[index]) {
       setVideoErrors(prev => ({ ...prev, [index]: true }));
@@ -83,24 +79,6 @@ function KnowledgeDetailNode({ showSourceHandle, showTargetHandle, ...props }: E
   const toggleDisplayMode = useCallback(() => {
     setDisplayMode(prev => prev === 'native' ? 'iframe' : 'native');
     setVideoErrors({});
-    setPlayerReady({});
-  }, []);
-
-  // 从B站URL中提取BV号
-  const extractBilibiliInfo = useCallback((url: string) => {
-    // 尝试匹配BV号
-    const bvMatch = url.match(/BV\w+/);
-    if (bvMatch) {
-      return {
-        bvid: bvMatch[0],
-        page: url.match(/p=(\d+)/) ? url.match(/p=(\d+)/)?.[1] || '1' : '1'
-      };
-    }
-    // 如果是完整的iframe URL，直接返回
-    if (url.includes('player.bilibili.com')) {
-      return { fullUrl: url };
-    }
-    return null;
   }, []);
  
   // 媒体内容组件 - 使用useMemo避免重渲染
@@ -236,7 +214,7 @@ function KnowledgeDetailNode({ showSourceHandle, showTargetHandle, ...props }: E
         )}
       </div>
     );
-  }, [displayMode, hasAnimations, hasBilibiliUrls, isLoading, videoUrls, videoErrors, playerReady, props.data.media?.bilibiliUrls, handleVideoError, toggleDisplayMode, extractBilibiliInfo]);
+  }, [displayMode, hasAnimations, hasBilibiliUrls, isLoading, videoUrls, videoErrors, props.data.media?.bilibiliUrls, handleVideoError, toggleDisplayMode]);
   
   // 自定义内容，包括文本和媒体
   const customContent = (

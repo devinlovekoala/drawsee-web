@@ -13,7 +13,7 @@ interface ModeSelectorProps {
     disabled?: boolean;
 }
 
-const ModeSelector: React.FC<ModeSelectorProps> = ({ options, value, onChange, disabled = false }) => {
+const ModeSelector: React.FC<ModeSelectorProps> = ({ options, onChange, disabled = false }) => {
     // const [isOpen, setIsOpen] = useState(false);
     // const [openUpwards, setOpenUpwards] = useState(false);
     // const buttonRef = useRef<HTMLButtonElement>(null);

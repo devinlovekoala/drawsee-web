@@ -1,5 +1,3 @@
-import { NodeProps } from '@xyflow/react';
-import type { QueryNode as QueryNodeType } from './types/node.types';
 import { BaseNode, ExtendedNodeProps } from './base/BaseNode';
 import React, { useMemo } from 'react';
 

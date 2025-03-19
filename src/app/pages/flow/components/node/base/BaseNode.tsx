@@ -6,32 +6,6 @@ import { NODE_WIDTH, NODE_MIN_HEIGHT } from '../../../constants';
 import MarkdownWithLatex from '../../markdown/MarkdownWithLatex';
 import React, { useMemo } from 'react';
 
-// 定义节点选中样式的CSS
-const selectedNodeStyles = `
-@keyframes pulseHighlight {
-  0% {
-    box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.4);
-  }
-  70% {
-    box-shadow: 0 0 0 10px rgba(79, 70, 229, 0);
-  }
-  100% {
-    box-shadow: 0 0 0 0 rgba(79, 70, 229, 0);
-  }
-}
-
-.node-selected {
-  border: 2px solid #4F46E5 !important;
-  box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.2), 0 4px 12px rgba(0, 0, 0, 0.08) !important;
-  transform: translateY(-2px);
-  transition: all 0.2s ease-in-out;
-}
-
-.node-selected-pulse {
-  animation: pulseHighlight 2s infinite;
-}
-`;
-
 // 用于类型检查的接口
 interface HasTitleText {
   title?: string;
@@ -91,7 +65,6 @@ export const BaseNode = React.memo(function BaseNode<T extends NodeType>({
   showSourceHandle = true,
   showTargetHandle = true,
   selected,
-  ...props
 }: ExtendedNodeProps<T>) {
   const nodeData = data as unknown as HasTitleText;
   

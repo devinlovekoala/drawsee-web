@@ -3,12 +3,7 @@ import { createPortal } from 'react-dom';
 import { AiTaskType } from '@/api/types/flow.types';
 import {
   CubeTransparentIcon,
-  GlobeAltIcon,
-  PhotoIcon,
-  SparklesIcon,
   ChevronDownIcon,
-  ScaleIcon,
-  PuzzlePieceIcon
 } from '@heroicons/react/24/outline';
 import { BookOpenIcon } from 'lucide-react';
 

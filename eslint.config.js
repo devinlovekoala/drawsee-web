@@ -23,6 +23,10 @@ export default tseslint.config(
         'warn',
         { allowConstantExport: true },
       ],
+      // 允许未使用的局部变量
+      'no-unused-vars': 'off',
+      // 允许未使用的参数
+      'no-unused-params': 'off',
     },
   },
 )

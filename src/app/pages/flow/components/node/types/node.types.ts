@@ -1,5 +1,5 @@
 import { Node } from '@xyflow/react';
-import { NodeType, NodeData as ApiNodeData } from '@/api/types/flow.types';
+import { NodeType } from '@/api/types/flow.types';
 
 export interface BaseNodeData {
   title?: string;

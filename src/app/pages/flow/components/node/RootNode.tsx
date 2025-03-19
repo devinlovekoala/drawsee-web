@@ -1,7 +1,7 @@
-import {Handle, Node, NodeProps, Position} from '@xyflow/react';
+import {Handle, Position} from '@xyflow/react';
 import { ExtendedNodeProps } from './base/BaseNode';
 
-function RootNode({ data, showSourceHandle = true, selected }: ExtendedNodeProps<'root'>) {
+function RootNode({ showSourceHandle = true, selected }: ExtendedNodeProps<'root'>) {
   return (
     <div 
       className={`root-node ${selected ? 'root-node-selected root-node-pulse' : ''}`}
