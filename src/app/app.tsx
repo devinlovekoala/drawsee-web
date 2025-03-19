@@ -4,7 +4,7 @@ import {
   SidebarInset,
   SidebarProvider,
 } from "@/app/components/ui/sidebar.tsx";
-import {createContext, useCallback, useEffect, useState} from "react";
+import {useCallback, useEffect, useState} from "react";
 import {LOGIN_FLAG_KEY, TOKEN_KEY} from "@/common/constant/storage-key.constant.ts";
 import {checkLogin} from "@/api/methods/auth.methods.ts";
 import {toast} from "sonner";
@@ -12,22 +12,9 @@ import {ConversationVO, CreateAiTaskVO} from "@/api/types/flow.types.ts";
 import {useRequest} from "alova/client";
 import {getConversations} from "@/api/methods/flow.methods.ts";
 import AuthForm from "@/app/components/form/auth-form.tsx";
-import { FlowLocationState } from "./pages/flow/flow";
+import { FlowLocationState } from "@/app/contexts/FlowContext";
 import AppSideBar from "./components/AppSideBar";
-
-export interface AppContextType {
-  conversations: Array<ConversationVO>;
-  isLogin: boolean;
-  handleBlankQuery: (data: CreateAiTaskVO) => void;
-  handleTitleUpdate: (convId: number, title: string) => void;
-}
-
-export const AppContext = createContext<AppContextType>({
-  conversations: [],
-  isLogin: false,
-  handleBlankQuery: () => {},
-  handleTitleUpdate: () => {},
-});
+import { AppContext } from "@/app/contexts/AppContext";
 
 function App() {
   const navigate = useNavigate();
@@ -90,8 +77,13 @@ function App() {
     navigate('/flow', {state: {convId: data.conversation.id, taskId: data.taskId} as FlowLocationState});
   }, [navigate]);
 
+  const handleNewChat = useCallback((convId: number) => {
+    // 把convId对应的conversation移动到最前面
+    setConversations((prev) => [prev.find((c) => c.id === convId) as ConversationVO, ...prev.filter((c) => c.id !== convId)]);
+  }, []);
+
   return (
-    <AppContext.Provider value={{conversations, isLogin, handleBlankQuery, handleTitleUpdate}}>
+    <AppContext.Provider value={{conversations, isLogin, handleBlankQuery, handleTitleUpdate, handleNewChat}}>
       {/* 登录模态框 */}
       {!isLogin && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm">
@@ -108,7 +100,7 @@ function App() {
 
         {/* 右边 */}
         <SidebarInset>
-          <div className="flex flex-1 flex-col gap-4 p-4 pt-0 select-none">
+          <div className="flex flex-1 flex-col gap-4 p-2 select-none items-center justify-center">
             <div style={{ width: "100%", height: "100%" }}>
               <Outlet/>
             </div>

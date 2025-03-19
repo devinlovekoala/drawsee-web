@@ -21,7 +21,7 @@ interface BaseNodeData {
 interface RootNodeData extends Omit<BaseNodeData, 'title' | 'text'> {}
 
 interface QueryNodeData extends BaseNodeData {
-  mode: string;
+  mode: AiTaskType;
 }
 
 interface AnswerNodeData extends BaseNodeData {}

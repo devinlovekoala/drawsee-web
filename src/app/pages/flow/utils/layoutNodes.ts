@@ -1,14 +1,13 @@
 import ELK from 'elkjs/lib/elk-api';
 import type { ElkNode, ElkExtendedEdge } from 'elkjs';
 import { Node, Edge } from '@xyflow/react';
-import { NODE_WIDTH, ROOT_NODE_WIDTH, TEMP_QUERY_NODE_HEIGHT, TEMP_QUERY_NODE_ID_PREFIX } from '../constants';
+import { NODE_WIDTH, ROOT_NODE_SIZE, TEMP_QUERY_NODE_HEIGHT, TEMP_QUERY_NODE_ID_PREFIX } from '../constants';
 import { calculateNodeHeight } from './calculateNodeHeight';
 import { NodeType } from '@/api/types/flow.types';
 import { NodeData } from '../components/node/types/node.types';
 import { updateNodesPositionAndHeight } from '@/api/methods/flow.methods';
 import type { NodeToUpdate } from '@/api/types/flow.types';
 import dagre from '@dagrejs/dagre';
-import { flextree } from 'd3-flextree';
 import { layoutFromMap } from "entitree-flex"
 import { Settings } from 'entitree-flex/dist/Settings';
 
@@ -28,7 +27,7 @@ export async function mrtreeLayout(nodes: Node[], edges: Edge[], shouldUpdateSer
     
     // 准备ELK节点
     const elkNodes = nodes.map(node => {
-      const width = node.type !== 'root' ? NODE_WIDTH : ROOT_NODE_WIDTH;
+      const width = node.type !== 'root' ? NODE_WIDTH : ROOT_NODE_SIZE;
       
       let height: number;
       // 获取节点高度
@@ -46,7 +45,7 @@ export async function mrtreeLayout(nodes: Node[], edges: Edge[], shouldUpdateSer
         console.log(`${node.type}节点进行calculateNodeHeight，结果：${height}，用时: ${calcEndTime - calcStartTime}毫秒`);
         
         // 更新节点的高度信息
-        (node.data as any).height = height;
+        (node.data as NodeData<NodeType>).height = height;
       }
       
       return {
@@ -174,7 +173,7 @@ export function dagreLayout(nodes: Node[], edges: Edge[], shouldUpdateServer: bo
     let cachedHeightCount = 0;
     
     const nodesWithDimensions = nodes.map((node) => {
-      const width = node.type !== 'root' ? NODE_WIDTH : ROOT_NODE_WIDTH;
+      const width = node.type !== 'root' ? NODE_WIDTH : ROOT_NODE_SIZE;
       
       let height: number;
       // 获取节点高度
@@ -192,7 +191,7 @@ export function dagreLayout(nodes: Node[], edges: Edge[], shouldUpdateServer: bo
         console.log(`${node.type}节点进行calculateNodeHeight，结果：${height}，用时: ${calcEndTime - calcStartTime}毫秒`);
         
         // 更新节点的高度信息
-        (node.data as any).height = height;
+        (node.data as NodeData<NodeType>).height = height;
       }
       
       return {
@@ -268,196 +267,11 @@ export function dagreLayout(nodes: Node[], edges: Edge[], shouldUpdateServer: bo
   }
 }
 
-/**
- * 使用d3-flextree布局算法
- * 该算法支持变量节点大小的树布局
- * @param nodes 节点列表
- * @param edges 边列表
- * @param shouldUpdateServer 是否需要更新服务器
- * @returns 布局后的节点和边
- */
-export function flexTreeLayout(nodes: Node[], edges: Edge[], shouldUpdateServer: boolean = false): { nodes: Node[], edges: Edge[] } {
-  // 记录开始时间
-  const startTime = performance.now();
-  
-  try {
-    if (nodes.length === 0) {
-      return { nodes, edges };
-    }
-
-    // 性能统计
-    let heightCalculationTime = 0;
-    let cachedHeightCount = 0;
-
-    // 创建节点ID到节点的映射
-    const nodeMap = new Map<string, Node>();
-    nodes.forEach(node => {
-      nodeMap.set(node.id, node);
-    });
-
-    // 创建父子关系映射
-    const childrenMap = new Map<string, string[]>();
-    edges.forEach(edge => {
-      const parentId = edge.source;
-      const childId = edge.target;
-      
-      if (!childrenMap.has(parentId)) {
-        childrenMap.set(parentId, []);
-      }
-      childrenMap.get(parentId)?.push(childId);
-    });
-
-    // 找到根节点
-    const rootNode = nodes.find(node => node.type === 'root') || nodes[0];
-    
-    // 准备节点尺寸
-    const nodesWithDimensions = nodes.map((node) => {
-      const width = node.type !== 'root' ? NODE_WIDTH : ROOT_NODE_WIDTH;
-      
-      let height: number;
-      // 获取节点高度
-      if (node.id.startsWith(TEMP_QUERY_NODE_ID_PREFIX)) {
-        height = TEMP_QUERY_NODE_HEIGHT;
-      } else if (node.data.height !== undefined) {
-        height = node.data.height as number;
-        cachedHeightCount++;
-      } else {
-        // 计算节点高度
-        const calcStartTime = performance.now();
-        height = calculateNodeHeight(node as Node<NodeData<NodeType>>);
-        const calcEndTime = performance.now();
-        heightCalculationTime += (calcEndTime - calcStartTime);
-        console.log(`${node.type}节点进行calculateNodeHeight，结果：${height}，用时: ${calcEndTime - calcStartTime}毫秒`);
-        
-        // 更新节点的高度信息
-        (node.data as any).height = height;
-      }
-      
-      return {
-        ...node,
-        width,
-        height
-      };
-    });
-    
-    // 创建节点尺寸映射
-    const nodeSizeMap = new Map<string, [number, number]>();
-    nodesWithDimensions.forEach(node => {
-      nodeSizeMap.set(node.id, [node.width, node.height]);
-    });
-
-    // 创建flextree布局
-    const layout = flextree({
-      nodeSize: (node: any) => {
-        const id = node.data.id;
-        return nodeSizeMap.get(id) || [100, 50];
-      },
-      spacing: 400 // 节点间距
-    });
-
-    // 构建层次结构
-    const buildHierarchy = (nodeId: string): any => {
-      const node = nodeMap.get(nodeId);
-      if (!node) return null;
-      
-      const children = childrenMap.get(nodeId) || [];
-      return {
-        id: nodeId,
-        children: children.map(childId => buildHierarchy(childId)).filter(Boolean)
-      };
-    };
-
-    // 从根节点开始构建层次结构
-    const hierarchyData = buildHierarchy(rootNode.id);
-    
-    // 创建层次结构
-    const root = layout.hierarchy(hierarchyData);
-    
-    // 计算布局
-    layout(root);
-    
-    // 应用布局结果到节点
-    const nodesToUpdate: NodeToUpdate[] = [];
-    const newNodes = nodes.map(node => {
-      // 在层次结构中查找对应节点
-      const findNode = (n: any): any => {
-        if (n.data.id === node.id) return n;
-        if (!n.children) return null;
-        for (const child of n.children) {
-          const found = findNode(child);
-          if (found) return found;
-        }
-        return null;
-      };
-      
-      const hierarchyNode = findNode(root);
-      if (!hierarchyNode) return node;
-      
-      // 应用新位置
-      const newNode = {
-        ...node,
-        position: {
-          x: hierarchyNode.x,
-          y: hierarchyNode.y
-        }
-      };
-      
-      // 如果需要更新服务器且位置发生变化
-      if (
-        shouldUpdateServer && 
-        (node.position.x !== newNode.position.x || node.position.y !== newNode.position.y)
-      ) {
-        // 获取节点高度
-        const nodeWithDimensions = nodesWithDimensions.find(n => n.id === node.id);
-        const height = node.data.height as number || 
-                      (nodeWithDimensions ? nodeWithDimensions.height : calculateNodeHeight(node as Node<NodeData<NodeType>>));
-        
-        nodesToUpdate.push({
-          id: parseInt(node.id),
-          position: newNode.position,
-          height: height
-        });
-      }
-      
-      return newNode;
-    });
-
-    // 更新服务器
-    if (nodesToUpdate.length > 0) {
-      try {
-        updateNodesPositionAndHeight(nodesToUpdate).send()
-          .then(() => {
-            console.log('节点位置和高度更新成功');
-          })
-          .catch(error => {
-            console.error('节点位置和高度更新失败', error);
-          });
-      } catch (error) {
-        console.error('Failed to update nodes position', error);
-      }
-    }
-    
-    // 输出性能统计
-    const endTime = performance.now();
-    const totalTime = endTime - startTime;
-    console.log(`布局计算总耗时: ${totalTime.toFixed(2)}ms`);
-    console.log(`高度计算耗时: ${heightCalculationTime.toFixed(2)}ms (${(heightCalculationTime / totalTime * 100).toFixed(2)}%)`);
-    console.log(`使用缓存高度的节点数: ${cachedHeightCount}/${nodes.length} (${(cachedHeightCount / nodes.length * 100).toFixed(2)}%)`);
-    
-    return { nodes: newNodes, edges };
-  } catch (error) {
-    console.error('flexTreeLayout error', error);
-    return { nodes, edges };
-  }
-}
-
 export function entitreeFlexLayout(nodes: Node[], edges: Edge[], shouldUpdateServer: boolean = false, resetHeight: boolean = false): { nodes: Node[], edges: Edge[] } {
   // 记录开始时间
   const startTime = performance.now();
   
   try {
-    console.log('entitreeFlexLayout', nodes.length, edges.length);
-    
     if (nodes.length === 0) {
       return { nodes, edges };
     }
@@ -485,12 +299,14 @@ export function entitreeFlexLayout(nodes: Node[], edges: Edge[], shouldUpdateSer
     let cachedHeightCount = 0;
     
     nodes.forEach(node => {
-      const width = node.type !== 'root' ? NODE_WIDTH : ROOT_NODE_WIDTH;
+      const width = node.type !== 'root' ? NODE_WIDTH : ROOT_NODE_SIZE;
       let height: number;
       
       // 获得节点高度
       if (node.id.startsWith(TEMP_QUERY_NODE_ID_PREFIX)) {
         height = TEMP_QUERY_NODE_HEIGHT;
+      } else if (node.type === 'root') {
+        height = ROOT_NODE_SIZE;
       } else if (!resetHeight && node.data.height !== undefined) {
         height = node.data.height as number;
         cachedHeightCount++;
@@ -512,7 +328,7 @@ export function entitreeFlexLayout(nodes: Node[], edges: Edge[], shouldUpdateSer
         }
         
         // 更新节点的高度信息（用于后续渲染）
-        (node.data as any).height = height;
+        node.data.height = height;
       }
       
       flatTree[node.id] = {

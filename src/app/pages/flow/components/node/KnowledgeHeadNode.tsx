@@ -1,13 +1,12 @@
 import { BaseNode, ExtendedNodeProps } from './base/BaseNode';
-import { FlowContext, FlowContextType } from '../../flow';
-import { useContext } from 'react';
+import { useFlowContext } from '@/app/contexts/FlowContext';
 import { CreateAiTaskDTO } from '@/api/types/flow.types';
 import { toast } from 'sonner';
 import { createAiTask } from '@/api/methods/flow.methods';
 
 function KnowledgeHeadNode({ showSourceHandle, showTargetHandle, ...props }: ExtendedNodeProps<'knowledge-head'>) {
   
-  const {chat, convId} = useContext<FlowContextType>(FlowContext);
+  const {chat, convId} = useFlowContext();
   const handleKnowledgeDetailChat = () => {
     const createAiTaskDTO = {
       type: "knowledge-detail",
@@ -33,7 +32,7 @@ function KnowledgeHeadNode({ showSourceHandle, showTargetHandle, ...props }: Ext
       footerContent={
         <button
           onClick={() => {handleKnowledgeDetailChat()}}
-          className="px-3 py-1 text-xs font-medium text-white bg-green-500 rounded hover:bg-green-600 transition-colors"
+          className="px-6 py-1 font-medium text-white bg-green-500 rounded hover:bg-green-600 transition-colors"
         >
           继续生成
         </button>

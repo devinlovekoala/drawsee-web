@@ -4,7 +4,7 @@ import QueryNode from "@/app/pages/flow/components/node/QueryNode";
 import AnswerNode from "@/app/pages/flow/components/node/AnswerNode";
 import KnowledgeHeadNode from "@/app/pages/flow/components/node/KnowledgeHeadNode";
 import KnowledgeDetailNode from "@/app/pages/flow/components/node/KnowledgeDetailNode";
-import {useCallback, useState, useEffect, createContext} from "react";
+import {useCallback, useState, useEffect} from "react";
 import {useLocation} from "react-router-dom";
 import {useWatcher} from "alova/client";
 import {getNodesByConvId} from "@/api/methods/flow.methods.ts";
@@ -20,6 +20,7 @@ import { toast } from "sonner";
 // 导入优化后的CSS样式
 import './styles/index.css';
 import { TEMP_QUERY_NODE_ID_PREFIX } from "./constants";
+import { FlowContext, FlowLocationState } from "@/app/contexts/FlowContext";
 
 const nodeTypes = {
   'root': RootNode,
@@ -28,20 +29,6 @@ const nodeTypes = {
   'knowledge-head': KnowledgeHeadNode,
   'knowledge-detail': KnowledgeDetailNode,
 } as const;
-
-export type FlowLocationState = {
-  convId: number;
-  taskId?: number;
-};
-
-export type FlowContextType = {
-  chat: (taskId: number) => void;
-  convId: number;
-}
-export const FlowContext = createContext<FlowContextType>({
-  chat: () => {},
-  convId: -1,
-});
 
 function Flow() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -63,9 +50,6 @@ function Flow() {
   } = useTempQueryNode(convId, isChatting, selectedNode, rootNodeId, elements, setElements);
 
   const {executeLayout, executeFitView} = useFlowTools();
-
-  const onSelectionChange = useCallback(() => {
-  }, []);
 
   const onNodesChange: OnNodesChange = useCallback((changes) => {
     console.log('onNodesChange', changes);
@@ -101,8 +85,15 @@ function Flow() {
           setUserInput('');
         }
       } else if (unselectedNodeId) {
-        // 如果取消选中节点，则取消选中
-        setSelectedNode(null);
+        // 如果取消选中节点，则选中根节点，除非当前选中节点就是根节点
+        const rootNode = newNodes.find(node => node.id === rootNodeId);
+        setSelectedNode(selectedNode?.id === rootNodeId ? null : rootNode || null);
+        if (rootNode) {
+          newNodes = newNodes.map(node => ({
+            ...node,
+            selected: node.id === rootNodeId
+          }));
+        }
         // 如果存在临时提问节点则删除临时提问节点
         const tempQueryNode = newNodes.find(node => node.id.startsWith(TEMP_QUERY_NODE_ID_PREFIX));
         if (tempQueryNode) {
@@ -124,13 +115,13 @@ function Flow() {
             if (node.id === change.id) {
               const curHeight = node.data.height as number | undefined;
               const newHeight = change.dimensions?.height;
-              //console.log('curHeight', curHeight, 'newHeight', newHeight);
+              console.log('curHeight', curHeight, 'newHeight', newHeight);
+              node.data.height = newHeight;
               if (!node.id.startsWith(TEMP_QUERY_NODE_ID_PREFIX) && (
                 ( curHeight === undefined && newHeight !== undefined ) ||
                 ( curHeight !== undefined && newHeight !== undefined && 
-                  Math.abs(newHeight - curHeight) > 5 )
+                  Math.abs(newHeight - curHeight) > 8 )
               )) {
-                node.data.height = newHeight;
                 updateHeightNodeCount++;
               }
             }
@@ -151,7 +142,7 @@ function Flow() {
         edges: newEdges,
       };
     });
-  },[executeFitView, executeLayout, nodesAndEdgesNoneTempQueryNode, selectedNode?.id, setElements]);
+  },[executeFitView, executeLayout, nodesAndEdgesNoneTempQueryNode, rootNodeId, selectedNode?.id, setElements]);
 
   const onEdgesChange: OnEdgesChange = useCallback((changes) => {
     setElements(({nodes, edges}) => {
@@ -214,21 +205,46 @@ function Flow() {
       // 执行布局 - 但不使用动画，提高性能
       const layoutedNodes = executeLayout(flowNodes, flowEdges, true);
       setElements({nodes: layoutedNodes, edges: flowEdges});
-      setIsLoading(false);
-      
-      executeFitView(layoutedNodes.sort((a, b) => parseInt(a.id) - parseInt(b.id)).slice(0, 1).map(node => node.id), 500);
+
       // 如果是新创建的conv，那么就chat
       if (taskIdFromLocation) {
         setTimeout(() => {
           chat(taskIdFromLocation);
         }, 100);
       }
+
+      setTimeout(() => {
+        setIsLoading(false);
+      }, 500);
     })
     .onError(() => {
       // 出错时设置加载状态为false
       setIsLoading(false);
       toast.error('获取节点数据失败');
     });
+
+  const flowChat = useCallback((taskId: number) => {
+    // 将当前选中的节点的selected设置为false
+    setSelectedNode(null);
+    setElements(({nodes, edges}) => {
+      return {
+        nodes: nodes.map(node => ({
+          ...node,
+          selected: false
+        })),
+        edges
+      };
+    });
+    chat(taskId);
+  }, [chat, setElements, setSelectedNode]);
+
+  const onError = useCallback((code: string, message: string) => {
+    console.error('reactflow onError', code, message);
+  }, []);
+
+  const onInit = useCallback(() => {
+    executeFitView(elements.nodes.sort((a, b) => parseInt(a.id) - parseInt(b.id)).slice(0, 1).map(node => node.id), 250);
+  }, [elements.nodes, executeFitView]);
 
   if (isLoading) {
     return <LoadingSpinner />;
@@ -237,27 +253,15 @@ function Flow() {
   return (
     <FlowContext.Provider value={{
       convId,
-      chat: (taskId: number) => {
-        // 将当前选中的节点的selected设置为false
-        setSelectedNode(null);
-        setElements(({nodes, edges}) => {
-          return {
-            nodes: nodes.map(node => ({
-              ...node,
-              selected: false
-            })),
-            edges
-          };
-        });
-        chat(taskId);
-      }
-    } as FlowContextType}>
+      chat: flowChat
+    }}>
       <ReactFlow 
         nodes={elements.nodes} 
-        edges={elements.edges} 
+        edges={elements.edges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
-        onSelectionChange={onSelectionChange}
+        onError={onError}
+        onInit={onInit}
         nodeTypes={nodeTypes} 
         style={{backgroundColor: "#EEEBE8"}}
         nodesDraggable={false}
@@ -265,7 +269,7 @@ function Flow() {
         selectionKeyCode={null}
         multiSelectionKeyCode={null}
         deleteKeyCode={null}
-        //onlyRenderVisibleElements={true} 会很卡
+        onlyRenderVisibleElements={true} // 只渲染可见元素，提高性能
         maxZoom={2}
         minZoom={0.01}
         defaultViewport={{ x: 0, y: 0, zoom: 0.5 }}
@@ -274,13 +278,13 @@ function Flow() {
           animated: false,
           selectable: false,
           style: {
-            stroke: '#999', // 灰色
-            strokeWidth: 2,
-            strokeLinecap: 'round',
-            strokeLinejoin: 'round',
-            strokeDasharray: '10 10',
-            strokeDashoffset: 0,
-            strokeOpacity: 1,
+            stroke: '#999', // 线条的颜色，使用十六进制表示法，这里是灰色
+            strokeWidth: 5, // 线条的宽度，单位是像素
+            strokeLinecap: 'round', // 线条的端点样式，这里是圆形的端点
+            strokeLinejoin: 'round', // 线条的连接点样式，这里是圆形的连接
+            strokeDasharray: '25 30', // 线条的虚线样式，表示线段和空白的长度，这里是每段线段和空白各10个单位
+            strokeDashoffset: 0, // 虚线的偏移量，控制虚线的起始位置，这里是0，表示从起始位置开始
+            strokeOpacity: 0.85, // 线条的透明度，范围从0（完全透明）到1（完全不透明），这里是完全不透明
           }
         }}
       >

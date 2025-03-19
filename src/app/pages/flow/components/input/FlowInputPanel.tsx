@@ -1,11 +1,11 @@
-import { useCallback, useState, useRef, useEffect, useContext } from "react";
+import { useCallback, useState, useRef, useEffect } from "react";
 import { toast } from "sonner";
 import { CubeTransparentIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
 import { BookOpenIcon } from 'lucide-react';
 import { createAiTask } from "@/api/methods/flow.methods.ts";
 import type { AiTaskType, CreateAiTaskDTO } from '@/api/types/flow.types.ts';
-import { FlowContext, FlowContextType } from "../../flow";
 import { TempQueryNodeTask } from "../../hooks/useTempQueryNode";
+import { useFlowContext } from "@/app/contexts/FlowContext";
 
 // 定义可用的对话模式，与 ModeSelector.tsx 保持一致
 const chatModes = [
@@ -51,7 +51,7 @@ export function FlowInputPanel({
   const inputContainerRef = useRef<HTMLDivElement>(null);
   const selectedMode = chatModes.find(mode => mode.type === selectedType) || chatModes[0];
 
-  const {chat, convId} = useContext<FlowContextType>(FlowContext);
+  const {chat, convId} = useFlowContext();
   
   // 处理输入变化
   const handlePromptChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {

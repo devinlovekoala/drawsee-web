@@ -1,5 +1,5 @@
 import { Node } from '@xyflow/react';
-import { NodeType } from '@/api/types/flow.types';
+import { AiTaskType, NodeType } from '@/api/types/flow.types';
 
 export interface BaseNodeData {
   title?: string;
@@ -18,7 +18,7 @@ export interface RootNodeData extends Omit<BaseNodeData, 'title' | 'text'> {
 }
 
 export interface QueryNodeData extends BaseNodeData {
-  mode?: string;
+  mode: AiTaskType;
   [key: string]: unknown;
 }
 

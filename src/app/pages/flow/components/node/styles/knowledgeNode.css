@@ -1,0 +1,394 @@
+/* KnowledgeDetailNode 样式文件 */
+:root {
+  --card-border-radius: 0.5rem;
+  --card-padding: 1rem;
+  --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  
+  --color-pink-bg: rgba(252, 231, 243, 0.5);
+  --color-pink-border: rgba(249, 168, 212, 0.8);
+  --color-pink-text: rgba(190, 24, 93, 1);
+  --color-pink-hover: rgba(249, 168, 212, 1);
+  
+  --color-purple-bg: rgba(237, 233, 254, 0.5);
+  --color-purple-border: rgba(167, 139, 250, 0.8);
+  --color-purple-text: rgba(109, 40, 217, 1);
+  --color-purple-hover: rgba(167, 139, 250, 1);
+  
+  --color-gray-bg: rgba(243, 244, 246, 0.5);
+  --color-gray-border: rgba(209, 213, 219, 0.8);
+  --color-gray-text: rgba(75, 85, 99, 1);
+  --color-gray-hover: rgba(209, 213, 219, 1);
+  
+  --color-red-bg: rgba(254, 226, 226, 0.5);
+  --color-red-border: rgba(252, 165, 165, 0.8);
+  --color-red-text: rgba(220, 38, 38, 1);
+  
+  --color-white: rgba(255, 255, 255, 1);
+  --color-white-transparent: rgba(255, 255, 255, 0.8);
+  
+  --transition-fast: 200ms;
+  --transition-medium: 300ms;
+  
+  --badge-font-size: 0.75rem;
+  --badge-padding: 0.25rem 0.5rem;
+  
+  --button-radius: 9999px;
+  --button-small-padding: 0.25rem 0.5rem;
+  --button-medium-padding: 0.375rem 0.75rem;
+}
+
+/* Bilibili 卡片样式 */
+.bili-card {
+  border-radius: var(--card-border-radius);
+  overflow: hidden;
+  border: 1px solid var(--color-pink-border);
+  background: linear-gradient(to bottom right, var(--color-pink-bg), var(--color-white));
+  will-change: transform, opacity;
+}
+
+.bili-card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.bili-iframe-container {
+  position: relative;
+}
+
+.bili-toggle-btn {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  background-color: var(--color-pink-bg);
+  color: var(--color-pink-text);
+  padding: 0.25rem;
+  border-radius: 9999px;
+  border: none;
+  cursor: pointer;
+  z-index: 10;
+  transition: background-color var(--transition-fast);
+}
+
+.bili-toggle-btn:hover {
+  background-color: var(--color-pink-hover);
+}
+
+.bili-card-content {
+  display: flex;
+  flex-direction: column;
+  padding: var(--card-padding);
+  gap: 1rem;
+}
+
+@media (min-width: 768px) {
+  .bili-card-content {
+    flex-direction: row;
+    align-items: center;
+  }
+}
+
+.bili-thumbnail {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: linear-gradient(to bottom right, var(--color-pink-bg), var(--color-purple-bg));
+  border-radius: var(--card-border-radius);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+@media (min-width: 768px) {
+  .bili-thumbnail {
+    width: 33.333333%;
+    min-width: 200px;
+  }
+}
+
+.bili-thumbnail-overlay {
+  position: absolute;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.05);
+  transition: background-color var(--transition-fast);
+}
+
+.bili-thumbnail:hover .bili-thumbnail-overlay {
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+.bili-thumbnail-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.bili-play-btn {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 9999px;
+  background-color: var(--color-white-transparent);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  transition: transform var(--transition-fast);
+}
+
+.bili-thumbnail:hover .bili-play-btn {
+  transform: scale(1.1);
+}
+
+.bili-play-icon {
+  color: var(--color-pink-text);
+  margin-left: 0.25rem;
+}
+
+.bili-bvid {
+  font-size: var(--badge-font-size);
+  font-weight: 500;
+  color: var(--color-pink-text);
+  background-color: var(--color-white-transparent);
+  backdrop-filter: blur(4px);
+  padding: var(--badge-padding);
+  border-radius: var(--button-radius);
+}
+
+.bili-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.bili-title {
+  font-weight: 500;
+  color: var(--color-gray-text);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.bili-desc {
+  font-size: var(--badge-font-size);
+  color: var(--color-gray-text);
+}
+
+.bili-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: auto;
+}
+
+.bili-action-btn {
+  font-size: var(--badge-font-size);
+  padding: var(--button-medium-padding);
+  border-radius: var(--button-radius);
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  border: none;
+  cursor: pointer;
+  transition: background-color var(--transition-fast), transform var(--transition-fast);
+}
+
+.bili-play-action {
+  background-color: var(--color-pink-bg);
+  color: var(--color-pink-text);
+}
+
+.bili-play-action:hover {
+  background-color: var(--color-pink-hover);
+}
+
+.bili-open-action {
+  background-color: var(--color-gray-bg);
+  color: var(--color-gray-text);
+  text-decoration: none;
+}
+
+.bili-open-action:hover {
+  background-color: var(--color-gray-hover);
+}
+
+/* 动画视频样式 */
+.animation-section {
+  margin-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.bili-section {
+  margin-top: 2.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.section-title {
+  font-size: 1.875rem;
+  line-height: 2.25rem;
+  font-weight: 500;
+  color: var(--color-gray-text);
+}
+
+.toggle-mode-btn {
+  font-size: var(--badge-font-size);
+  padding: var(--button-small-padding);
+  background-color: var(--color-purple-bg);
+  color: var(--color-purple-text);
+  border-radius: var(--card-border-radius);
+  border: none;
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.toggle-mode-btn:hover {
+  background-color: var(--color-purple-hover);
+}
+
+.animation-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.animation-item {
+  border-radius: var(--card-border-radius);
+  overflow: hidden;
+  border: 1px solid var(--color-purple-border);
+  background-color: var(--color-purple-bg);
+}
+
+.animation-video, .animation-iframe {
+  width: 100%;
+  height: 200px;
+  display: block;
+}
+
+.animation-loading, .animation-empty {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 2rem 0;
+  border-radius: var(--card-border-radius);
+  border: 1px solid var(--color-purple-border);
+  background-color: var(--color-purple-bg);
+}
+
+.animation-loading {
+  gap: 0.75rem;
+}
+
+.animation-loading-spinner {
+  animation: spin 1s linear infinite;
+  border-radius: 9999px;
+  height: 2rem;
+  width: 2rem;
+  border: 2px solid transparent;
+  border-bottom-color: var(--color-purple-text);
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animation-loading-text {
+  color: var(--color-purple-text);
+  margin-left: 0.75rem;
+}
+
+.animation-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  background-color: var(--color-red-bg);
+  color: var(--color-red-text);
+  padding: 1rem;
+}
+
+.animation-error-icon {
+  height: 2.5rem;
+  width: 2.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.animation-error-text {
+  text-align: center;
+}
+
+.animation-error-actions {
+  display: flex;
+  margin-top: 0.5rem;
+  gap: 0.5rem;
+}
+
+.animation-error-btn {
+  padding: var(--button-small-padding);
+  background-color: var(--color-red-bg);
+  border-radius: var(--card-border-radius);
+  border: none;
+  cursor: pointer;
+  font-size: var(--badge-font-size);
+  transition: background-color var(--transition-fast);
+}
+
+.animation-error-btn:hover {
+  background-color: var(--color-red-border);
+}
+
+/* 页脚徽章样式 */
+.footer-badges {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--badge-padding);
+  font-size: var(--badge-font-size);
+  font-weight: 500;
+  border-radius: var(--card-border-radius);
+}
+
+.badge-icon {
+  margin-right: 0.25rem;
+}
+
+.badge-pink {
+  color: var(--color-pink-text);
+  background-color: var(--color-pink-bg);
+}
+
+.badge-purple {
+  color: var(--color-purple-text);
+  background-color: var(--color-purple-bg);
+}
+
+/* 媒体内容统一样式 */
+.media-content {
+  margin-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+} 

@@ -1,5 +1,5 @@
 import { renderToStaticMarkup } from 'react-dom/server';
-import { Node } from '@xyflow/react';
+import { Node, ReactFlowProvider } from '@xyflow/react';
 import { NodeType } from '@/api/types/flow.types';
 import { NodeData } from '../components/node/types/node.types';
 import { NODE_DEFAULT_HEIGHT } from '../constants';
@@ -8,6 +8,7 @@ import AnswerNode from '../components/node/AnswerNode';
 import KnowledgeHeadNode from '../components/node/KnowledgeHeadNode';
 import KnowledgeDetailNode from '../components/node/KnowledgeDetailNode';
 import RootNode from '../components/node/RootNode';
+import { ExtendedNodeProps } from '../components/node/base/BaseNode';
 
 // 创建一个隐藏的容器div
 let containerDiv: HTMLDivElement | null = null;
@@ -16,7 +17,7 @@ let containerDiv: HTMLDivElement | null = null;
 function ensureContainerDiv(): HTMLDivElement {
   if (!containerDiv) {
     containerDiv = document.createElement('div');
-    containerDiv.style.position = 'fixed';
+    containerDiv.style.position = 'fixed'; // 必须是fixed，不然hidden不生效
     containerDiv.style.visibility = 'hidden';
     document.body.appendChild(containerDiv);
   }
@@ -30,7 +31,7 @@ function ensureContainerDiv(): HTMLDivElement {
  * @returns 计算得到的节点高度
  */
 export function calculateNodeHeight(node: Node<NodeData<NodeType>>): number {    
-  let NodeComponent: React.ComponentType<any>;
+  let NodeComponent: React.ComponentType<ExtendedNodeProps<NodeType>>;
   switch (node.type) {
     case 'root':
       NodeComponent = RootNode;
@@ -53,17 +54,33 @@ export function calculateNodeHeight(node: Node<NodeData<NodeType>>): number {
   // 确保容器div存在
   const container = ensureContainerDiv();
   // 渲染节点组件，禁用所有 handles
+
+  // 禁用console.error，让它别输出在控制台中
+  const originalConsoleError = console.error;
+  console.error = () => {}; // Suppress console.error warnings
+
   const htmlString = renderToStaticMarkup(
-    <NodeComponent
-      id={node.id}
-      type={node.type}
-      data={node.data}
-      selected={false}
-      dragging={false}
-      showSourceHandle={false}
-      showTargetHandle={false}
-    />
+    <ReactFlowProvider>
+      <NodeComponent
+        id={node.id}
+        type={node.type}
+        data={node.data}
+        selected={false}
+        dragging={false}
+        showSourceHandle={false}
+        showTargetHandle={false}
+        zIndex={0}
+        selectable={false}
+        deletable={false}
+        draggable={false}
+        isConnectable={false}
+        positionAbsoluteX={0}
+        positionAbsoluteY={0}
+      />
+    </ReactFlowProvider>
   );
+
+  console.error = originalConsoleError; // Restore original console.error
 
   // 统计获得高度所需的时间并输出
   const startTime = performance.now();

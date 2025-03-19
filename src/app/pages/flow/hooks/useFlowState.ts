@@ -1,9 +1,9 @@
 import { NodeVO } from "@/api/types/flow.types";
 import { Edge, Node } from "@xyflow/react";
-import { useCallback, useContext, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { NodeData } from "../components/node/types/node.types";
 import { ChatTask, MediaData, TextData } from "../types/ChatTask.types";
-import { AppContext, AppContextType } from "@/app/app";
+import { useAppContext } from "@/app/contexts/AppContext";
 import { toast } from "sonner";
 import { BASE_URL } from "@/api";
 import {SSE} from "sse.js";
@@ -19,7 +19,7 @@ function useFlowState(convId: number) {
 
   // 工具函数
   const {executeFitView, adjustViewportToShowLatestContent, executeLayout} = useFlowTools();
-  const {handleTitleUpdate} = useContext<AppContextType>(AppContext);
+  const {handleTitleUpdate, handleNewChat} = useAppContext();
 
   // 节点和边的状态
   const [elements, setElements] = useState<{nodes: Node[], edges: Edge[]}>(
@@ -85,6 +85,9 @@ function useFlowState(convId: number) {
             const currentEdges = [...edges.filter(edge => !edge.target.startsWith(TEMP_QUERY_NODE_ID_PREFIX)), newEdge];
             // 执行布局
             const layoutedNodes = isUserQueryNode ? currentNodes : executeLayout(currentNodes, currentEdges, false);
+            // 获得新节点布局后的位置
+            const newNodeLayoutedPosition = layoutedNodes.find(node => node.id === newNode.id)?.position;
+            console.log('newNodeLayoutedPosition', newNodeLayoutedPosition);
             // 调整视口以显示最新内容
             executeFitView([newNode.id], 250);
             // 更新节点和边
@@ -215,6 +218,8 @@ function useFlowState(convId: number) {
     setIsChatting(true);
     // 设置最后需要聚焦的节点id
     lastFocusNodeId.current = null;
+    // 把当前对话移动到最前面
+    handleNewChat(convId);
     
     // SSE请求
     const source = new SSE(

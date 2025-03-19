@@ -1,5 +1,13 @@
+import { AiTaskType } from '@/api/types/flow.types';
 import { BaseNode, ExtendedNodeProps } from './base/BaseNode';
 import React, { useMemo } from 'react';
+
+const chatTypeMap: Record<AiTaskType, string> = {
+  'general': '常规问答',
+  'knowledge': '知识问答',
+  'knowledge-detail': '知识详情',
+  'animation': '动画生成',
+};
 
 /**
  * 自定义比较函数，用于React.memo
@@ -31,17 +39,18 @@ function arePropsEqual(
 }
 
 // 使用React.memo包装QueryNode组件，避免不必要的重新渲染
-const QueryNode = React.memo(function QueryNode({ 
+const QueryNode = React.memo(function QueryNode({
+  data,
   showSourceHandle, 
   showTargetHandle, 
   ...props 
 }: ExtendedNodeProps<'query'>) {
   // 使用useMemo缓存footerContent
   const footerContent = useMemo(() => (
-    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-      查询
+    <span className="inline-flex items-center px-5 py-1 rounded-full font-medium bg-blue-100 text-blue-800">
+      {chatTypeMap[data.mode]}
     </span>
-  ), []);
+  ), [data.mode]);
 
   return (
     <BaseNode
@@ -49,6 +58,7 @@ const QueryNode = React.memo(function QueryNode({
       showSourceHandle={showSourceHandle}
       showTargetHandle={showTargetHandle}
       footerContent={footerContent}
+      data={data}
     />
   );
 }, arePropsEqual);

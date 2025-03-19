@@ -15,14 +15,14 @@ import {
 } from "@/app/components/ui/collapsible.tsx";
 import DrawSeeIcon from '@/assets/svg/昭析.svg';
 import { useLocation, useNavigate } from "react-router-dom";
-import { AppContext, AppContextType } from "@/app/app";
-import { useCallback, useContext, useEffect, useState } from "react";
-import { FlowLocationState } from "../pages/flow/flow";
+import { useCallback, useEffect, useState } from "react";
+import { useAppContext } from "@/app/contexts/AppContext";
+import { FlowLocationState } from "@/app/contexts/FlowContext";
 
 function AppSideBar() {
     const navigate = useNavigate();
     const location = useLocation();
-    const {conversations, isLogin} = useContext<AppContextType>(AppContext);
+    const {conversations, isLogin} = useAppContext();
     const [activeConversationId, setActiveConversationId] = useState<number | null>(null);
 
     // 从location中获取当前会话ID
@@ -74,24 +74,25 @@ function AppSideBar() {
 									</CollapsibleTrigger>
 							</div>
 							<CollapsibleContent className="mt-2.5 space-y-1 overflow-y-auto max-h-[calc(100vh-300px)] scrollbar-hide">
-									{conversations.map((conversation) => (
+									{conversations.map((conversation, index) => (
 									<div
-											key={conversation.id}
-											onClick={() => handleConversationClick(conversation.id)}
-											className={`
-											group relative flex select-none items-center justify-between gap-1 rounded-lg px-3 py-2.5 text-sm
-											${activeConversationId === conversation.id 
-												? 'bg-white shadow-sm ring-1 ring-neutral-300 font-medium text-neutral-900' 
-												: 'text-neutral-700 hover:bg-white hover:shadow-sm hover:ring-1 hover:ring-neutral-200'}
-											transition-all duration-200 cursor-pointer
-											`}
+										key={conversation.id}
+										onClick={() => handleConversationClick(conversation.id)}
+										className={`
+										group relative flex select-none items-center justify-between gap-1 rounded-lg mx-1 px-3 py-2.5 text-sm
+										${activeConversationId === conversation.id 
+											? 'bg-white shadow-sm ring-1 ring-neutral-300 font-medium text-neutral-900' 
+											: 'text-neutral-700 hover:bg-white hover:shadow-sm hover:ring-1 hover:ring-neutral-200'}
+										${index === 0 ? 'mt-1' : ''}
+										transition-all duration-200 cursor-pointer
+										`}
 									>
-											<div className="flex items-center gap-2">
-											<Sparkles size="16px" className={`${activeConversationId === conversation.id ? 'text-neutral-700' : 'text-neutral-500'} transition-colors group-hover:text-neutral-700`}/>
-											<span className={`select-none truncate ${activeConversationId === conversation.id ? 'font-medium' : 'group-hover:font-medium'} pl-1 max-w-52 transition-colors`}>
-													{conversation.title}
-											</span>
-											</div>
+										<div className="flex items-center gap-2">
+										<Sparkles size="16px" className={`${activeConversationId === conversation.id ? 'text-neutral-700' : 'text-neutral-500'} transition-colors group-hover:text-neutral-700`}/>
+										<span className={`select-none truncate ${activeConversationId === conversation.id ? 'font-medium' : 'group-hover:font-medium'} pl-1 max-w-52 transition-colors`}>
+												{conversation.title}
+										</span>
+										</div>
 									</div>
 									))}
 									{/* 占位 */}

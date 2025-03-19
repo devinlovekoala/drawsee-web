@@ -4,9 +4,10 @@ import { Edge, Node, useReactFlow } from "@xyflow/react";
 
 // 默认的fitView配置
 const DEFAULT_FIT_VIEW_CONFIG = {
-  duration: 400,
-  maxZoom: 0.8,
-  padding: 0.2
+  duration: 650,
+  maxZoom: 0.90,
+  minZoom: 0.75,  
+  padding: 0.3
 };
 
 function useFlowTools() {
@@ -20,7 +21,8 @@ function useFlowTools() {
     nodeIds: string[],
     delay: number = 0,
     duration: number = DEFAULT_FIT_VIEW_CONFIG.duration,
-    maxZoom: number = DEFAULT_FIT_VIEW_CONFIG.maxZoom, 
+    maxZoom: number = DEFAULT_FIT_VIEW_CONFIG.maxZoom,
+    minZoom: number = DEFAULT_FIT_VIEW_CONFIG.minZoom,
     padding: number = DEFAULT_FIT_VIEW_CONFIG.padding
   ) => {
     setTimeout(async () => {
@@ -28,7 +30,8 @@ function useFlowTools() {
         nodes: nodeIds.map(id => ({ id })),
         duration,
         padding,
-        maxZoom
+        maxZoom,
+        minZoom,
       });
       console.log('fitView result', result);
       return result;
