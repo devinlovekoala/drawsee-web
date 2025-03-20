@@ -2,9 +2,23 @@ import React, { useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
+import remarkRehype from 'remark-rehype';
+import remarkParse from 'remark-parse';
+//import remarkCodeExtra from 'remark-code-extra';
+//import codesandbox from 'remark-codesandbox';
 import rehypeKatex from 'rehype-katex';
+import rehypeHighlight from 'rehype-highlight'
+//import rehypePrettyCode from "rehype-pretty-code";
+//import rehypeStarryNight from 'rehype-starry-night'
+import rehypeStringify from 'rehype-stringify'
 import classNames from 'classnames';
 import 'katex/dist/katex.min.css';
+import './styles/katex.min.css';
+//import './styles/starry-night-style-light.css';
+import './styles/highlight-atom-one-dark.css';
+import { Terminal } from 'lucide-react';
+import CopyButton from '../button/CopyButton';
+import { nanoid } from 'nanoid';
 
 // 创建静态全局缓存，避免组件重新渲染时缓存被重置
 // 使用弱映射减少内存占用，允许文本内容被垃圾回收
@@ -37,8 +51,8 @@ interface MarkdownWithLatexProps {
 }
 
 const MarkdownWithLatex: React.FC<MarkdownWithLatexProps> = ({ 
-	text, 
-	className 
+	text,
+	className,
 }) => {
 	// 为文本内容生成hash，用作缓存键
 	const cacheKey = useMemo(() => generateHash(text), [text]);
@@ -49,12 +63,51 @@ const MarkdownWithLatex: React.FC<MarkdownWithLatexProps> = ({
 		if (markdownCache[cacheKey]) {
 			return markdownCache[cacheKey];
 		}
-		
 		// 如果缓存中没有，渲染并存入缓存
 		const rendered = (
 			<ReactMarkdown
-				remarkPlugins={[remarkGfm, remarkMath]}
-				rehypePlugins={[rehypeKatex]}
+				remarkPlugins={[remarkMath, remarkParse, remarkRehype, remarkGfm]}
+				rehypePlugins={[rehypeKatex, rehypeHighlight, rehypeStringify]}
+				components={{
+					pre: ({ children }) => <pre className="not-prose">{children}</pre>,
+					code: ({ node, className, children, ...props }) => {
+						const match = /language-(\w+)/.exec(className || "");
+						// 获取具体是哪中语言
+						const language = match?.[1];
+						if (match?.length) {
+							const uuid = nanoid();
+							return (
+								<div className={`not-prose rounded-md border nowheel ${className}`}>
+									{/* 顶部 */}
+									<div className="flex h-12 items-center justify-between px-5 bg-zinc-600">
+										<div className="flex items-center gap-2">
+											<Terminal size={24} />
+											<span className="text-[22px] ml-3">{language}</span>
+											<p className="text-sm text-zinc-600">
+												{node?.data?.meta}
+											</p>
+										</div>
+										<CopyButton getText={() => document.getElementById(uuid)?.innerText || ''} size={24} />
+									</div>
+									<div className="overflow-x-auto scrollbar-hide">
+										<div id={uuid} className="p-4">
+											{children}
+										</div>
+									</div>
+								</div>
+							);
+						} else {
+							return (
+								<code
+									{...props}
+									className={`not-prose rounded-md border nowheel ${className}`}
+								>
+									{children}
+								</code>
+							);
+						}
+					},
+				}}
 			>
 				{text}
 			</ReactMarkdown>

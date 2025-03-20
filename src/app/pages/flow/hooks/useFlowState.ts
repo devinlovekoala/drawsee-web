@@ -19,7 +19,7 @@ function useFlowState(convId: number) {
 
   // 工具函数
   const {executeFitView, adjustViewportToShowLatestContent, executeLayout} = useFlowTools();
-  const {handleTitleUpdate, handleNewChat} = useAppContext();
+  const {handleTitleUpdate} = useAppContext();
 
   // 节点和边的状态
   const [elements, setElements] = useState<{nodes: Node[], edges: Edge[]}>(
@@ -90,6 +90,19 @@ function useFlowState(convId: number) {
             console.log('newNodeLayoutedPosition', newNodeLayoutedPosition);
             // 调整视口以显示最新内容
             executeFitView([newNode.id], 250);
+
+            // 如果节点是knowledge-detail，则修改knowledge-head的isGenerated为true
+            if (nodeVO.type === 'knowledge-detail') {
+              const knowledgeHeadNode = layoutedNodes.find(node => 
+                node.type === 'knowledge-head' && 
+                nodeVO.parentId && 
+                node.id === nodeVO.parentId.toString()
+              );
+              if (knowledgeHeadNode) {
+                knowledgeHeadNode.data.isGenerated = true;
+              }
+            }
+
             // 更新节点和边
             return {
               nodes: layoutedNodes,
@@ -214,22 +227,25 @@ function useFlowState(convId: number) {
    * 启动聊天
    */
   const chat = useCallback((taskId: number) => {
+    // 如果正在聊天，则不进行处理
+    if (isChatting) {
+      toast.error('正在聊天中，请先完成当前对话');
+      return;
+    }
     // 设置处理SSE状态为true
     setIsChatting(true);
     // 设置最后需要聚焦的节点id
     lastFocusNodeId.current = null;
-    // 把当前对话移动到最前面
-    handleNewChat(convId);
     
     // SSE请求
     const source = new SSE(
       `${BASE_URL}/flow/completion?taskId=${taskId}`,
       {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem(TOKEN_KEY)}`
-          }
+				method: 'GET',
+				headers: {
+					'Content-Type': 'application/json',
+					'Authorization': `Bearer ${localStorage.getItem(TOKEN_KEY)}`
+				}
       }
     );
     
@@ -244,6 +260,7 @@ function useFlowState(convId: number) {
     source.addEventListener("error", (event: MessageEvent<string>) => {
       if (event.data === "waiting") {
         // 1秒后重试
+				// TODO 多次重试后直接失败处理
         setTimeout(() => {
           chat(taskId);
         }, 1000);
@@ -254,7 +271,7 @@ function useFlowState(convId: number) {
         setIsChatting(false);
       }
     });
-  }, [addChatTask]);
+  }, [addChatTask, isChatting]);
 
   return {
     // 状态

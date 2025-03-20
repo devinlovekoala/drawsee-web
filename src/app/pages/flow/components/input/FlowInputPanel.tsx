@@ -6,6 +6,7 @@ import { createAiTask } from "@/api/methods/flow.methods.ts";
 import type { AiTaskType, CreateAiTaskDTO } from '@/api/types/flow.types.ts';
 import { TempQueryNodeTask } from "../../hooks/useTempQueryNode";
 import { useFlowContext } from "@/app/contexts/FlowContext";
+import { useAppContext } from "@/app/contexts/AppContext";
 
 // 定义可用的对话模式，与 ModeSelector.tsx 保持一致
 const chatModes = [
@@ -52,6 +53,7 @@ export function FlowInputPanel({
   const selectedMode = chatModes.find(mode => mode.type === selectedType) || chatModes[0];
 
   const {chat, convId} = useFlowContext();
+  const {handleNewChat} = useAppContext();
   
   // 处理输入变化
   const handlePromptChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -149,12 +151,13 @@ export function FlowInputPanel({
       
       // 发送聊天请求
       setTimeout(() => {
+        handleNewChat(convId);
         chat(response.taskId);
       }, 300);
     }).catch((error) => {
       toast.error(`请求失败, ${error.message}`);
     });
-  }, [canInput, prompt, parentIdOfTempQueryNode, selectedType, convId, canNotInputReason, setPrompt, chat]);
+  }, [canInput, prompt, parentIdOfTempQueryNode, selectedType, convId, canNotInputReason, setPrompt, handleNewChat, chat]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -179,7 +182,7 @@ export function FlowInputPanel({
       <div className={`mode-selector-wrapper ${isOpen ? 'open' : 'closed'}`}>
         <button 
           ref={buttonRef}
-          className="mode-selector-button"
+          className="mode-selector-button shadow-[0_0_0_1px_rgba(0,0,0,0.1)]"
           onClick={toggleDropdown}
         >
           <div className="mode-selector-icon-wrapper">
@@ -200,7 +203,7 @@ export function FlowInputPanel({
             isExpanded 
               ? isAnimating ? 'animate-expand-width expanded' : 'expanded' 
               : isAnimating ? 'animate-shrink-width collapsed' : 'collapsed'
-          }`}
+          } shadow-[0_0_0_1px_rgba(0,0,0,0.1)]`}
         >
           <textarea 
             id="question-input"

@@ -47,9 +47,9 @@ const QueryNode = React.memo(function QueryNode({
 }: ExtendedNodeProps<'query'>) {
   // 使用useMemo缓存footerContent
   const footerContent = useMemo(() => (
-    <span className="inline-flex items-center px-5 py-1 rounded-full font-medium bg-blue-100 text-blue-800">
+    data.mode ? <span className="inline-flex items-center px-5 py-1 rounded-full font-medium bg-blue-100 text-blue-800">
       {chatTypeMap[data.mode]}
-    </span>
+    </span> : <></>
   ), [data.mode]);
 
   return (

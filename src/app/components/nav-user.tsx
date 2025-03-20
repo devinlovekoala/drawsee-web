@@ -29,7 +29,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/app/components/ui/sidebar.tsx"
-
+import { useAppContext } from "@/app/contexts/AppContext";
 interface Props {
   user: {
     name: string;
@@ -39,6 +39,7 @@ interface Props {
 
 export function NavUser({user}: Props) {
   const { isMobile } = useSidebar()
+  const { handleLogout } = useAppContext();
 
   return (
     <SidebarMenu>
@@ -102,7 +103,7 @@ export function NavUser({user}: Props) {
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleLogout()}>
               <LogOut />
               Log out
             </DropdownMenuItem>

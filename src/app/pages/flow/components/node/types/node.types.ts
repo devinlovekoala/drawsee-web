@@ -28,6 +28,7 @@ export interface AnswerNodeData extends BaseNodeData {
 
 export interface KnowledgeHeadNodeData extends BaseNodeData {
   [key: string]: unknown;
+  isGenerated: boolean;
 }
 
 export interface KnowledgeDetailNodeData extends BaseNodeData {

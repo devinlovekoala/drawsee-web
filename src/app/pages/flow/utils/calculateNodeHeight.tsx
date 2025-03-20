@@ -83,7 +83,7 @@ export function calculateNodeHeight(node: Node<NodeData<NodeType>>): number {
   console.error = originalConsoleError; // Restore original console.error
 
   // 统计获得高度所需的时间并输出
-  const startTime = performance.now();
+  //const startTime = performance.now();
 
   // 计算需要额外加的高度
   let extraHeight = 0;
@@ -107,8 +107,8 @@ export function calculateNodeHeight(node: Node<NodeData<NodeType>>): number {
   // 确保最小高度
   height = Math.max(height, NODE_DEFAULT_HEIGHT);
 
-  const endTime = performance.now();
-  console.log(`获得${node.type}节点高度所需的时间: ${endTime - startTime}毫秒`);
+  //const endTime = performance.now();
+  //console.log(`获得${node.type}节点高度所需的时间: ${endTime - startTime}毫秒`);
 
   return height + extraHeight;
 }

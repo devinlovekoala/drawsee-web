@@ -15,15 +15,19 @@ import {
 } from "@/app/components/ui/collapsible.tsx";
 import DrawSeeIcon from '@/assets/svg/昭析.svg';
 import { useLocation, useNavigate } from "react-router-dom";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect } from "react";
 import { useAppContext } from "@/app/contexts/AppContext";
 import { FlowLocationState } from "@/app/contexts/FlowContext";
 
-function AppSideBar() {
+interface AppSideBarProps {
+  activeConversationId: number | null;
+  setActiveConversationId: (id: number | null) => void;
+}
+
+function AppSideBar({activeConversationId, setActiveConversationId}: AppSideBarProps) {
     const navigate = useNavigate();
     const location = useLocation();
     const {conversations, isLogin} = useAppContext();
-    const [activeConversationId, setActiveConversationId] = useState<number | null>(null);
 
     // 从location中获取当前会话ID
     useEffect(() => {
@@ -33,12 +37,12 @@ function AppSideBar() {
       } else {
         setActiveConversationId(null);
       }
-    }, [location]);
+    }, [location, setActiveConversationId]);
 
     const handleConversationClick = useCallback((convId: number) => {
       setActiveConversationId(convId);
       navigate('/flow', {state: {convId} as FlowLocationState});
-    }, [navigate]);
+    }, [navigate, setActiveConversationId]);
 
     return (
 			<Sidebar className="pr-4 bg-gradient-to-b from-neutral-50 to-neutral-100" variant="inset">
@@ -58,7 +62,10 @@ function AppSideBar() {
 					<SidebarContent className="overflow-y-auto max-h-[calc(100vh-100px)] scrollbar-hide">
 					<div className="pl-4 pr-1.5 mt-6">
 							<button
-							onClick={() => navigate('/blank')}
+							onClick={() => {
+								setActiveConversationId(null);
+								navigate('/blank');
+							}}
 							className="group px-[12px] text-[14px] select-none h-12 items-center leading-5 tracking-normal gap-2 flex w-full cursor-pointer justify-between rounded-lg bg-white py-4 text-left font-medium text-neutral-900 shadow-sm ring-1 ring-neutral-200 transition duration-200 hover:shadow-md hover:ring-neutral-300">
 							<span className="transition-colors group-hover:text-neutral-700">新建对话</span>
 							<MessageCirclePlus size="18px" className="transition-transform group-hover:scale-110" />

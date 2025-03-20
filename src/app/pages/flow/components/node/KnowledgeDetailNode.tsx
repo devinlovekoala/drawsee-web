@@ -331,7 +331,7 @@ const KnowledgeDetailNode = React.memo(function KnowledgeDetailNode({
     if (!props.data.text) return null;
     
     return (
-      <article className="node-content select-text prose prose-xl max-w-none px-3">
+      <article className="node-content prose prose-xl max-w-none px-3">
         <MarkdownWithLatex className="scrollbar-hide" text={props.data.text} />
       </article>
     );

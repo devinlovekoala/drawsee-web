@@ -1,4 +1,4 @@
-import {Background, BackgroundVariant, ReactFlow, type Node, Panel, OnNodesChange, applyNodeChanges, applyEdgeChanges, OnEdgesChange} from "@xyflow/react";
+import {Background, BackgroundVariant, ReactFlow, type Node, Panel, OnNodesChange, applyNodeChanges, applyEdgeChanges, OnEdgesChange, MiniMap} from "@xyflow/react";
 import RootNode from "@/app/pages/flow/components/node/RootNode";
 import QueryNode from "@/app/pages/flow/components/node/QueryNode";
 import AnswerNode from "@/app/pages/flow/components/node/AnswerNode";
@@ -21,6 +21,8 @@ import { toast } from "sonner";
 import './styles/index.css';
 import { TEMP_QUERY_NODE_ID_PREFIX } from "./constants";
 import { FlowContext, FlowLocationState } from "@/app/contexts/FlowContext";
+import FlowToolBar from "./components/FlowToolBar";
+import { useAppContext } from "@/app/contexts/AppContext";
 
 const nodeTypes = {
   'root': RootNode,
@@ -36,6 +38,8 @@ function Flow() {
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   // 用户输入
   const [userInput, setUserInput] = useState<string>('');
+  // 展示小地图
+  const [showMiniMap, setShowMiniMap] = useState<boolean>(true);
   // 获取location中的convId和taskId
   const {convId, taskId: taskIdFromLocation} = useLocation().state as FlowLocationState;
   // 使用FlowState Hook
@@ -51,8 +55,10 @@ function Flow() {
 
   const {executeLayout, executeFitView} = useFlowTools();
 
+  const {nodeWidth, setNodeWidth} = useAppContext();
+
   const onNodesChange: OnNodesChange = useCallback((changes) => {
-    console.log('onNodesChange', changes);
+    //console.log('onNodesChange', changes);
     
     setElements(({nodes, edges}) => {
       let newNodes = nodes;
@@ -111,16 +117,16 @@ function Flow() {
       changes.forEach((change) => {
         if (change.type === 'dimensions') {
           // 修改newNodes中id相同的节点
-          newNodes.forEach((node) => {
+          newNodes.forEach((node, index) => {
             if (node.id === change.id) {
               const curHeight = node.data.height as number | undefined;
               const newHeight = change.dimensions?.height;
-              console.log('curHeight', curHeight, 'newHeight', newHeight);
-              node.data.height = newHeight;
+              //console.log('curHeight', curHeight, 'newHeight', newHeight);
+              newNodes[index].data.height = newHeight;
               if (!node.id.startsWith(TEMP_QUERY_NODE_ID_PREFIX) && (
                 ( curHeight === undefined && newHeight !== undefined ) ||
                 ( curHeight !== undefined && newHeight !== undefined && 
-                  Math.abs(newHeight - curHeight) > 8 )
+                  Math.abs(newHeight - curHeight) > 10 )
               )) {
                 updateHeightNodeCount++;
               }
@@ -128,7 +134,9 @@ function Flow() {
           });
         }
       });
-      if (updateHeightNodeCount > 0) {
+      // updateHeightNodeCount 超过node总数的一半
+      //console.log('updateHeightNodeCount', updateHeightNodeCount, 'newNodes.length', newNodes.length);
+      if (updateHeightNodeCount > (newNodes.length / 2)) {
         console.log('实际渲染时height变化了', updateHeightNodeCount, '次，进行布局');
         // 进行布局
         executeLayout(newNodes, edges, true);
@@ -182,6 +190,15 @@ function Flow() {
           ...(node.type !== 'root' ? node.data : {})
         } as NodeData<typeof node.type>;
   
+        // 如果节点是knowledge-head，则判断是否已经生成
+        if (node.type === 'knowledge-head') {
+          apiNodes.forEach(apiNode => {
+            if (apiNode.parentId === node.id && apiNode.type === 'knowledge-detail') {
+              data.isGenerated = true;
+            }
+          });
+        }
+
         return {
           id: node.id.toString(),
           type: node.type,
@@ -222,6 +239,26 @@ function Flow() {
       setIsLoading(false);
       toast.error('获取节点数据失败');
     });
+  
+  const handleRelayout = useCallback((resetHeight: boolean = false, newNodeWidth?: number) => {
+    if (isChatting) return;
+    console.log('handleRelayout');
+    setElements(({nodes, edges}) => {
+      const layoutedNodes = executeLayout(nodes, edges, true, resetHeight, newNodeWidth);
+      executeFitView(layoutedNodes.map(node => node.id), 350, 600, 0.8, 0.2);
+      return {
+        nodes: layoutedNodes,
+        edges
+      };
+    });
+  }, [executeFitView, executeLayout, isChatting, setElements]);
+
+  const handleNodeWidthChange = useCallback((width: number) => {
+    setNodeWidth(width);
+    setTimeout(() => {
+      handleRelayout(true, width);
+    }, 100);
+  }, [handleRelayout, setNodeWidth]);
 
   const flowChat = useCallback((taskId: number) => {
     // 将当前选中的节点的selected设置为false
@@ -252,6 +289,7 @@ function Flow() {
 
   return (
     <FlowContext.Provider value={{
+      isChatting,
       convId,
       chat: flowChat
     }}>
@@ -269,6 +307,7 @@ function Flow() {
         selectionKeyCode={null}
         multiSelectionKeyCode={null}
         deleteKeyCode={null}
+        panActivationKeyCode={"Space"}
         onlyRenderVisibleElements={true} // 只渲染可见元素，提高性能
         maxZoom={2}
         minZoom={0.01}
@@ -289,6 +328,9 @@ function Flow() {
         }}
       >
         <Background variant={BackgroundVariant.Lines} size={10}/>
+        {showMiniMap && (
+          <MiniMap nodeStrokeWidth={3} nodeColor={'#b8b8b8'} style={{borderRadius: '10px'}} />
+        )}
         <Panel position={"bottom-center"}>
           <FlowInputPanel
             prompt={userInput}
@@ -297,6 +339,15 @@ function Flow() {
             canNotInputReason={canNotInputReason}
             addTempQueryNodeTask={addTempQueryNodeTask}
             parentIdOfTempQueryNode={parentIdOfTempQueryNode}
+          />
+        </Panel>
+        <Panel position={"top-right"}>
+          <FlowToolBar
+            showMiniMap={showMiniMap}
+            setShowMiniMap={setShowMiniMap}
+            onRelayout={handleRelayout} 
+            onNodeWidthChange={handleNodeWidthChange} 
+            nodeWidth={nodeWidth} 
           />
         </Panel>
       </ReactFlow>

@@ -267,10 +267,10 @@ export function dagreLayout(nodes: Node[], edges: Edge[], shouldUpdateServer: bo
   }
 }
 
-export function entitreeFlexLayout(nodes: Node[], edges: Edge[], shouldUpdateServer: boolean = false, resetHeight: boolean = false): { nodes: Node[], edges: Edge[] } {
+export function entitreeFlexLayout(nodes: Node[], edges: Edge[], nodeWidth: number, shouldUpdateServer: boolean = false, resetHeight: boolean = false): { nodes: Node[], edges: Edge[] } {
   // 记录开始时间
-  const startTime = performance.now();
-  
+  //const startTime = performance.now();
+
   try {
     if (nodes.length === 0) {
       return { nodes, edges };
@@ -295,11 +295,11 @@ export function entitreeFlexLayout(nodes: Node[], edges: Edge[], shouldUpdateSer
     const flatTree = {} as Record<string, { width: number, height: number, children: string[], parents: string[] }>;
     
     // 性能统计
-    let heightCalculationTime = 0;
-    let cachedHeightCount = 0;
+    //let heightCalculationTime = 0;
+    //let cachedHeightCount = 0;
     
     nodes.forEach(node => {
-      const width = node.type !== 'root' ? NODE_WIDTH : ROOT_NODE_SIZE;
+      const width = node.type !== 'root' ? nodeWidth : ROOT_NODE_SIZE;
       let height: number;
       
       // 获得节点高度
@@ -309,14 +309,14 @@ export function entitreeFlexLayout(nodes: Node[], edges: Edge[], shouldUpdateSer
         height = ROOT_NODE_SIZE;
       } else if (!resetHeight && node.data.height !== undefined) {
         height = node.data.height as number;
-        cachedHeightCount++;
+        //cachedHeightCount++;
       } else {
         // 如果没有缓存高度，则计算高度
-        const calcStartTime = performance.now();
+        //const calcStartTime = performance.now();
         height = calculateNodeHeight(node as Node<NodeData<NodeType>>);
-        const calcEndTime = performance.now();
-        heightCalculationTime += (calcEndTime - calcStartTime);
-        console.log(`${node.type}节点进行calculateNodeHeight，结果：${height}，用时: ${calcEndTime - calcStartTime}毫秒`);
+        //const calcEndTime = performance.now();
+        //heightCalculationTime += (calcEndTime - calcStartTime);
+        //console.log(`${node.type}节点进行calculateNodeHeight，结果：${height}，用时: ${calcEndTime - calcStartTime}毫秒`);
         
         // 将没有高度信息的节点添加到需要更新的列表中
         if (!node.id.startsWith(TEMP_QUERY_NODE_ID_PREFIX)) {
@@ -342,7 +342,7 @@ export function entitreeFlexLayout(nodes: Node[], edges: Edge[], shouldUpdateSer
     const settings = {
       clone: false, // 如果您的应用程序不允许编辑原始对象，则返回输入的副本
       enableFlex: true, // 如果关闭，性能略好（不会读取node.width，node.height）
-      firstDegreeSpacing: 60, // 节点之间的间距（像素），属于同一源的节点，例如具有相同父节点的子节点
+      firstDegreeSpacing: 75, // 节点之间的间距（像素），属于同一源的节点，例如具有相同父节点的子节点
       nextAfterAccessor: "spouses", // 用于在当前节点之后侧向移动的侧节点属性
       nextAfterSpacing: 10, // 当前节点之后的"侧"节点的间距
       nextBeforeAccessor: "siblings", // 用于在当前节点之前侧向移动的侧节点属性
@@ -354,7 +354,7 @@ export function entitreeFlexLayout(nodes: Node[], edges: Edge[], shouldUpdateSer
       rootY: 0, // 如果不是0，设置根节点的位置
       secondDegreeSpacing: 20, // 节点之间的间距（像素），不属于同一父节点的节点，例如"cousin"节点
       sourcesAccessor: "parents", // 用作祖先ID数组的属性
-      sourceTargetSpacing: 100, // 在垂直方向上节点之间的间距（垂直方向），否则在水平方向
+      sourceTargetSpacing: 120, // 在垂直方向上节点之间的间距（垂直方向），否则在水平方向
       targetsAccessor: "children", // 用作子节点ID数组的属性
     } as Partial<Settings>;
     
@@ -400,11 +400,11 @@ export function entitreeFlexLayout(nodes: Node[], edges: Edge[], shouldUpdateSer
     }).filter((node: Node | null): node is Node => node !== null);
     
     // 输出性能统计
-    const endTime = performance.now();
-    const totalTime = endTime - startTime;
-    console.log(`布局计算总耗时: ${totalTime.toFixed(2)}ms`);
-    console.log(`高度计算耗时: ${heightCalculationTime.toFixed(2)}ms (${(heightCalculationTime / totalTime * 100).toFixed(2)}%)`);
-    console.log(`使用缓存高度的节点数: ${cachedHeightCount}/${nodes.length} (${(cachedHeightCount / nodes.length * 100).toFixed(2)}%)`);
+    //const endTime = performance.now();
+    //const totalTime = endTime - startTime;
+    //console.log(`布局计算总耗时: ${totalTime.toFixed(2)}ms`);
+    //console.log(`高度计算耗时: ${heightCalculationTime.toFixed(2)}ms (${(heightCalculationTime / totalTime * 100).toFixed(2)}%)`);
+    //console.log(`使用缓存高度的节点数: ${cachedHeightCount}/${nodes.length} (${(cachedHeightCount / nodes.length * 100).toFixed(2)}%)`);
     
     // 更新服务器
     if (shouldUpdateServer && nodesToUpdate.length > 0) {

@@ -2,9 +2,12 @@ import { Handle, Position, NodeProps, useReactFlow } from '@xyflow/react';
 import { NodeType } from '@/api/types/flow.types';
 import { format } from 'date-fns';
 import type { NodeData } from '../types/node.types';
-import { NODE_WIDTH, NODE_MIN_HEIGHT, NODE_DEFAULT_HEIGHT } from '../../../constants';
+import { NODE_MIN_HEIGHT, NODE_DEFAULT_HEIGHT, NODE_WIDTH } from '../../../constants';
 import MarkdownWithLatex from '../../markdown/MarkdownWithLatex';
 import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
+import { useAppContext } from '@/app/contexts/AppContext';
+import CopyButton from '../../button/CopyButton';
+import DownloadImgButton from '../../button/DownloadImgButton';
 
 // 缩放阈值常量
 const ZOOM_THRESHOLD = 0.40; // 低于此值时使用简化显示
@@ -72,7 +75,7 @@ function arePropsEqual<T extends NodeType>(
   if (prevData.text !== nextData.text) return false;
   if (prevData.updatedAt !== nextData.updatedAt) return false;
   if (prevData.height !== nextData.height) return false;
-  
+
   // 检查自定义内容
   if (prevProps.customContent !== nextProps.customContent) return false;
   if (prevProps.headerContent !== nextProps.headerContent) return false;
@@ -99,12 +102,13 @@ export const BaseNode = React.memo(function BaseNode<T extends NodeType>({
 }: ExtendedNodeProps<T>) {
   const nodeData = data as unknown as HasTitleText;
   const { getViewport } = useReactFlow();
+  const { nodeWidth } = useAppContext();
   const nodeRef = useRef<HTMLDivElement>(null);
   
   // 缩放状态
   const [currentZoom, setCurrentZoom] = useState(() => getViewport().zoom);
   const [isSimplifiedView, setIsSimplifiedView] = useState(() => getViewport().zoom < ZOOM_THRESHOLD);
-  
+
   // 计算预览文本字体大小 - 缩放越小，字体越大
   const previewFontSize = useMemo(() => {
     if (!isSimplifiedView) return MIN_PREVIEW_FONT_SIZE;
@@ -127,21 +131,26 @@ export const BaseNode = React.memo(function BaseNode<T extends NodeType>({
   
   // 分别为简化视图和正常视图设置不同的样式
   const simplifiedNodeStyles = useMemo(() => ({
-    width: NODE_WIDTH,
+    width: nodeWidth || NODE_WIDTH,
     height: `${nodeHeight}px`,
     minHeight: `${NODE_MIN_HEIGHT}px`
-  }), [nodeHeight]);
+  }), [nodeHeight, nodeWidth]);
   
   const normalNodeStyles = useMemo(() => ({
-    width: NODE_WIDTH,
+    width: nodeWidth || NODE_WIDTH,
     minHeight: `${NODE_MIN_HEIGHT}px`
-  }), []);
+  }), [nodeWidth]);
   
+  // 版本号
+  const [, setVersion] = useState(0);
+
   // 清除缓存，当节点关键属性改变时
   useEffect(() => {
     // 清除此节点的旧缓存
     if (nodeContentCache[id]) {
       delete nodeContentCache[id];
+      // 强制刷新
+      setVersion(v => v + 1);
     }
   }, [id, nodeData.title, nodeData.text, nodeData.height, selected]);
   
@@ -185,6 +194,7 @@ export const BaseNode = React.memo(function BaseNode<T extends NodeType>({
     
     // 在非简化视图下，使用缓存 (如果存在)
     if (nodeContentCache[id]) {
+      //console.log('使用缓存', id);
       return nodeContentCache[id];
     }
     
@@ -194,17 +204,24 @@ export const BaseNode = React.memo(function BaseNode<T extends NodeType>({
         {/* Header with light effect */}
         <div className={`base-node-header ${selected ? 'selected' : 'default'}`}>
           <div className="base-node-header-glow"></div>
+          {/* 标题 */}
           {hasTitle && <h3 className={`base-node-title ${selected ? 'selected' : 'default'}`}>{nodeData.title}</h3>}
+          {/* 其他内容 */}
           {headerContent}
+          {/* 复制按钮 */}
+          <div className="flex items-center gap-2">
+            <DownloadImgButton element={nodeRef.current!} size={24} />
+            <CopyButton getText={() => nodeData.text || ''} size={24} />
+          </div>
         </div>
 
         {/* Content with subtle gradient */}
-        <div className={`base-node-content nodrag nopan`}>
+        <div className={`base-node-content nodrag ${selected ? 'select-text nopan' : 'select-none'}`}>
           {customContent ? (
             customContent
           ) : (
             hasText && (
-              <article className="node-content select-text prose prose-xl max-w-none px-3">
+              <article className={`node-content prose prose-xl max-w-none px-3`}>
                 <MarkdownWithLatex 
                   className="scrollbar-hide" 
                   text={nodeData.text || ''} 

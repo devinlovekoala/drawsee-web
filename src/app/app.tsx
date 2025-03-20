@@ -1,4 +1,4 @@
-import {Outlet, useNavigate} from "react-router-dom";
+import {Outlet, useLocation, useNavigate} from "react-router-dom";
 import { Toaster } from "@/common/components/ui/sonner.tsx";
 import {
   SidebarInset,
@@ -15,22 +15,54 @@ import AuthForm from "@/app/components/form/auth-form.tsx";
 import { FlowLocationState } from "@/app/contexts/FlowContext";
 import AppSideBar from "./components/AppSideBar";
 import { AppContext } from "@/app/contexts/AppContext";
+import { NODE_WIDTH } from "./pages/flow/constants";
 
 function App() {
   const navigate = useNavigate();
   
   const [conversations, setConversations] = useState<Array<ConversationVO>>([]);
+  const [activeConversationId, setActiveConversationId] = useState<number | null>(null);
   const [isLogin, setIsLogin] = useState<boolean>(true);
+  const [nodeWidth, setNodeWidth] = useState<number>(NODE_WIDTH);
 
-  const {send} = useRequest(getConversations(), {immediate: false});
+  const location = useLocation();
+  
+  const {send} = useRequest(getConversations(), {immediate: false, force: true});
 
   const getConvData = useCallback(() => {
     send().then((data) => {
       setConversations(data);
+      //console.log('getConvData, conversations', data);
     }).catch((error: Error) => {
       toast.error(`获取会话数据失败，${error.message}`);
     });
   }, [send]);
+
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      // 设置一个标志，表示页面正在被刷新
+      sessionStorage.setItem('isRefreshing', 'true');
+    };
+    const handlePopState = () => {
+      // 当用户进行前进或后退导航时，清除刷新标志
+      sessionStorage.removeItem('isRefreshing');
+      getConvData(); // 在前进或后退时执行 getConvData
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('popstate', handlePopState);
+    // 检查页面是否被刷新
+    const isRefreshing = sessionStorage.getItem('isRefreshing') === 'true';
+    if (isRefreshing) {
+      // 处理刷新情况
+      console.log('页面被刷新');
+      sessionStorage.removeItem('isRefreshing'); // 检查后清除标志
+      getConvData(); // 刷新后执行 getConvData
+    }
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [getConvData, location.pathname]);
 
   useEffect(() => {
     const loginFlag = sessionStorage.getItem(LOGIN_FLAG_KEY);
@@ -47,8 +79,6 @@ function App() {
           toast.error("未登录，请先登录");
           setIsLogin(false);
         });
-    } else {
-      getConvData();
     }
   }, [getConvData, navigate]);
 
@@ -63,27 +93,47 @@ function App() {
   }, [getConvData, navigate]);
 
   const handleTitleUpdate = useCallback((convId: number, title: string) => {
-    setConversations((prev) =>
-      prev.map((conversation) =>
+    console.log('handleTitleUpdate', convId, title);
+    setConversations((prev) => {
+      const newConversations = prev.map((conversation) =>
         conversation.id === convId
           ? { ...conversation, title }
           : conversation
-      )
-    );
+      );
+      console.log('handleTitleUpdate, newConversations', newConversations);
+      return newConversations;
+    });
   }, []);
 
   const handleBlankQuery = useCallback((data: CreateAiTaskVO) => {
-    setConversations((prev) => [data.conversation, ...prev]);
+    setConversations((prev) => {
+      const newConversations = [{...data.conversation}, ...prev];
+      console.log('handleBlankQuery, newConversations', newConversations);
+      return newConversations;
+    });
+    setActiveConversationId(data.conversation.id);
     navigate('/flow', {state: {convId: data.conversation.id, taskId: data.taskId} as FlowLocationState});
-  }, [navigate]);
+  }, [navigate, setActiveConversationId]);
 
   const handleNewChat = useCallback((convId: number) => {
     // 把convId对应的conversation移动到最前面
-    setConversations((prev) => [prev.find((c) => c.id === convId) as ConversationVO, ...prev.filter((c) => c.id !== convId)]);
+    setConversations((prev) => {
+      const conversationToMove = prev.find(conversation => conversation.id === convId);
+      console.log('handleNewChat, conversationToMove, prev', conversationToMove, prev);
+      if (!conversationToMove) return prev;
+      return [conversationToMove, ...prev.filter(conversation => conversation.id !== convId)];
+    });
   }, []);
 
+  const handleLogout = useCallback(() => {
+    sessionStorage.clear();
+    localStorage.clear();
+    setIsLogin(false);
+    navigate('/');
+  }, [navigate]);
+
   return (
-    <AppContext.Provider value={{conversations, isLogin, handleBlankQuery, handleTitleUpdate, handleNewChat}}>
+    <AppContext.Provider value={{conversations, isLogin, nodeWidth, setNodeWidth, handleBlankQuery, handleTitleUpdate, handleNewChat, handleLogout}}>
       {/* 登录模态框 */}
       {!isLogin && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm">
@@ -96,7 +146,10 @@ function App() {
       {/* 主页面 */}
       <SidebarProvider>
         {/* 左边 */}
-        <AppSideBar/>
+        <AppSideBar
+          activeConversationId={activeConversationId}
+          setActiveConversationId={setActiveConversationId}
+        />
 
         {/* 右边 */}
         <SidebarInset>

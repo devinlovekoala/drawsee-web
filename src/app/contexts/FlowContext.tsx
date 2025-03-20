@@ -8,11 +8,13 @@ export type FlowLocationState = {
 export type FlowContextType = {
   chat: (taskId: number) => void;
   convId: number;
+  isChatting: boolean;
 }
 
 export const FlowContext = createContext<FlowContextType>({
   chat: () => {},
   convId: -1,
+  isChatting: false,
 });
 
 export const useFlowContext = () => {
