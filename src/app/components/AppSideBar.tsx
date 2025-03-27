@@ -18,13 +18,15 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useCallback, useEffect } from "react";
 import { useAppContext } from "@/app/contexts/AppContext";
 import { FlowLocationState } from "@/app/contexts/FlowContext";
+import { LOGIN_FLAG_KEY } from "@/common/constant/storage-key.constant";
 
 interface AppSideBarProps {
   activeConversationId: number | null;
   setActiveConversationId: (id: number | null) => void;
+  className?: string;
 }
 
-function AppSideBar({activeConversationId, setActiveConversationId}: AppSideBarProps) {
+function AppSideBar({activeConversationId, setActiveConversationId, className}: AppSideBarProps) {
     const navigate = useNavigate();
     const location = useLocation();
     const {conversations, isLogin} = useAppContext();
@@ -44,11 +46,19 @@ function AppSideBar({activeConversationId, setActiveConversationId}: AppSideBarP
       navigate('/flow', {state: {convId} as FlowLocationState});
     }, [navigate, setActiveConversationId]);
 
+		const { openSideBar } = useAppContext();
+
     return (
-			<Sidebar className="pr-4 bg-gradient-to-b from-neutral-50 to-neutral-100" variant="inset">
+			<Sidebar className={`pr-4 bg-gradient-to-b from-neutral-50 to-neutral-100 ${className}`} variant="inset">
 					{/* 头部标志 */}
-					<SidebarHeader className="border-b border-neutral-200">
-					<div className="cursor-pointer relative m-3 mb-3 hidden transition-all md:flex justify-start items-center shrink-0">
+					<SidebarHeader className={`border-b border-neutral-200 ${openSideBar ? '' : 'hidden'}`}>
+					<div className="cursor-pointer relative m-3 mb-3 hidden transition-all md:flex justify-start items-center shrink-0"
+						onClick={() => {
+							setActiveConversationId(null);
+							sessionStorage.removeItem(LOGIN_FLAG_KEY);
+							navigate('/about');
+						}}
+					>
 							<div className="pointer-events-none select-none relative flex items-center gap-1">
 							<img className="h-[32px] transition-transform hover:scale-110" src={DrawSeeIcon} alt="DrawSee" />
 							<div className="ml-2 text-[32px] font-bold overflow-hidden whitespace-nowrap bg-gradient-to-r from-neutral-950 to-neutral-500 bg-clip-text text-transparent">
@@ -59,16 +69,16 @@ function AppSideBar({activeConversationId, setActiveConversationId}: AppSideBarP
 					</SidebarHeader>
 
 					{/* 中间内容 */}
-					<SidebarContent className="overflow-y-auto max-h-[calc(100vh-100px)] scrollbar-hide">
+					<SidebarContent className={`overflow-y-auto max-h-[calc(100vh-100px)] scrollbar-hide ${openSideBar ? '' : 'hidden'}`}>
 					<div className="pl-4 pr-1.5 mt-6">
 							<button
-							onClick={() => {
-								setActiveConversationId(null);
-								navigate('/blank');
-							}}
-							className="group px-[12px] text-[14px] select-none h-12 items-center leading-5 tracking-normal gap-2 flex w-full cursor-pointer justify-between rounded-lg bg-white py-4 text-left font-medium text-neutral-900 shadow-sm ring-1 ring-neutral-200 transition duration-200 hover:shadow-md hover:ring-neutral-300">
-							<span className="transition-colors group-hover:text-neutral-700">新建对话</span>
-							<MessageCirclePlus size="18px" className="transition-transform group-hover:scale-110" />
+								onClick={() => {
+									setActiveConversationId(null);
+									navigate('/blank');
+								}}
+								className="group px-[12px] text-[14px] select-none h-12 items-center leading-5 tracking-normal gap-2 flex w-full cursor-pointer justify-between rounded-lg bg-white py-4 text-left font-medium text-neutral-900 shadow-sm ring-1 ring-neutral-200 transition duration-200 hover:shadow-md hover:ring-neutral-300">
+								<span className="transition-colors group-hover:text-neutral-700">新建对话</span>
+								<MessageCirclePlus size="18px" className="transition-transform group-hover:scale-110" />
 							</button>
 
 							<Collapsible defaultOpen={true}>
@@ -85,7 +95,7 @@ function AppSideBar({activeConversationId, setActiveConversationId}: AppSideBarP
 									<div
 										key={conversation.id}
 										onClick={() => handleConversationClick(conversation.id)}
-										className={`
+										className={` truncate text-ellipsis
 										group relative flex select-none items-center justify-between gap-1 rounded-lg mx-1 px-3 py-2.5 text-sm
 										${activeConversationId === conversation.id 
 											? 'bg-white shadow-sm ring-1 ring-neutral-300 font-medium text-neutral-900' 
@@ -110,9 +120,9 @@ function AppSideBar({activeConversationId, setActiveConversationId}: AppSideBarP
 					</SidebarContent>
 
 					{/* 底部用户 */}
-					<SidebarFooter className="border-t border-neutral-200">
+					<SidebarFooter className={`border-t border-neutral-200 ${openSideBar ? '' : 'hidden'}`}>
 					{isLogin && (
-							<NavUser user={{name: 'Jason', avatar: 'https://avatars.githubusercontent.com/u/10216806?v=4'}}/>
+						<NavUser />
 					)}
 					</SidebarFooter>
 			</Sidebar>

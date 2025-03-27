@@ -2,7 +2,7 @@ import { NodeVO } from "@/api/types/flow.types";
 import { Edge, Node } from "@xyflow/react";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { NodeData } from "../components/node/types/node.types";
-import { ChatTask, MediaData, TextData } from "../types/ChatTask.types";
+import { ChatTask, TextData } from "../types/ChatTask.types";
 import { useAppContext } from "@/app/contexts/AppContext";
 import { toast } from "sonner";
 import { BASE_URL } from "@/api";
@@ -89,7 +89,7 @@ function useFlowState(convId: number) {
             const newNodeLayoutedPosition = layoutedNodes.find(node => node.id === newNode.id)?.position;
             console.log('newNodeLayoutedPosition', newNodeLayoutedPosition);
             // 调整视口以显示最新内容
-            executeFitView([newNode.id], 250);
+            executeFitView([newNode.id], 500);
 
             // 如果节点是knowledge-detail，则修改knowledge-head的isGenerated为true
             if (nodeVO.type === 'knowledge-detail') {
@@ -132,7 +132,7 @@ function useFlowState(convId: number) {
             // 调整视口以显示最新内容
             setTimeout(() => {
               adjustViewportToShowLatestContent(targetNode);
-            }, 200);
+            }, 300);
             return {
               nodes: updatedNodes,
               edges,
@@ -140,10 +140,14 @@ function useFlowState(convId: number) {
           });
           break;
         }
-        // 新增媒体
-        case 'media': {
-          const mediaData = task.data as MediaData;
-          const nodeId = mediaData.nodeId.toString();
+        // 修改节点data
+        case 'data': {
+          const data = task.data as {
+            nodeId: number;
+            [key: string]: unknown;
+          };
+          const nodeId = data.nodeId.toString();
+          // 更新对应id节点的data
           setElements(({nodes, edges}) => {
             const targetNode = nodes.find(node => node.id === nodeId);
             if (!targetNode) return {nodes, edges};
@@ -153,18 +157,14 @@ function useFlowState(convId: number) {
               {
                 ...node, 
                 data: {
-                  ...node.data, 
-                  media: {
-                    animationObjectNames: mediaData.animationObjectNames,
-                    bilibiliUrls: mediaData.bilibiliUrls,
-                  }
+                  ...node.data,
+                  // 去除nodeId
+                  ...Object.fromEntries(
+                    Object.entries(data).filter(([key]) => key !== 'nodeId')
+                  )
                 }
               } : node
             );
-            // 调整视口以显示最新内容
-            setTimeout(() => {
-              adjustViewportToShowLatestContent(targetNode);
-            }, 200);
             return {
               nodes: updatedNodes,
               edges,
@@ -196,7 +196,7 @@ function useFlowState(convId: number) {
           // 执行fitView
           if (lastFocusNodeId.current) {
             console.log('最终布局执行fitView', lastFocusNodeId.current);
-            executeFitView([lastFocusNodeId.current], 400);
+            executeFitView([lastFocusNodeId.current], 1000);
           }
           break;
         }
@@ -236,7 +236,7 @@ function useFlowState(convId: number) {
     setIsChatting(true);
     // 设置最后需要聚焦的节点id
     lastFocusNodeId.current = null;
-    
+
     // SSE请求
     const source = new SSE(
       `${BASE_URL}/flow/completion?taskId=${taskId}`,
@@ -282,6 +282,7 @@ function useFlowState(convId: number) {
     // 方法
     chat,
     setElements,
+    addChatTask
   };
 }
 

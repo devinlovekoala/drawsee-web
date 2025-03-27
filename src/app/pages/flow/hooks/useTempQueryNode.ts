@@ -1,6 +1,6 @@
 import { useMemo, useRef, useCallback, useState, useEffect } from "react";
 import { Node, Edge } from "@xyflow/react";
-import { NodeType } from "@/api/types/flow.types";
+import { AiTaskType, NodeType } from "@/api/types/flow.types";
 import useFlowTools from "./useFlowTools";
 import { TEMP_QUERY_NODE_ID_PREFIX } from "../constants";
 
@@ -8,6 +8,7 @@ import { TEMP_QUERY_NODE_ID_PREFIX } from "../constants";
 export type TempQueryNodeTask = { 
   type: 'create' | 'update';
   text: string;
+  mode?: AiTaskType;
 } | {
   type: 'delete';
   fitViewNodeIds?: string[];
@@ -185,8 +186,12 @@ function useTempQueryNode(
               node.id === `${TEMP_QUERY_NODE_ID_PREFIX}pre` ? {
                 ...node,
                 id: newTempQueryNodeId,
-                data: { ...node.data, text: task.text },
-                selectable: false
+                data: { 
+                  ...node.data, 
+                  text: task.text,
+                  ...(task.mode ? {mode: task.mode} : {})
+                },
+                selectable: false,
               } : node
             );
             const updatedEdges = edgesWithPreTempNode.map(edge => 

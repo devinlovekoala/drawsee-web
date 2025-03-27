@@ -9,7 +9,7 @@ interface FlowToolBarProps {
   setShowMiniMap: (show: boolean) => void;
 }
 
-function FlowToolBar({ onRelayout, onNodeWidthChange, nodeWidth, showMiniMap, setShowMiniMap }: FlowToolBarProps) {
+function FlowRightToolBar({ onRelayout, onNodeWidthChange, nodeWidth, showMiniMap, setShowMiniMap }: FlowToolBarProps) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false); // 控制下拉框的显示状态
 
   const handleWidthChange = (width: number) => {
@@ -76,4 +76,4 @@ function FlowToolBar({ onRelayout, onNodeWidthChange, nodeWidth, showMiniMap, se
   );
 }
 
-export default FlowToolBar;
+export default FlowRightToolBar;

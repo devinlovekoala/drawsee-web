@@ -3,7 +3,7 @@ import { Check, ImageDown } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
-function DownloadImgButton({element, size = 16}: {element: HTMLElement, size?: number}) {
+function DownloadImgButton({element, size = 16, className}: {element: HTMLElement, size?: number, className?: string}) {
 
 	const [downloaded, setDownloaded] = useState(false);
 
@@ -27,7 +27,7 @@ function DownloadImgButton({element, size = 16}: {element: HTMLElement, size?: n
   return (
     <button
 			onClick={onDownload}
-			className="inline-flex rounded-md p-2 hover:bg-zinc-200 dark:hover:bg-zinc-800"
+			className={`inline-flex rounded-md p-2 hover:bg-zinc-200 dark:hover:bg-zinc-800 ${className}`}
 		>
 			<ImageDown
         size={size}

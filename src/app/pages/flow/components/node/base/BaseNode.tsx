@@ -1,4 +1,4 @@
-import { Handle, Position, NodeProps, useReactFlow } from '@xyflow/react';
+import { Handle, Position, NodeProps, useReactFlow, NodeToolbar } from '@xyflow/react';
 import { NodeType } from '@/api/types/flow.types';
 import { format } from 'date-fns';
 import type { NodeData } from '../types/node.types';
@@ -8,20 +8,13 @@ import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react'
 import { useAppContext } from '@/app/contexts/AppContext';
 import CopyButton from '../../button/CopyButton';
 import DownloadImgButton from '../../button/DownloadImgButton';
+import { Trash2 } from 'lucide-react';
 
 // 缩放阈值常量
 const ZOOM_THRESHOLD = 0.40; // 低于此值时使用简化显示
 const ZOOM_CHECK_INTERVAL = 200; // 检查缩放级别的间隔(ms)
 const MIN_PREVIEW_FONT_SIZE = 2.5; // 最小预览文本字体大小(rem)
 const MAX_PREVIEW_FONT_SIZE = 7; // 最大预览文本字体大小(rem)
-
-// 用于类型检查的接口
-interface HasTitleText {
-  title?: string;
-  text?: string;
-  createdAt: number;
-  height?: number;
-}
 
 // 扩展 NodeProps 的接口
 export interface ExtendedNodeProps<T extends NodeType> extends Omit<NodeProps, 'data'> {
@@ -75,6 +68,12 @@ function arePropsEqual<T extends NodeType>(
   if (prevData.text !== nextData.text) return false;
   if (prevData.updatedAt !== nextData.updatedAt) return false;
   if (prevData.height !== nextData.height) return false;
+  if (prevData.mode !== nextData.mode) return false;
+  if (prevData.process !== nextData.process) return false;
+  if (prevData.frame !== nextData.frame) return false;
+  if (prevData.objectName !== nextData.objectName) return false;
+  if (prevData.objectNames !== nextData.objectNames) return false;
+  if (prevData.urls !== nextData.urls) return false;
 
   // 检查自定义内容
   if (prevProps.customContent !== nextProps.customContent) return false;
@@ -93,6 +92,7 @@ function arePropsEqual<T extends NodeType>(
 export const BaseNode = React.memo(function BaseNode<T extends NodeType>({
   id,
   data,
+  type,
   headerContent,
   footerContent,
   customContent,
@@ -100,9 +100,15 @@ export const BaseNode = React.memo(function BaseNode<T extends NodeType>({
   showTargetHandle = true,
   selected,
 }: ExtendedNodeProps<T>) {
-  const nodeData = data as unknown as HasTitleText;
+  const nodeData = data as {
+    title: string;
+    createdAt: number;
+    text?: string;
+    height?: number;
+    [key: string]: unknown;
+  };
   const { getViewport } = useReactFlow();
-  const { nodeWidth } = useAppContext();
+  const { nodeWidth, openDeleteNodeDialog } = useAppContext();
   const nodeRef = useRef<HTMLDivElement>(null);
   
   // 缩放状态
@@ -124,7 +130,7 @@ export const BaseNode = React.memo(function BaseNode<T extends NodeType>({
       hasTitle: nodeData.title !== undefined,
       hasText: nodeData.text !== undefined,
       formattedDate: format(new Date(nodeData.createdAt), 'yyyy-MM-dd HH:mm'),
-      textPreview: extractPreview(nodeData.text, 100),
+      textPreview: extractPreview(nodeData?.text || '', 100),
       nodeHeight: nodeData.height || NODE_DEFAULT_HEIGHT
     };
   }, [nodeData.title, nodeData.text, nodeData.createdAt, nodeData.height]);
@@ -152,7 +158,11 @@ export const BaseNode = React.memo(function BaseNode<T extends NodeType>({
       // 强制刷新
       setVersion(v => v + 1);
     }
-  }, [id, nodeData.title, nodeData.text, nodeData.height, selected]);
+  }, [
+    id, selected, nodeData.title, nodeData.text, nodeData.height, 
+    nodeData?.mode, nodeData?.process, nodeData?.frame, nodeData?.objectName, nodeData?.objectNames, nodeData?.urls,
+    headerContent, footerContent, customContent, showSourceHandle, showTargetHandle
+  ]);
   
   // 定期检查缩放级别
   useEffect(() => {
@@ -208,11 +218,6 @@ export const BaseNode = React.memo(function BaseNode<T extends NodeType>({
           {hasTitle && <h3 className={`base-node-title ${selected ? 'selected' : 'default'}`}>{nodeData.title}</h3>}
           {/* 其他内容 */}
           {headerContent}
-          {/* 复制按钮 */}
-          <div className="flex items-center gap-2">
-            <DownloadImgButton element={nodeRef.current!} size={24} />
-            <CopyButton getText={() => nodeData.text || ''} size={24} />
-          </div>
         </div>
 
         {/* Content with subtle gradient */}
@@ -256,6 +261,16 @@ export const BaseNode = React.memo(function BaseNode<T extends NodeType>({
     textPreview, previewFontSize
   ]);
   
+  const canBeDeleted = useMemo(() => {
+    const nodeType = type as NodeType;
+    return nodeType === 'query' || nodeType === 'knowledge-detail' || nodeType === 'knowledge-head';
+  }, [type]);
+
+  const canBeCopied = useMemo(() => {
+    const nodeType = type as NodeType;
+    return nodeType !== 'resource';
+  }, [type]);
+
   return (
     <>
       <div
@@ -266,6 +281,28 @@ export const BaseNode = React.memo(function BaseNode<T extends NodeType>({
         {renderContent()}
       </div>
       
+      {/* ToolBar */}
+      <NodeToolbar position={Position.Top} align={'end'} >
+        <div className="flex items-center gap-2">
+          {/* 灰色背景 */}
+          <DownloadImgButton element={nodeRef.current!} size={20} className="bg-gray-50" />
+          {
+            canBeCopied &&
+            <CopyButton getText={() => nodeData.text || ''} size={20} className="bg-gray-50" />
+          }
+          {
+            selected && canBeDeleted &&
+            <button
+              className="p-2 bg-red-50 rounded-lg text-red-600 hover:bg-red-100 active:bg-red-200 transition-colors duration-200"
+              title="删除节点"
+              onClick={() => openDeleteNodeDialog(id)}
+            >
+              <Trash2 size={20} />
+            </button>
+          }
+        </div>
+      </NodeToolbar>
+
       {/* Handles 始终保持相同位置 */}
       {showSourceHandle && (
         <Handle

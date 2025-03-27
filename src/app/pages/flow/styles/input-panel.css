@@ -32,7 +32,7 @@
 
 @keyframes expandWidth {
   from {
-    width: 60%;
+    width: 75%;
   }
   to {
     width: 100%;
@@ -44,16 +44,16 @@
     width: 100%;
   }
   to {
-    width: 60%;
+    width: 75%;
   }
 }
 
 .animate-slide-in-top {
-  animation: slideInFromTop 0.2s ease-in-out, fadeIn 0.2s ease-in-out;
+  /* animation: slideInFromTop 0.2s ease-in-out, fadeIn 0.2s ease-in-out; */
 }
 
 .animate-slide-in-bottom {
-  animation: slideInFromBottom 0.2s ease-in-out, fadeIn 0.2s ease-in-out;
+  /* animation: slideInFromBottom 0.2s ease-in-out, fadeIn 0.2s ease-in-out; */
 }
 
 .animate-expand-width {
@@ -74,13 +74,13 @@
   will-change: content;
   transition-duration: 200ms;
   bottom: env(safe-area-inset-bottom);
-  transform: translateY(20%) translateX(-50%);
+  transform: translateY(30%) translateX(-50%);
   pointer-events: all;
 }
 
 @media (min-width: 640px) {
   .input-panel-container {
-    width: 24rem;
+    width: 30rem;
     position: absolute;
     margin-left: 0;
     margin-right: 0;
@@ -88,14 +88,24 @@
   }
 }
 
+/* 选择器容器样式 */
+.selectors-container {
+  position: absolute;
+  top: -2.8rem;
+  left: 0;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  transition-property: transform;
+  transition-duration: 200ms;
+  z-index: 51;
+}
+
 /* 模式选择按钮样式 */
 .mode-selector-wrapper {
-  position: absolute;
-  top: -3rem;
-  left: 0;
+  position: relative;
   display: flex;
-  width: 100%;
-  justify-content: center;
   transition-property: transform;
   transition-duration: 200ms;
 }
@@ -114,13 +124,13 @@
   gap: 0.5rem;
   padding: 0.5rem 0.75rem;
   border-radius: 0.75rem;
-  /* background-color: #f5f5f5; */
   background-color: white;
   transition-property: background-color;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   transition-duration: 150ms;
   outline: none;
-  ring: 1px #e5e5e5;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1);
+  white-space: nowrap; /* 防止文本换行 */
 }
 
 .mode-selector-button:hover {
@@ -139,6 +149,8 @@
 .mode-selector-text {
   font-size: 0.75rem;
   color: #4b5563;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .mode-selector-chevron {
@@ -175,7 +187,7 @@
 }
 
 .input-container.collapsed {
-  width: 60%;
+  width: 75%;
 }
 
 .input-textarea {
@@ -225,8 +237,10 @@
   position: absolute;
   bottom: 100%;
   margin-bottom: 0.5rem;
-  left: 0;
-  width: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 280px;
+  width: max-content;
   z-index: 10;
 }
 
@@ -234,8 +248,9 @@
   background-color: white;
   border-radius: 0.75rem;
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-  ring: 1px #e5e5e5;
+  border: 1px solid #e5e7eb;
   overflow: hidden;
+  width: 100%;
 }
 
 .mode-dropdown-header {
@@ -264,6 +279,7 @@
   transition-property: background-color;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   transition-duration: 150ms;
+  min-width: 260px;
 }
 
 .mode-option.selected {
@@ -282,6 +298,7 @@
   height: 2rem;
   border-radius: 9999px;
   background-color: #e5e5e5;
+  flex-shrink: 0;
 }
 
 .mode-option-icon {
@@ -293,6 +310,8 @@
 .mode-option-info {
   display: flex;
   flex-direction: column;
+  flex: 1;
+  min-width: 0;
 }
 
 .mode-option-name {
@@ -304,6 +323,8 @@
 .mode-option-description {
   font-size: 0.75rem;
   color: #6b7280;
+  white-space: normal;
+  word-break: break-word;
 }
 
 .mode-option-check {

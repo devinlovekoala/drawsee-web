@@ -313,7 +313,7 @@ export function entitreeFlexLayout(nodes: Node[], edges: Edge[], nodeWidth: numb
       } else {
         // 如果没有缓存高度，则计算高度
         //const calcStartTime = performance.now();
-        height = calculateNodeHeight(node as Node<NodeData<NodeType>>);
+        height = calculateNodeHeight(node as Node<NodeData<NodeType>>, nodeWidth);
         //const calcEndTime = performance.now();
         //heightCalculationTime += (calcEndTime - calcStartTime);
         //console.log(`${node.type}节点进行calculateNodeHeight，结果：${height}，用时: ${calcEndTime - calcStartTime}毫秒`);

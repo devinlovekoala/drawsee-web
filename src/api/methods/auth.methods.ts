@@ -13,4 +13,4 @@ export const signup =
     alova.Post<LoginVO>('/user/signup', userSignUpDTO);
 
 export const checkLogin =
-  () => alova.Get('/user/check_login');
+  () => alova.Get<LoginVO>('/user/check_login');

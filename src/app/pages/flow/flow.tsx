@@ -21,8 +21,11 @@ import { toast } from "sonner";
 import './styles/index.css';
 import { TEMP_QUERY_NODE_ID_PREFIX } from "./constants";
 import { FlowContext, FlowLocationState } from "@/app/contexts/FlowContext";
-import FlowToolBar from "./components/FlowToolBar";
+import FlowRightToolBar from "./components/FlowRightToolBar";
 import { useAppContext } from "@/app/contexts/AppContext";
+import ResourceNode from "./components/node/resource/ResourceNode";
+import FlowLeftToolBar from "./components/FlowLeftToolBar";
+import { TASK_KEY_PREFIX } from "@/common/constant/storage-key.constant";
 
 const nodeTypes = {
   'root': RootNode,
@@ -30,6 +33,7 @@ const nodeTypes = {
   'answer': AnswerNode,
   'knowledge-head': KnowledgeHeadNode,
   'knowledge-detail': KnowledgeDetailNode,
+  'resource': ResourceNode,
 } as const;
 
 function Flow() {
@@ -43,7 +47,7 @@ function Flow() {
   // 获取location中的convId和taskId
   const {convId, taskId: taskIdFromLocation} = useLocation().state as FlowLocationState;
   // 使用FlowState Hook
-  const {elements, setElements, isChatting, rootNodeId, chat} = useFlowState(convId);
+  const {elements, setElements, isChatting, rootNodeId, chat, addChatTask} = useFlowState(convId);
   // 使用临时查询节点Hook
   const {
     canInput,
@@ -53,10 +57,13 @@ function Flow() {
     nodesAndEdgesNoneTempQueryNode
   } = useTempQueryNode(convId, isChatting, selectedNode, rootNodeId, elements, setElements);
 
+  // 使用FlowTools Hook
   const {executeLayout, executeFitView} = useFlowTools();
 
+  // 使用AppContext Hook
   const {nodeWidth, setNodeWidth} = useAppContext();
 
+  // 节点变化监听
   const onNodesChange: OnNodesChange = useCallback((changes) => {
     //console.log('onNodesChange', changes);
     
@@ -68,8 +75,10 @@ function Flow() {
       let selectedNodeId: string | null = null;
       let unselectedNodeId: string | null = null;
       let fitViewNodeId: string | null = null;
+      let selectionChanged = false;
       changes.forEach((change) => {
         if (change.type === 'select') {
+          selectionChanged = true;
           if (change.selected) {
             selectedNodeId = change.id;
           } else {
@@ -77,6 +86,10 @@ function Flow() {
           }
         }
       });
+      if (selectionChanged) {
+        // 触发自定义事件，通知选择变化
+        window.dispatchEvent(new CustomEvent('node-selection-change'));
+      }
       if (selectedNodeId) {
         // 如果选中节点发生变化，则更新选中节点
         if (selectedNodeId !== selectedNode?.id) {
@@ -152,6 +165,7 @@ function Flow() {
     });
   },[executeFitView, executeLayout, nodesAndEdgesNoneTempQueryNode, rootNodeId, selectedNode?.id, setElements]);
 
+  // 边变化监听
   const onEdgesChange: OnEdgesChange = useCallback((changes) => {
     setElements(({nodes, edges}) => {
       return {
@@ -168,7 +182,8 @@ function Flow() {
     setUserInput('');
   }, [convId]);
 
-  useWatcher(getNodesByConvId(convId), [convId], {immediate: true, force: true})
+  // 获取节点数据，当convId变化时，重新发送请求
+  const {send} = useWatcher(getNodesByConvId(convId), [convId], {immediate: true, force: true})
     .onSuccess(async (event) => {
       const apiNodes = event.data as ApiNodeVO[];
       // 如果没有节点数据，直接设置为空并结束加载
@@ -190,10 +205,20 @@ function Flow() {
           ...(node.type !== 'root' ? node.data : {})
         } as NodeData<typeof node.type>;
   
-        // 如果节点是knowledge-head，则判断是否已经生成
+        // 如果节点是knowledge-head或者solver-first或者solver-continue，则判断是否已经生成
         if (node.type === 'knowledge-head') {
           apiNodes.forEach(apiNode => {
             if (apiNode.parentId === node.id && apiNode.type === 'knowledge-detail') {
+              data.isGenerated = true;
+            }
+          });
+        }
+        if (node.data.subtype === 'solver-first' || node.data.subtype === 'solver-continue') {
+          apiNodes.forEach(apiNode => {
+            if (
+              apiNode.parentId === node.id && 
+              (apiNode.data.subtype === 'solver-continue' || apiNode.data.subtype === 'solver-summary')
+            ) {
               data.isGenerated = true;
             }
           });
@@ -225,9 +250,17 @@ function Flow() {
 
       // 如果是新创建的conv，那么就chat
       if (taskIdFromLocation) {
-        setTimeout(() => {
-          chat(taskIdFromLocation);
-        }, 100);
+        // 检查该taskId是否已经执行过
+        const hasExecuted = sessionStorage.getItem(TASK_KEY_PREFIX+taskIdFromLocation);
+        if (!hasExecuted) {
+          // 标记该taskId已经执行过
+          sessionStorage.setItem(TASK_KEY_PREFIX+taskIdFromLocation, 'true');
+          setTimeout(() => {
+            chat(taskIdFromLocation);
+          }, 100);
+        } else {
+          console.log(`Task:${taskIdFromLocation}已经执行过，不重复执行`);
+        }
       }
 
       setTimeout(() => {
@@ -239,6 +272,22 @@ function Flow() {
       setIsLoading(false);
       toast.error('获取节点数据失败');
     });
+  
+  // 监听节点删除事件
+  useEffect(() => {
+    const handleNodeDeleted = () => {
+      setIsLoading(true);
+      setSelectedNode(null);
+      setUserInput('');
+      send();
+    };
+    // 添加事件监听
+    window.addEventListener('node-deleted', handleNodeDeleted as EventListener);
+    // 清理函数
+    return () => {
+      window.removeEventListener('node-deleted', handleNodeDeleted as EventListener);
+    };
+  }, [send]);
   
   const handleRelayout = useCallback((resetHeight: boolean = false, newNodeWidth?: number) => {
     if (isChatting) return;
@@ -253,6 +302,7 @@ function Flow() {
     });
   }, [executeFitView, executeLayout, isChatting, setElements]);
 
+  // 处理节点宽度变化
   const handleNodeWidthChange = useCallback((width: number) => {
     setNodeWidth(width);
     setTimeout(() => {
@@ -260,6 +310,7 @@ function Flow() {
     }, 100);
   }, [handleRelayout, setNodeWidth]);
 
+  // 处理对话
   const flowChat = useCallback((taskId: number) => {
     // 将当前选中的节点的selected设置为false
     setSelectedNode(null);
@@ -275,47 +326,52 @@ function Flow() {
     chat(taskId);
   }, [chat, setElements, setSelectedNode]);
 
+  // 错误处理
   const onError = useCallback((code: string, message: string) => {
     console.error('reactflow onError', code, message);
   }, []);
 
+  // 初始化
   const onInit = useCallback(() => {
     executeFitView(elements.nodes.sort((a, b) => parseInt(a.id) - parseInt(b.id)).slice(0, 1).map(node => node.id), 250);
   }, [elements.nodes, executeFitView]);
 
+  // 加载中
   if (isLoading) {
     return <LoadingSpinner />;
   }
 
+  // 返回
   return (
     <FlowContext.Provider value={{
       isChatting,
       convId,
-      chat: flowChat
+      chat: flowChat,
+      addChatTask
     }}>
       <ReactFlow 
         nodes={elements.nodes} 
         edges={elements.edges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        onError={onError}
-        onInit={onInit}
-        nodeTypes={nodeTypes} 
-        style={{backgroundColor: "#EEEBE8"}}
-        nodesDraggable={false}
-        draggable={false}
-        selectionKeyCode={null}
-        multiSelectionKeyCode={null}
-        deleteKeyCode={null}
-        panActivationKeyCode={"Space"}
+        onNodesChange={onNodesChange} // 节点变化监听
+        onEdgesChange={onEdgesChange} // 边变化监听
+        onError={onError} // 错误处理
+        onInit={onInit} // 初始化
+        nodeTypes={nodeTypes} // 节点类型
+        style={{backgroundColor: "#EEEBE8", borderRadius: '8px'}} // 背景样式
+        nodesDraggable={false} // 节点不可拖拽
+        draggable={false} // 节点不可拖拽
+        selectionKeyCode={null} // 取消选择快捷键
+        multiSelectionKeyCode={null} // 取消多选快捷键
+        deleteKeyCode={null} // 取消删除快捷键
+        panActivationKeyCode={"Space"} // 平移快捷键
         onlyRenderVisibleElements={true} // 只渲染可见元素，提高性能
-        maxZoom={2}
-        minZoom={0.01}
-        defaultViewport={{ x: 0, y: 0, zoom: 0.5 }}
-        defaultEdgeOptions={{
-          type: 'smoothstep',
-          animated: false,
-          selectable: false,
+        maxZoom={2} // 最大缩放
+        minZoom={0.01} // 最小缩放
+        defaultViewport={{ x: 0, y: 0, zoom: 0.5 }} // 默认视图
+        defaultEdgeOptions={{ // 默认边样式
+          type: 'smoothstep', // 平滑曲线
+          animated: false, // 动画
+          selectable: false, // 不可选择
           style: {
             stroke: '#999', // 线条的颜色，使用十六进制表示法，这里是灰色
             strokeWidth: 5, // 线条的宽度，单位是像素
@@ -327,12 +383,16 @@ function Flow() {
           }
         }}
       >
+        {/* 背景 */}
         <Background variant={BackgroundVariant.Lines} size={10}/>
+        {/* 小地图 */}
         {showMiniMap && (
           <MiniMap nodeStrokeWidth={3} nodeColor={'#b8b8b8'} style={{borderRadius: '10px'}} />
         )}
+        {/* 底部输入框 */}
         <Panel position={"bottom-center"}>
           <FlowInputPanel
+            selectedNode={selectedNode}
             prompt={userInput}
             setPrompt={setUserInput}
             canInput={canInput}
@@ -341,14 +401,19 @@ function Flow() {
             parentIdOfTempQueryNode={parentIdOfTempQueryNode}
           />
         </Panel>
+        {/* 顶部右侧工具栏 */}
         <Panel position={"top-right"}>
-          <FlowToolBar
+          <FlowRightToolBar
             showMiniMap={showMiniMap}
             setShowMiniMap={setShowMiniMap}
             onRelayout={handleRelayout} 
             onNodeWidthChange={handleNodeWidthChange} 
             nodeWidth={nodeWidth} 
           />
+        </Panel>
+        {/* 顶部左侧工具栏 */}
+        <Panel position={"top-left"}>
+          <FlowLeftToolBar />
         </Panel>
       </ReactFlow>
     </FlowContext.Provider>

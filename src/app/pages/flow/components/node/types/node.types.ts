@@ -1,5 +1,5 @@
 import { Node } from '@xyflow/react';
-import { AiTaskType, NodeType } from '@/api/types/flow.types';
+import { NodeType, ResourceNodeData } from '@/api/types/flow.types';
 
 export interface BaseNodeData {
   title?: string;
@@ -18,11 +18,16 @@ export interface RootNodeData extends Omit<BaseNodeData, 'title' | 'text'> {
 }
 
 export interface QueryNodeData extends BaseNodeData {
-  mode: AiTaskType;
+  mode: 'general' | 'knowledge' | 'animation' | 'solver-first';
   [key: string]: unknown;
 }
 
+type AnswerSubType = 'solver-first' | 'solver-continue' | 'solver-summary' | 'html-maker' | 'planner-first' | 'planner-split';
+
 export interface AnswerNodeData extends BaseNodeData {
+  subtype?: AnswerSubType;
+  isDone?: boolean;
+  isGenerated?: boolean;
   [key: string]: unknown;
 }
 
@@ -39,21 +44,19 @@ export interface KnowledgeDetailNodeData extends BaseNodeData {
   [key: string]: unknown;
 }
 
-export interface AnimationNodeData extends BaseNodeData {
-  [key: string]: unknown;
-}
-
 export type NodeData<T extends string> = 
   T extends 'root' ? RootNodeData :
   T extends 'query' ? QueryNodeData :
   T extends 'answer' ? AnswerNodeData :
   T extends 'knowledge-head' ? KnowledgeHeadNodeData :
   T extends 'knowledge-detail' ? KnowledgeDetailNodeData :
-  T extends 'animation' ? AnimationNodeData :
+  T extends 'resource' ? ResourceNodeData :
   BaseNodeData;
 
 export type FlowNode<T extends NodeType> = Node<NodeData<T>>;
+export type RootNode = FlowNode<'root'>;
 export type QueryNode = FlowNode<'query'>;
 export type AnswerNode = FlowNode<'answer'>;
 export type KnowledgeHeadNode = FlowNode<'knowledge-head'>;
-export type KnowledgeDetailNode = FlowNode<'knowledge-detail'>; 
+export type KnowledgeDetailNode = FlowNode<'knowledge-detail'>;
+export type ResourceNode = FlowNode<'resource'>;

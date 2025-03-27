@@ -1,10 +1,10 @@
 "use client"
 
 import {
-  BadgeCheck,
-  Bell,
+  //BadgeCheck,
+  //Bell,
+  //CreditCard,
   ChevronsUpDown,
-  CreditCard,
   LogOut,
   Sparkles,
 } from "lucide-react"
@@ -30,16 +30,14 @@ import {
   useSidebar,
 } from "@/app/components/ui/sidebar.tsx"
 import { useAppContext } from "@/app/contexts/AppContext";
-interface Props {
-  user: {
-    name: string;
-    avatar: string;
-  }
-}
+import * as Progress from '@radix-ui/react-progress';
 
-export function NavUser({user}: Props) {
+export function NavUser() {
   const { isMobile } = useSidebar()
-  const { handleLogout } = useAppContext();
+  const { handleLogout, userInfo } = useAppContext();
+
+  const avatar = 'https://avatars.githubusercontent.com/u/10216806?v=4';
+  const progress = userInfo ? (userInfo.aiTaskCount / userInfo.aiTaskLimit) * 100 : 0;
 
   return (
     <SidebarMenu>
@@ -52,11 +50,21 @@ export function NavUser({user}: Props) {
               className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
               <Avatar className="h-8 w-8 rounded-lg">
-                <AvatarImage src={user.avatar} alt={user.name} />
+                <AvatarImage src={avatar} alt={userInfo?.username} />
                 <AvatarFallback className="rounded-lg">CN</AvatarFallback>
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-semibold">{user.name}</span>
+                <span className="truncate font-semibold">{userInfo?.username}</span>
+                <Progress.Root className="relative h-2 w-full overflow-hidden rounded-full bg-gray-200 mt-1" value={progress}>
+                  <Progress.Indicator
+                    className="h-full w-full bg-blue-500 transition-transform duration-300 ease-in-out"
+                    style={{ transform: `translateX(-${100 - progress}%)` }}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-blue-400 opacity-30 animate-pulse" />
+                </Progress.Root>
+                <span className="text-xs text-gray-500 mt-1">
+                  {userInfo?.aiTaskCount} / {userInfo?.aiTaskLimit} 今日AI使用额度
+                </span>
               </div>
               <ChevronsUpDown className="ml-auto size-4" />
             </SidebarMenuButton>
@@ -71,11 +79,11 @@ export function NavUser({user}: Props) {
             <DropdownMenuLabel className="p-0 font-normal">
               <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                 <Avatar className="h-8 w-8 rounded-lg">
-                  <AvatarImage src={user.avatar} alt={user.name} />
+                  <AvatarImage src={avatar} alt={userInfo?.username} />
                   <AvatarFallback className="rounded-lg">CN</AvatarFallback>
                 </Avatar>
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-semibold">{user.name}</span>
+                  <span className="truncate font-semibold">{userInfo?.username}</span>
                   {/*<span className="truncate text-xs">{user.email}</span>*/}
                 </div>
               </div>
@@ -87,7 +95,7 @@ export function NavUser({user}: Props) {
                 Upgrade to Pro
               </DropdownMenuItem>
             </DropdownMenuGroup>
-            <DropdownMenuSeparator />
+            {/* <DropdownMenuSeparator />
             <DropdownMenuGroup>
               <DropdownMenuItem>
                 <BadgeCheck />
@@ -101,7 +109,7 @@ export function NavUser({user}: Props) {
                 <Bell />
                 Notifications
               </DropdownMenuItem>
-            </DropdownMenuGroup>
+            </DropdownMenuGroup> */}
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => handleLogout()}>
               <LogOut />

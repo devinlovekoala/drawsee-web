@@ -1,12 +1,13 @@
-import { AiTaskType } from '@/api/types/flow.types';
 import { BaseNode, ExtendedNodeProps } from './base/BaseNode';
 import React, { useMemo } from 'react';
 
-const chatTypeMap: Record<AiTaskType, string> = {
+const chatTypeMap: Record<string, string> = {
   'general': '常规问答',
   'knowledge': '知识问答',
-  'knowledge-detail': '知识详情',
   'animation': '动画生成',
+  'solver-first': '解题模式',
+  'planner': '目标解析',
+  'html-maker': '网页生成'
 };
 
 /**

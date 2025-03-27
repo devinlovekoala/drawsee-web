@@ -1,4 +1,4 @@
-export type NodeType = "root" | "query" | "answer" | "knowledge-head" | "knowledge-detail" | "animation";
+export type NodeType = "root" | "query" | "answer" | "knowledge-head" | "knowledge-detail" | "resource";
 
 export interface ConversationVO {
   id: number;
@@ -16,26 +16,49 @@ interface BaseNodeData {
   userId: number;
   createdAt: number;
   updatedAt: number;
+  [key: string]: unknown;
 }
 
-interface RootNodeData extends Omit<BaseNodeData, 'title' | 'text'> {}
+type RootNodeData = Omit<BaseNodeData, 'title' | 'text'>;
 
 interface QueryNodeData extends BaseNodeData {
   mode: AiTaskType;
 }
 
-interface AnswerNodeData extends BaseNodeData {}
+interface AnswerNodeData extends BaseNodeData {
+  subtype?: string;
+  isDone?: boolean;
+};
 
-interface KnowledgeHeadNodeData extends BaseNodeData {}
+type KnowledgeHeadNodeData = BaseNodeData;
 
-interface KnowledgeDetailNodeData extends BaseNodeData {
-  media: {
-    bilibiliUrls: string[];
-    animationObjectNames: string[];
-  };
+type KnowledgeDetailNodeData = BaseNodeData;
+
+type AnimationNodeData = BaseNodeData;
+
+export type ResourceSubType = "bilibili" | "animation" | "generated-animation";
+
+interface BilibiliResourceNodeData extends BaseNodeData {
+  subtype: "bilibili";
+  urls: string[];
+  [key: string]: unknown;
 }
 
-interface AnimationNodeData extends BaseNodeData {}
+interface AnimationResourceNodeData extends BaseNodeData {
+  subtype: "animation";
+  objectNames: string[];
+  [key: string]: unknown;
+}
+
+interface GeneratedAnimationResourceNodeData extends BaseNodeData {
+  subtype: "generated-animation";
+  frame?: Uint8Array;
+  objectName?: string;
+  progress?: string;
+  [key: string]: unknown;
+}
+
+export type ResourceNodeData = BilibiliResourceNodeData | AnimationResourceNodeData | GeneratedAnimationResourceNodeData;
 
 export type NodeData = {
   root: RootNodeData;
@@ -44,6 +67,7 @@ export type NodeData = {
   'knowledge-head': KnowledgeHeadNodeData;
   'knowledge-detail': KnowledgeDetailNodeData;
   'animation': AnimationNodeData;
+  'resource': ResourceNodeData;
 }
 
 export interface NodeVO {
@@ -74,7 +98,13 @@ export type AiTaskType =
   | 'general'      // 常规问答模式
   | 'knowledge'    // 知识问答模式
   | 'knowledge-detail' // 知识详情
-  | 'animation';    // 动画模式
+  | 'animation'    // 动画模式
+  | 'solver-first'     // 开始解题模式
+  | 'solver-continue'      // 继续解题模式
+  | 'solver-summary'      // 总结解题模式
+  | 'planner' // 目标解析模式
+  | 'html-maker' // 网页生成模式
+  | 'circuit-analyze' // 电路分析模式
 
 export interface CreateAiTaskVO {
   taskId: number;
@@ -97,4 +127,5 @@ export interface CreateAiTaskDTO {
   promptParams: Record<string, string> | null;
   convId: number | null;
   parentId: number | null;
+  model: string | null;
 }

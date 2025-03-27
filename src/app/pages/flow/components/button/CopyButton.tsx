@@ -3,7 +3,7 @@ import { useState } from "react";
 //import { toast } from "sonner";
 import copy from 'copy-to-clipboard';
 
-const CopyButton = ({ getText, size = 16, text}: { getText: () => string, size?: number, text?: string }) => {
+const CopyButton = ({ getText, size = 16, text, className}: { getText: () => string, size?: number, text?: string, className?: string }) => {
   const [copied, setCopited] = useState(false);
 
   const onCopy = () => {
@@ -18,7 +18,7 @@ const CopyButton = ({ getText, size = 16, text}: { getText: () => string, size?:
   return (
     <button
       onClick={onCopy}
-      className="inline-flex rounded-md p-2 hover:bg-zinc-200 dark:hover:bg-zinc-800"
+      className={`inline-flex rounded-md p-2 hover:bg-zinc-200 dark:hover:bg-zinc-800 ${className}`}
     >
       <Copy
         size={size}

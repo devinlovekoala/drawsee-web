@@ -1,7 +1,7 @@
 ---
 description: 
 globs: 
-alwaysApply: true
+alwaysApply: false
 ---
 By default, all responses must be in 中文！  
  
@@ -14,7 +14,7 @@ By default, all responses must be in 中文！
 - Alova.js
 - ESlint严格模式
 当前计算机环境为windows环境，一切命令行命令必须遵循windows规则
-当前项目src所在目录为：D:\Program-Projects-Main\drawsee\drawsee_frontend\src
+当前项目src所在目录为：D:\Program-Projects-Main\drawsee\drawsee-web\src
 当前项目代码配置制表符长度为2
 
 # AI Full-Stack Development Assistant Guide  

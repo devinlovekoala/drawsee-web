@@ -1,28 +1,16 @@
-import { useCallback, useState, useRef, useEffect } from "react";
+import { useCallback, useState, useRef, useEffect, useMemo } from "react";
 import { toast } from "sonner";
-import { CubeTransparentIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
-import { BookOpenIcon } from 'lucide-react';
+import { XMarkIcon } from '@heroicons/react/24/outline';
+import { BookOpenIcon, CodeXmlIcon, MessageCircleIcon, TargetIcon } from 'lucide-react';
 import { createAiTask } from "@/api/methods/flow.methods.ts";
 import type { AiTaskType, CreateAiTaskDTO } from '@/api/types/flow.types.ts';
 import { TempQueryNodeTask } from "../../hooks/useTempQueryNode";
 import { useFlowContext } from "@/app/contexts/FlowContext";
 import { useAppContext } from "@/app/contexts/AppContext";
-
-// 定义可用的对话模式，与 ModeSelector.tsx 保持一致
-const chatModes = [
-  {
-    name: '常规问答模式',
-    description: '最常规的 AI 生成模式，一问一答。',
-    icon: CubeTransparentIcon,
-    type: 'general' as AiTaskType
-  },
-  {
-    name: '知识问答模式',
-    description: '基于知识库的 AI 生成模式，能识别用户提问中的相关知识点。',
-    icon: BookOpenIcon,
-    type: 'knowledge' as AiTaskType
-  }
-];
+import '@/app/components/text-selection/TextSelectionToolbar.css';
+import { Node as FlowNode } from "@xyflow/react";
+import { DeepSeek, Doubao } from "./ModelIcons";
+import { DropdownOption, SelectDropdown } from "./SelectDropdown";
 
 interface FlowInputPanelProps {
   prompt: string;
@@ -31,9 +19,13 @@ interface FlowInputPanelProps {
   canNotInputReason: string | null;
   addTempQueryNodeTask: (task: TempQueryNodeTask, sessionId?: string | null) => void;
   parentIdOfTempQueryNode: string | null;
+  selectedNode: FlowNode | null;
 }
 
+export type ModelType = 'deepseekV3' | 'doubao';
+
 export function FlowInputPanel({
+  selectedNode,
   prompt,
   setPrompt,
   canInput, 
@@ -41,31 +33,108 @@ export function FlowInputPanel({
   addTempQueryNodeTask,
   parentIdOfTempQueryNode
 }: FlowInputPanelProps) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [selectedType, setSelectedType] = useState<AiTaskType>('general');
+
+  const chatModes = useMemo(() => {
+    const defaultModes = [
+      {
+        name: '常规问答模式',
+        description: '最常规的 AI 生成模式，一问一答。',
+        icon: MessageCircleIcon,
+        type: 'general' satisfies AiTaskType
+      },
+      {
+        name: '知识问答模式',
+        description: '基于知识库的 AI 生成模式，能识别用户提问中的相关知识点。',
+        icon: BookOpenIcon,
+        type: 'knowledge' satisfies AiTaskType
+      },
+      {
+        name: '目标解析模式',
+        description: '基于目标解析引擎，能够对用户目标进行有效拆解。',
+        icon: TargetIcon,
+        type: 'planner' satisfies AiTaskType
+      },
+      {
+        name: '网页生成模式',
+        description: '基于网页生成引擎，能够基于用户提问生成可预览的html网页。',
+        icon: CodeXmlIcon,
+        type: 'html-maker' satisfies AiTaskType
+      }
+    ];
+    if (selectedNode?.data.subtype === 'planner-split') {
+      // 把planner模式排在第一位
+      const plannerMode = defaultModes.find(mode => mode.type === 'planner');
+      if (plannerMode) {
+        return [
+          plannerMode,
+          ...defaultModes.filter(mode => mode.type !== 'planner')
+        ];
+      }
+    }
+    if (selectedNode?.data.subtype === 'html-maker') {
+      // 把html-maker模式排在第一位
+      const htmlMakerMode = defaultModes.find(mode => mode.type === 'html-maker');
+      if (htmlMakerMode) {
+        return [
+          htmlMakerMode,
+          ...defaultModes.filter(mode => mode.type !== 'html-maker')
+        ];
+      }
+    }
+    return defaultModes;
+  }, [selectedNode]);
+
+  // 新增模型选项
+  const modelOptions = useMemo<DropdownOption[]>(() => [
+    {
+      name: '豆包',
+      description: '豆包大语言模型',
+      icon: Doubao.Color,
+      type: 'doubao' satisfies ModelType
+    },
+    {
+      name: 'DeepSeekV3',
+      description: 'DeepSeekV3大语言模型',
+      icon: DeepSeek.Color,
+      type: 'deepseekV3' satisfies ModelType
+    }
+  ], []);
+
   const [isExpanded, setIsExpanded] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
+  const [selectedType, setSelectedType] = useState<AiTaskType>(chatModes[0].type as AiTaskType);
+  const [selectedModel, setSelectedModel] = useState<ModelType>('doubao');
   const containerRef = useRef<HTMLDivElement>(null);
-  const buttonRef = useRef<HTMLButtonElement>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const inputContainerRef = useRef<HTMLDivElement>(null);
-  const selectedMode = chatModes.find(mode => mode.type === selectedType) || chatModes[0];
 
   const {chat, convId} = useFlowContext();
-  const {handleNewChat} = useAppContext();
+  const {handleNewChat, quoteText, setQuoteText, handleAiTaskCountPlus} = useAppContext();
   
+  const [isProcessing, setIsProcessing] = useState(false);
+  
+  // 当selectedNode发生变化时，更新selectedType
+  useEffect(() => {
+    if (selectedNode?.data.subtype === 'planner-split') {
+      setSelectedType('planner');
+    } else if (selectedNode?.data.subtype === 'html-maker') {
+      setSelectedType('html-maker');
+    } else {
+      setSelectedType('general');
+    }
+  }, [selectedNode]);
+
   // 处理输入变化
   const handlePromptChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newText = e.target.value;
     setPrompt(newText);
     // 如果是第一次输入，触发输入框扩展动画
-    if (newText.length === 1 && prompt.length === 0) {
+    if (newText.length > 0 && prompt.length === 0) {
       setIsExpanded(true);
       
       // 创建临时查询节点
       if (canInput) {
-        addTempQueryNodeTask({type: 'create', text: newText});
+        addTempQueryNodeTask({type: 'create', text: newText, mode: selectedType});
       }
     } else if (newText.length > 0) {
       // 更新临时节点文本
@@ -94,28 +163,9 @@ export function FlowInputPanel({
     }
   }, [prompt]);
 
-  // 全局点击事件监听，用于关闭下拉菜单
-  useEffect(() => {
-    function handleGlobalClick(event: MouseEvent) {
-      if (
-        isOpen && 
-        dropdownRef.current && 
-        !dropdownRef.current.contains(event.target as Node) &&
-        buttonRef.current && 
-        !buttonRef.current.contains(event.target as Node)
-      ) {
-        setIsOpen(false);
-      }
-    }
-    
-    // 使用捕获阶段监听，确保在事件冒泡被阻止前捕获到事件
-    window.addEventListener('click', handleGlobalClick, true);
-    return () => {
-      window.removeEventListener('click', handleGlobalClick, true);
-    };
-  }, [isOpen]);
-
   const handleSubmit = useCallback(() => {
+    if (isProcessing) return;
+    
     if (!canInput) {
       toast.error(`当前无法追问，${canNotInputReason as string}`);
       return;
@@ -128,16 +178,37 @@ export function FlowInputPanel({
       toast.error("无法确定追问的节点");
       return;
     }
+
+    setIsProcessing(true);
+    
+    // 构建最终提交的问题文本，如果有引用则包含引用内容
+    let finalPrompt = prompt;
+    if (quoteText) {
+      finalPrompt = `对于之前内容中的：\n\n>${quoteText.replace(/\n/g, ' ')}\n\n我的问题是：${prompt}`;
+    }
+    // 最终选择的模型
+    let finalModel = null;
+    if (selectedType === 'general' || selectedType === 'knowledge') {
+      finalModel = selectedModel;
+    }
+
     const createAiTaskDTO = {
       type: selectedType,
-      prompt: prompt,
+      prompt: finalPrompt,
       promptParams: null,
       convId: convId,
-      parentId: parseInt(parentIdOfTempQueryNode)
+      parentId: parseInt(parentIdOfTempQueryNode),
+      model: finalModel // 使用选择的模型
     } as CreateAiTaskDTO;
     
     createAiTask(createAiTaskDTO).then((response) => {
       toast.success("问题已发送");
+      handleAiTaskCountPlus();
+
+      // 清空引用文本
+      if (quoteText) {
+        setQuoteText(null);
+      }
       
       // 重置状态并添加收缩动画
       setPrompt('');
@@ -156,8 +227,10 @@ export function FlowInputPanel({
       }, 300);
     }).catch((error) => {
       toast.error(`请求失败, ${error.message}`);
+    }).finally(() => {
+      setIsProcessing(false);
     });
-  }, [canInput, prompt, parentIdOfTempQueryNode, selectedType, convId, canNotInputReason, setPrompt, handleNewChat, chat]);
+  }, [canInput, prompt, parentIdOfTempQueryNode, selectedType, selectedModel, convId, canNotInputReason, quoteText, setQuoteText, setPrompt, handleNewChat, chat, isProcessing]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -166,37 +239,83 @@ export function FlowInputPanel({
     }
   };
 
-  const handleModeSelect = (mode: typeof chatModes[0]) => {
-    setSelectedType(mode.type);
-    setIsOpen(false);
+  // 处理模式选择
+  const handleModeSelect = (option: DropdownOption) => {
+    setSelectedType(option.type as AiTaskType);
   };
 
-  const toggleDropdown = (e: React.MouseEvent) => {
-    e.stopPropagation(); // 阻止事件冒泡
-    setIsOpen(!isOpen);
+  // 处理模型选择
+  const handleModelSelect = (option: DropdownOption) => {
+    setSelectedModel(option.type as ModelType);
   };
+
+  // 处理引用文本显示，超过15个字符显示省略号
+  const displayQuoteText = useCallback((text: string) => {
+    if (!text) return '';
+    return text.length <= 15 ? text : text.substring(0, 15) + '...';
+  }, []);
+
+  // 清除引用文本
+  const clearQuoteText = useCallback(() => {
+    setQuoteText(null);
+  }, [setQuoteText]);
 
   return (
-    <div ref={containerRef} className="input-panel-container">
-      {/* 模式选择按钮 */}
-      <div className={`mode-selector-wrapper ${isOpen ? 'open' : 'closed'}`}>
-        <button 
-          ref={buttonRef}
-          className="mode-selector-button shadow-[0_0_0_1px_rgba(0,0,0,0.1)]"
-          onClick={toggleDropdown}
-        >
-          <div className="mode-selector-icon-wrapper">
-            {selectedMode.icon && <selectedMode.icon className="w-5 h-5" />}
-          </div>
-          <span className="mode-selector-text">{selectedMode.name}</span>
-          <ChevronDownIcon 
-            className={`mode-selector-chevron ${isOpen ? 'open' : ''}`}
+    <div ref={containerRef} className="input-panel-container"
+      style={quoteText ? {
+        transform: "translateY(15%) translateX(-50%)"
+      } : {}}
+    >
+      {/* 选择器按钮区域 */}
+      <div className={`selectors-container flex flex-row justify-center gap-2`}>
+        {/* 模式选择器 */}
+        <SelectDropdown
+          options={chatModes}
+          selectedType={selectedType}
+          onSelect={handleModeSelect}
+          buttonLabel={chatModes.find(mode => mode.type === selectedType)?.name || '常规问答模式'}
+          dropdownTitle="选择对话模式"
+        />
+        
+        {/* 模型选择器 */}
+        {
+          (selectedType === 'general' || selectedType === 'knowledge') &&
+          <SelectDropdown
+            options={modelOptions}
+            selectedType={selectedModel}
+            onSelect={handleModelSelect}
+            buttonLabel={modelOptions.find(model => model.type === selectedModel)?.name || '默认模型'}
+            dropdownTitle="选择使用模型"
           />
-        </button>
+        }
       </div>
 
       {/* 输入框 */}
-      <div className="relative flex items-center justify-center">
+      <div className="relative flex flex-col items-center justify-center">
+        {/* 引用文本区域 */}
+        {quoteText && (
+          <div className={`quote-container ${
+              isExpanded 
+                ? isAnimating ? 'animate-expand-width expanded' : 'expanded' 
+                : isAnimating ? 'animate-shrink-width collapsed' : 'collapsed'
+              }`}
+          >
+            <div className="quote-bar"></div>
+            <div className="quote-text-wrapper">
+              <div className="quote-text text-ellipsis">
+                引用：{displayQuoteText(quoteText)}
+              </div>
+              <button 
+                onClick={clearQuoteText}
+                className="quote-close"
+                title="清除引用"
+              >
+                <XMarkIcon className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+        )}
+        
         <div 
           ref={inputContainerRef}
           className={`input-container ${
@@ -220,55 +339,18 @@ export function FlowInputPanel({
           <button 
             onClick={handleSubmit}
             className={`input-send-button ${!canInput ? 'disabled' : ''}`}
-            disabled={!canInput}
+            disabled={!canInput || isProcessing}
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="input-send-icon">
-              <path d="M22 2 11 13"></path>
-              <path d="m22 2-7 20-4-9-9-4 20-7z"></path>
-            </svg>
+            {isProcessing ? (
+              <div className="animate-spin h-4 w-4 border-2 border-neutral-500 rounded-full border-t-transparent"></div>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="input-send-icon">
+                <path d="M22 2 11 13"></path>
+                <path d="m22 2-7 20-4-9-9-4 20-7z"></path>
+              </svg>
+            )}
           </button>
         </div>
-        
-        {/* 模式选择下拉菜单 - 直接在输入框上方渲染，不使用Portal */}
-        {isOpen && (
-          <div 
-            ref={dropdownRef}
-            className="mode-dropdown animate-slide-in-bottom"
-            onClick={(e) => e.stopPropagation()} // 阻止事件冒泡
-          >
-            <div className="mode-dropdown-content">
-              <div className="mode-dropdown-header">
-                <h3 className="mode-dropdown-title">选择对话模式</h3>
-              </div>
-              <div className="mode-dropdown-body">
-                {chatModes.map((mode) => (
-                  <div
-                    key={mode.type}
-                    onClick={() => handleModeSelect(mode)}
-                    className={`mode-option ${selectedType === mode.type ? 'selected' : ''}`}
-                  >
-                    <div className="mode-option-icon-wrapper">
-                      {mode.icon && <mode.icon className="mode-option-icon" />}
-                    </div>
-                    <div className="mode-option-info">
-                      <p className="mode-option-name">{mode.name}</p>
-                      <p className="mode-option-description">{mode.description}</p>
-                    </div>
-                    {selectedType === mode.type && (
-                      <div className="mode-option-check">
-                        <div className="mode-option-check-wrapper">
-                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mode-option-check-icon">
-                            <path d="M20 6 9 17l-5-5"></path>
-                          </svg>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

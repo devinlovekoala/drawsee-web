@@ -25,3 +25,9 @@ export const createAiTask =
 
 export const getResourceUrl =
   (objectName: string) => alova.Get<{url: string}>(`/flow/resources`, {params: {objectName}});
+
+export const deleteNode = 
+  (nodeId: string) =>  alova.Delete(`/flow/nodes/${nodeId}`)
+
+export const deleteConversation =
+  (convId: string) => alova.Delete(`/flow/conversations/${convId}`)

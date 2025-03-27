@@ -2,13 +2,14 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { Node, ReactFlowProvider } from '@xyflow/react';
 import { NodeType } from '@/api/types/flow.types';
 import { NodeData } from '../components/node/types/node.types';
-import { NODE_DEFAULT_HEIGHT } from '../constants';
+import { NODE_DEFAULT_HEIGHT, NODE_WIDTH } from '../constants';
 import QueryNode from '../components/node/QueryNode';
 import AnswerNode from '../components/node/AnswerNode';
 import KnowledgeHeadNode from '../components/node/KnowledgeHeadNode';
 import KnowledgeDetailNode from '../components/node/KnowledgeDetailNode';
 import RootNode from '../components/node/RootNode';
 import { ExtendedNodeProps } from '../components/node/base/BaseNode';
+import ResourceNode from '../components/node/resource/ResourceNode';
 
 // 创建一个隐藏的容器div
 let containerDiv: HTMLDivElement | null = null;
@@ -30,7 +31,7 @@ function ensureContainerDiv(): HTMLDivElement {
  * @param node 需要计算高度的节点
  * @returns 计算得到的节点高度
  */
-export function calculateNodeHeight(node: Node<NodeData<NodeType>>): number {    
+export function calculateNodeHeight(node: Node<NodeData<NodeType>>, nodeWidth: number = NODE_WIDTH): number {    
   let NodeComponent: React.ComponentType<ExtendedNodeProps<NodeType>>;
   switch (node.type) {
     case 'root':
@@ -47,6 +48,9 @@ export function calculateNodeHeight(node: Node<NodeData<NodeType>>): number {
       break;
     case 'knowledge-detail':
       NodeComponent = KnowledgeDetailNode;
+      break;
+    case 'resource':
+      NodeComponent = ResourceNode;
       break;
     default:
       return NODE_DEFAULT_HEIGHT;
@@ -85,19 +89,6 @@ export function calculateNodeHeight(node: Node<NodeData<NodeType>>): number {
   // 统计获得高度所需的时间并输出
   //const startTime = performance.now();
 
-  // 计算需要额外加的高度
-  let extraHeight = 0;
-  if (node.type === 'knowledge-detail') {
-    const media = node.data.media as {
-      bilibiliUrls: string[];
-      animationObjectNames: string[];
-    };
-    const hasBilibiliUrls = media?.bilibiliUrls?.length ? true : false;
-    const hasAnimations = media?.animationObjectNames?.length ? true : false;
-    extraHeight = hasBilibiliUrls ? 200 * media.bilibiliUrls.length : 0;
-    extraHeight += hasAnimations ? 210 * media.animationObjectNames.length : 0;
-  }
-
   // 清空容器
   container.innerHTML = '';
   // 设置新的内容
@@ -107,8 +98,40 @@ export function calculateNodeHeight(node: Node<NodeData<NodeType>>): number {
   // 确保最小高度
   height = Math.max(height, NODE_DEFAULT_HEIGHT);
 
+  // 计算需要额外加的高度
+  let extraHeight = 0;
+  if (node.type === 'resource') {
+    console.log(`ResourceNode: ${node.data.subtype}节点计算得高度为：${height}`);
+
+    // 资源高度，根据nodeWidth计算，宽高比16:9
+    const resourceHeight = nodeWidth * 9 / 16;
+
+    switch (node.data.subtype) {
+      case 'bilibili': {
+        const urls = node.data.urls as string[];
+        extraHeight = urls.length * resourceHeight;
+        break;
+      }
+      case 'animation': {
+        const objectNames = node.data.objectNames as string[];
+        extraHeight = objectNames.length * resourceHeight;
+        break;
+      }
+      case 'generated-animation': {
+        extraHeight = resourceHeight;
+        break;
+      }
+      default:
+        break;
+    }
+  }
+
   //const endTime = performance.now();
   //console.log(`获得${node.type}节点高度所需的时间: ${endTime - startTime}毫秒`);
+
+  if (node.type === 'resource') {
+    console.log(`ResourceNode: ${node.data.subtype}节点最终计算得高度为：${height + extraHeight}`);
+  }
 
   return height + extraHeight;
 }

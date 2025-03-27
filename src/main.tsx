@@ -3,10 +3,10 @@ import { createRoot } from 'react-dom/client';
 import './main.css';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import App from './app/app.tsx';
-import About from '@/app/pages/about/about.tsx';
 import Blank from "@/app/pages/blank/blank.tsx";
 import Flow from "@/app/pages/flow/flow.tsx";
 import { ReactFlowProvider } from '@xyflow/react';
+import About from './about/about.tsx';
 
 const router = createBrowserRouter([
   {
@@ -21,11 +21,11 @@ const router = createBrowserRouter([
         path: '/flow',
         element: <Flow />
       },
-      {
-        path: '/about',
-        element: <About />
-      }
     ]
+  },
+  {
+    path: '/about',
+    element: <About />
   }
 ]);
 

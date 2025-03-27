@@ -4,11 +4,12 @@ import { CreateAiTaskDTO } from '@/api/types/flow.types';
 import { toast } from 'sonner';
 import { createAiTask } from '@/api/methods/flow.methods';
 import { useState } from 'react';
+import { useAppContext } from '@/app/contexts/AppContext';
 
 function KnowledgeHeadNode({ showSourceHandle, showTargetHandle, data, ...props }: ExtendedNodeProps<'knowledge-head'>) {
   
-  const {isChatting} = useFlowContext();
-  const {chat, convId} = useFlowContext();
+  const {chat, convId, isChatting, addChatTask} = useFlowContext();
+  const {handleAiTaskCountPlus} = useAppContext();
 
   const [isGenerated, setIsGenerated] = useState(data.isGenerated || false);
 
@@ -31,6 +32,14 @@ function KnowledgeHeadNode({ showSourceHandle, showTargetHandle, data, ...props 
     } as CreateAiTaskDTO;
     createAiTask(createAiTaskDTO).then((response) => {
       toast.success("问题已发送");
+      handleAiTaskCountPlus();
+      addChatTask({
+        type: 'data',
+        data: {
+          nodeId: parseInt(props.id),
+          isGenerated: true
+        }
+      });
       setTimeout(() => {
         chat(response.taskId);
       }, 200);
