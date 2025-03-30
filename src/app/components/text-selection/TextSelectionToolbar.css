@@ -1,0 +1,122 @@
+/* 文本选择工具栏样式 */
+.rhm-popover {
+  z-index: 100;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+  background-color: #f8f9fa;
+  border: 1px solid #e5e7eb;
+  /* 移除这些禁用动画和变换的属性，让工具栏能正确定位 */
+  /* animation: none !important; */
+  /* transform: none !important; */
+}
+
+.rhm-menu {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+}
+
+.rhm-arrow {
+  fill: #f8f9fa !important; /* 填充与工具栏背景色一致 */
+  stroke: #e5e7eb; /* 添加边框颜色 */
+  stroke-width: 1px;
+}
+
+/* 按钮交互样式 */
+.text-selection-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  background-color: #f8f9fa;
+  color: #4b5563;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.text-selection-btn:hover {
+  background-color: #e5e7eb;
+  color: #111827;
+}
+
+.text-selection-btn:active {
+  background-color: #d1d5db;
+  transform: scale(0.96);
+}
+
+/* 文本引用样式 */
+.quote-container {
+  display: flex;
+  align-items: center; /* 改为居中对齐 */
+  padding: 10px 12px;
+  border-radius: 8px;
+  background-color: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  margin-bottom: 8px;
+  /* width: 100%; 设置为100%宽度 */
+  max-width: 100%;
+  animation: fadeIn 0.3s ease;
+}
+
+.quote-container.expanded {
+  width: 100%;
+}
+
+.quote-container.collapsed {
+  width: 75%;
+}
+
+.quote-bar {
+  width: 3px;
+  height: 20px; /* 固定高度 */
+  border-radius: 4px;
+  background-color: #9ca3af;
+  margin-right: 10px;
+  flex-shrink: 0;
+}
+
+.quote-text-wrapper {
+  flex: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.quote-text {
+  font-size: 14px;
+  color: #4b5563;
+  white-space: nowrap; /* 让内容在一行显示 */
+  overflow: hidden;
+  text-overflow: ellipsis; /* 超出部分显示省略号 */
+  padding-right: 10px; /* 确保文本和按钮之间有空间 */
+}
+
+.quote-close {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  color: #9ca3af;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.quote-close:hover {
+  color: #4b5563;
+  background-color: #e5e7eb;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+} 

@@ -1,0 +1,58 @@
+/* 导入所有节点相关样式 */
+@import './node.css';
+
+/* 导入输入面板样式 */
+@import './input-panel.css';
+
+/* 全局样式优化 */
+.react-flow__node {
+  /* 使用will-change提示浏览器这些元素会经常变化 */
+  will-change: transform;
+  /* 强制GPU加速 */
+  transform: translateZ(0);
+}
+
+.react-flow__handle {
+  /* 使用will-change提示浏览器这些元素会经常变化 */
+  will-change: transform;
+}
+
+/* 优化滚动条样式 */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+/* 优化动画性能 */
+.react-flow__node-root,
+.react-flow__node-query,
+.react-flow__node-answer,
+.react-flow__node-knowledge-head,
+.react-flow__node-knowledge-detail {
+  /* 使用transform和opacity进行动画，而不是其他属性 */
+  transition: transform 0.2s ease-out, opacity 0.2s ease-out;
+}
+
+/* 减少不必要的层叠上下文创建 */
+.react-flow__node:not(:hover):not(.selected) {
+  z-index: auto !important;
+}
+
+/* 优化边的渲染性能 */
+.react-flow__edge {
+  pointer-events: none;
+}
+
+.react-flow__edge-path {
+  stroke-width: 1.5;
+}
+
+/* 优化背景渲染 */
+.react-flow__background {
+  background-size: 10px 10px;
+  background-image: radial-gradient(#e5e7eb 1px, transparent 1px);
+} 

@@ -1,0 +1,93 @@
+/* 自定义滚动条样式 */
+textarea::-webkit-scrollbar {
+    width: 8px; /* 滚动条的宽度 */
+}
+
+textarea::-webkit-scrollbar-track {
+    background: #f1f1f1; /* 滚动条轨道的背景色 */
+    border-radius: 10px; /* 轨道的圆角 */
+}
+
+textarea::-webkit-scrollbar-thumb {
+    background: #888; /* 滚动条的颜色 */
+    border-radius: 10px; /* 滚动条的圆角 */
+}
+
+textarea::-webkit-scrollbar-thumb:hover {
+    background: #555; /* 鼠标悬停时的颜色 */
+}
+
+/* 自定义滚动条样式 */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* 波纹动画 */
+@keyframes ripple {
+  0% {
+    transform: translate(-50%, -50%) scale(0.3);
+    opacity: 0.5;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0;
+  }
+}
+
+.animate-ripple {
+  animation: ripple 4s cubic-bezier(0.23, 1, 0.32, 1) infinite;
+}
+
+/* 新增炫酷波纹效果 */
+@keyframes pulse-glow {
+  0% {
+    box-shadow: 0 0 5px 0px rgba(99, 102, 241, 0.2);
+    border-color: rgba(99, 102, 241, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 20px 5px rgba(99, 102, 241, 0.4);
+    border-color: rgba(99, 102, 241, 0.6);
+  }
+  100% {
+    box-shadow: 0 0 5px 0px rgba(99, 102, 241, 0.2);
+    border-color: rgba(99, 102, 241, 0.3);
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 3s ease-in-out infinite;
+}
+
+@keyframes float {
+  0% {
+    transform: translate(-50%, -50%) translateY(0px);
+  }
+  50% {
+    transform: translate(-50%, -50%) translateY(-10px);
+  }
+  100% {
+    transform: translate(-50%, -50%) translateY(0px);
+  }
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+@keyframes rotate {
+  from {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+  to {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+
+.animate-rotate {
+  animation: rotate 20s linear infinite;
+}
