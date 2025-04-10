@@ -1,19 +1,21 @@
-import {useCallback, useState} from "react";
+import {useCallback, useState, useEffect} from "react";
 import {createAiTask} from "@/api/methods/flow.methods.ts";
 import {AiTaskType, CreateAiTaskDTO} from "@/api/types/flow.types.ts";
 import {toast} from "sonner";
 import { ArrowTurnDownLeftIcon } from '@heroicons/react/24/outline';
-import { ModeSelector } from './components/ModeSelector';
 import './styles/scrollbar.css';
 import { useAppContext } from "@/app/contexts/AppContext";
-import { XIcon, CheckIcon, WandIcon, ImageUpIcon } from "lucide-react";
+import { XIcon, CheckIcon, WandIcon, ImageUpIcon, ArrowLeft } from "lucide-react";
 import ImageUploader from "@/app/components/ImageUploader";
 import { getSolverWays } from '@/api/methods/tool.methods';
 import { ModelSelector } from "./components/ModelSelector";
 import { ModelType } from "../flow/components/input/FlowInputPanel";
+import { useLocation, useNavigate } from "react-router-dom";
 
 function Blank() {
   const {handleBlankQuery, handleAiTaskCountPlus} = useAppContext();
+  const location = useLocation();
+  const navigate = useNavigate();
 
   interface QueryForm {
     type: AiTaskType;
@@ -22,12 +24,40 @@ function Blank() {
     model: ModelType;
   }
 
+  // 从location中获取agent类型
+  const agentType = location.state?.agentType as AiTaskType || 'general';
+  const agentName = location.state?.agentName as string;
+
   const [queryForm, setQueryForm] = useState<QueryForm>({
-    type: "general",
+    type: agentType,
     prompt: "",
     promptParams: {},
     model: "doubao"
   });
+
+  // 当location变化时，更新queryForm的type字段
+  useEffect(() => {
+    if (location.state?.agentType) {
+      setQueryForm(prev => ({
+        ...prev,
+        type: location.state.agentType as AiTaskType,
+        prompt: "",
+        promptParams: {}
+      }));
+      
+      // 如果是解题模式，重置解题相关状态
+      if (location.state.agentType === 'solver-first') {
+        setSelectedWay('');
+        setCustomWay('');
+        setSolvingWays([]);
+      }
+
+      // 如果是电路分析模式，导航到电路分析页面
+      if (location.state.agentType === 'circuit-analyze') {
+        navigate('/circuit');
+      }
+    }
+  }, [location.state, navigate]);
 
   const [showImageUploader, setShowImageUploader] = useState(false);
   const [solvingWays, setSolvingWays] = useState<string[]>([]);
@@ -82,15 +112,6 @@ function Blank() {
     });
   }, [isProcessing, queryForm.prompt, queryForm.type, queryForm.promptParams, queryForm.model, selectedWay, customWay, handleAiTaskCountPlus, handleBlankQuery]);
 
-  // 处理模式变更
-  const handleModeChange = (type: AiTaskType) => {
-    setQueryForm(prev => ({...prev, type, prompt: "", promptParams: {}}));
-    setIsLoadingWays(false);
-    setSelectedWay('');
-    setCustomWay('');
-    setSolvingWays([]);
-  };
-
   // 处理模型变更
   const handleModelChange = (model: ModelType) => {
     setQueryForm(prev => ({...prev, model}));
@@ -130,6 +151,21 @@ function Blank() {
     }
   };
 
+  // 返回通用模式
+  const handleReturnToGeneral = () => {
+    navigate('/blank', { state: {} });
+    setQueryForm({
+      type: 'general',
+      prompt: "",
+      promptParams: {},
+      model: "doubao"
+    });
+    setSelectedWay('');
+    setCustomWay('');
+    setSolvingWays([]);
+    toast.success("已切换到通用对话模式");
+  };
+
   const currentTime = new Date();
   const hours = currentTime.getHours();
   let greeting = "晚上好";
@@ -141,6 +177,37 @@ function Blank() {
 
   // 判断是否为数学公式输入模式
   const isSolverMode = queryForm.type === "solver-first";
+  // 判断是否为动画生成模式
+  const isAnimationMode = queryForm.type === "animation";
+  // 判断是否为通用模式
+  const isGeneralMode = queryForm.type === "general";
+
+  // 根据模式获取页面标题和描述
+  const getPageInfo = () => {
+    if (isSolverMode) {
+      return {
+        title: "AI推理解题",
+        description: "上传题目图片或输入题目，让AI为您提供详细解题过程"
+      };
+    } else if (isAnimationMode) {
+      return {
+        title: "AI动画生成",
+        description: "描述您想要制作的动画内容，AI将为您创建生动的动画展示"
+      };
+    } else if (queryForm.type === "circuit-analyze") {
+      return {
+        title: "AI电子电路分析",
+        description: "设计和分析电路，AI将为您提供详细的电路分析结果"
+      };
+    } else {
+      return {
+        title: greeting,
+        description: "有什么可以帮助您的？"
+      };
+    }
+  };
+
+  const pageInfo = getPageInfo();
 
   return (
     <div className="w-full h-full bg-background flex flex-col flex-wrap content-start md:content-center md:pt-0">
@@ -202,9 +269,22 @@ function Blank() {
       <div className="relative z-10 w-full mt-14 mb-16">
         <div className="w-full animate-fade-in">
           <div className="max-w-[800px] mx-auto px-4">
-            <div className="pl-4 mb-1 text-left mt-2">
-              <h1 className="mb-2 text-2xl md:text-3xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-neutral-900 to-neutral-600">{greeting}</h1>
-              <p className="mb-4 text-sm md:text-base tracking-tight text-neutral-600">选择一个对话模式来开始对话吧！</p>
+            <div className="pl-4 mb-1 text-left mt-2 flex items-center justify-between">
+              <div>
+                <h1 className="mb-2 text-2xl md:text-3xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-neutral-900 to-neutral-600">{pageInfo.title}</h1>
+                <p className="mb-4 text-sm md:text-base tracking-tight text-neutral-600">{pageInfo.description}</p>
+              </div>
+              
+              {/* 返回通用模式按钮 - 仅在非通用模式时显示 */}
+              {!isGeneralMode && (
+                <button 
+                  onClick={handleReturnToGeneral}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-white/80 hover:bg-white text-neutral-700 rounded-lg border border-neutral-200 shadow-sm transition-all duration-200 hover:shadow hover:border-neutral-300"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  <span className="text-sm font-medium">返回通用模式</span>
+                </button>
+              )}
             </div>
 
             <div className="py-6 relative p-2 backdrop-blur-sm bg-white/50 border border-neutral-200/50 rounded-2xl transition-all duration-200 hover:border-neutral-300 group">
@@ -219,6 +299,7 @@ function Blank() {
                       queryForm.type === "knowledge" ? "请输入知识性问题..." :
                       queryForm.type === "animation" ? "请输入你想制作动画的问题..." :
                       queryForm.type === "solver-first" ? "请输入需要解答的题目（可通过图片上传）..." :
+                      queryForm.type === "circuit-analyze" ? "请上传电路图或描述电路问题..." :
                       "请输入问题"
                     }
                     className="w-full p-4 h-32 pr-0 text-xl bg-transparent outline-none resize-none scrollbar-hide"
@@ -372,17 +453,13 @@ function Blank() {
                 <div className="items-center justify-between block w-full md:flex">
                   <div className="mb-4 whitespace-nowrap md:mb-0">
                     <div className="flex gap-3">
-                      <ModeSelector 
-                        selectedType={queryForm.type} 
-                        onTypeChange={handleModeChange} 
-                      />
-                      {
-                        (queryForm.type === "general" || queryForm.type === "knowledge") &&
+                      {/* 只在通用模式或知识模式下显示模型选择器 */}
+                      {(queryForm.type === "general" || queryForm.type === "knowledge") && (
                         <ModelSelector 
                           selectedModel={queryForm.model} 
                           onModelChange={handleModelChange} 
                         />
-                      }
+                      )}
                     </div>
                   </div>
                 </div>

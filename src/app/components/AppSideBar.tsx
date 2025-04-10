@@ -19,6 +19,7 @@ import { useCallback, useEffect } from "react";
 import { useAppContext } from "@/app/contexts/AppContext";
 import { FlowLocationState } from "@/app/contexts/FlowContext";
 import { LOGIN_FLAG_KEY } from "@/common/constant/storage-key.constant";
+import { AgentMenu } from "./agent-menu/AgentMenu";
 
 interface AppSideBarProps {
   activeConversationId: number | null;
@@ -80,6 +81,9 @@ function AppSideBar({activeConversationId, setActiveConversationId, className}: 
 								<span className="transition-colors group-hover:text-neutral-700">新建对话</span>
 								<MessageCirclePlus size="18px" className="transition-transform group-hover:scale-110" />
 							</button>
+
+              {/* 添加智能助手菜单 */}
+              <AgentMenu />
 
 							<Collapsible defaultOpen={true}>
 							<div className="flex items-center gap-1.5 mb-0 mt-10">
