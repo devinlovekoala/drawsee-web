@@ -97,13 +97,11 @@ export interface XYPosition {
 export type AiTaskType = 
   | 'general'      // 常规问答模式
   | 'knowledge'    // 知识问答模式
-  | 'knowledge-detail' // 知识详情
-  | 'animation'    // 动画模式
+  | 'knowledge-detail' // 知识详情模式
+  | 'animation'    // 动画生成模式
   | 'solver-first'     // 开始解题模式
   | 'solver-continue'      // 继续解题模式
   | 'solver-summary'      // 总结解题模式
-  | 'planner' // 目标解析模式
-  | 'html-maker' // 网页生成模式
   | 'circuit-analyze' // 电路分析模式
 
 export interface CreateAiTaskVO {

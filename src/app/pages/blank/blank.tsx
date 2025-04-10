@@ -219,8 +219,6 @@ function Blank() {
                       queryForm.type === "knowledge" ? "请输入知识性问题..." :
                       queryForm.type === "animation" ? "请输入你想制作动画的问题..." :
                       queryForm.type === "solver-first" ? "请输入需要解答的题目（可通过图片上传）..." :
-                      queryForm.type === "planner" ? "请输入你想要达成的目标..." :
-                      queryForm.type === "html-maker" ? "请输入你想要制作的网页内容..." :
                       "请输入问题"
                     }
                     className="w-full p-4 h-32 pr-0 text-xl bg-transparent outline-none resize-none scrollbar-hide"
