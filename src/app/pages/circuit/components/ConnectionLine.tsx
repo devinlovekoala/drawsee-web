@@ -25,9 +25,10 @@ export const ConnectionLine = ({
       <path
         d={edgePath}
         fill="none"
-        stroke="#555"
+        stroke="#334155"
         strokeWidth={2}
         className="animated"
+        style={{ strokeDasharray: '5,5' }}
       />
     </g>
   );

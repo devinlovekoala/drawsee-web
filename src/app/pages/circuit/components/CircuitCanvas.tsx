@@ -2,11 +2,16 @@
 
 import React from 'react';
 import { CircuitFlowWithProvider } from './CircuitFlow';
+import { CircuitDesign } from '@/api/types/circuit.types';
 
-export function CircuitCanvas() {
+interface CircuitCanvasProps {
+  onCircuitDesignChange?: (design: CircuitDesign) => void;
+}
+
+export function CircuitCanvas({ onCircuitDesignChange }: CircuitCanvasProps) {
   return (
     <div className="w-full h-full">
-      <CircuitFlowWithProvider />
+      <CircuitFlowWithProvider onCircuitDesignChange={onCircuitDesignChange} />
     </div>
   );
 }

@@ -5,12 +5,15 @@ import { useCallback, useMemo, useState } from 'react';
 import { AiTaskType, CreateAiTaskDTO } from '@/api/types/flow.types';
 import { createAiTask } from '@/api/methods/flow.methods';
 import { useAppContext } from '@/app/contexts/AppContext';
+import { ModelSelector } from '../../../blank/components/ModelSelector';
+import { ModelType } from '../../../flow/components/input/FlowInputPanel';
 
 function AnswerNode({ data, ...props }: ExtendedNodeProps<'answer'>) {
   const {chat, convId, isChatting, addChatTask} = useFlowContext();
   const {handleAiTaskCountPlus} = useAppContext();
   const { subtype, isDone } = data;
   const [isGenerated, setIsGenerated] = useState(data.isGenerated || false);
+  const [selectedModel, setSelectedModel] = useState<ModelType>('doubao'); // 默认使用豆包模型
 
   const handleSolverChat = useCallback((taskType: AiTaskType) => {
     if (isChatting) {
@@ -22,13 +25,15 @@ function AnswerNode({ data, ...props }: ExtendedNodeProps<'answer'>) {
       return;
     }
     setIsGenerated(true);
-    const createAiTaskDTO = {
+    const createAiTaskDTO: CreateAiTaskDTO = {
       type: taskType,
       prompt: null,
       promptParams: null,
       convId: convId,
-      parentId: parseInt(props.id)
-    } as CreateAiTaskDTO;
+      parentId: parseInt(props.id),
+      model: selectedModel // 使用选定的模型，适用于所有任务类型
+    };
+    console.log('发送节点AI任务', createAiTaskDTO);
     createAiTask(createAiTaskDTO).then((response) => {
       toast.success("问题已发送");
       handleAiTaskCountPlus();
@@ -42,18 +47,48 @@ function AnswerNode({ data, ...props }: ExtendedNodeProps<'answer'>) {
       setTimeout(() => {
         chat(response.taskId);
       }, 200);
+    }).catch(error => {
+      console.error('节点AI任务失败', error);
+      setIsGenerated(false);
+      toast.error(error.message || "创建任务失败，请重试");
     });
-  }, [isChatting, isGenerated, convId, props.id, addChatTask, chat]);
+  }, [isChatting, isGenerated, convId, props.id, addChatTask, chat, handleAiTaskCountPlus, selectedModel]);
 
+  // 处理模型变更
+  const handleModelChange = useCallback((model: ModelType) => {
+    setSelectedModel(model);
+  }, []);
+
+  // 模型选择器组件 - 使用紧凑样式
+  const modelSelectorElement = useMemo(() => (
+    <div className="mt-2 mb-1">
+      <div className="w-full">
+        <ModelSelector selectedModel={selectedModel} onModelChange={handleModelChange} />
+      </div>
+    </div>
+  ), [selectedModel, handleModelChange]);
+
+  // 自定义内容
+  const customContent = useMemo(() => {
+    // 为解题和动画节点显示模型选择器
+    const showModelSelector = 
+      subtype === 'solver-continue' || 
+      subtype === 'solver-summary' || 
+      subtype === 'animation';
+    
+    return showModelSelector ? modelSelectorElement : null;
+  }, [subtype, modelSelectorElement]);
+
+  // 底部按钮内容
   const footerContent = useMemo(() => {
     if (subtype === 'solver-first' || (subtype === 'solver-continue' && isDone !== undefined)) {
       return (
         <button
           onClick={() => {
             if (subtype === 'solver-first' || (subtype === 'solver-continue' && !isDone)) {
-              handleSolverChat('solver-continue');
+              handleSolverChat('SOLVER_CONTINUE' as AiTaskType);
             } else if (subtype === 'solver-continue' && isDone) {
-              handleSolverChat('solver-summary');
+              handleSolverChat('SOLVER_SUMMARY' as AiTaskType);
             }
           }}
           disabled={isGenerated}
@@ -72,12 +107,32 @@ function AnswerNode({ data, ...props }: ExtendedNodeProps<'answer'>) {
         </button>
       );
     }
+    
+    // 为动画节点添加生成按钮
+    if (subtype === 'animation' && !isGenerated) {
+      return (
+        <button
+          onClick={() => handleSolverChat('ANIMATION' as AiTaskType)}
+          disabled={isGenerated}
+          className="px-6 py-2.5 font-medium rounded transition-colors bg-purple-500 text-white hover:bg-purple-600"
+        >
+          生成动画
+        </button>
+      );
+    }
+    
     return undefined;
   }, [subtype, isDone, isGenerated, handleSolverChat]);
 
+  // 创建增强的数据对象，包含自定义内容
+  const enhancedData = {
+    ...data,
+    customContent
+  };
+
   return (
     <BaseNode
-      data={data}
+      data={enhancedData}
       footerContent={footerContent}
       {...props}
     />

@@ -22,7 +22,7 @@ export interface QueryNodeData extends BaseNodeData {
   [key: string]: unknown;
 }
 
-type AnswerSubType = 'solver-first' | 'solver-continue' | 'solver-summary' | 'html-maker' | 'planner-first' | 'planner-split';
+type AnswerSubType = 'solver-first' | 'solver-continue' | 'solver-summary' | 'html-maker' | 'planner-first' | 'planner-split' | 'animation';
 
 export interface AnswerNodeData extends BaseNodeData {
   subtype?: AnswerSubType;

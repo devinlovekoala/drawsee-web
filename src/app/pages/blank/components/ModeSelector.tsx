@@ -37,19 +37,21 @@ const modes = [
     name: '网页生成模式',
     description: '基于网页生成引擎，能够基于用户提问生成可预览的html网页。',
     icon: CodeXmlIcon,
-    type: 'html-maker' satisfies AiTaskType
+    type: 'html-maker' as string,
+    disabled: true
   },
   {
     name: '目标解析模式',
     description: '基于目标解析引擎，能够对用户目标进行有效拆解。',
     icon: TargetIcon,
-    type: 'planner' satisfies AiTaskType
+    type: 'planner' as string,
+    disabled: true
   },
   {
     name: '动画生成模式',
     description: '基于昭析动画生成引擎，能够基于用户提问生成生动的动画视频解析。',
     icon: TvMinimalPlayIcon,
-    type: 'animation' as AiTaskType,
+    type: 'animation' satisfies AiTaskType,
   },
   {
     name: '电路分析模式',
@@ -162,11 +164,22 @@ export function ModeSelector({ selectedType, onTypeChange }: ModeSelectorProps) 
                 <div
                   key={mode.type}
                   role="menuitem"
-                  className="relative flex cursor-pointer select-none items-center rounded-lg text-sm outline-none transition-colors w-full p-0 focus:bg-transparent"
+                  className={`relative flex select-none items-center rounded-lg text-sm outline-none transition-colors w-full p-0 focus:bg-transparent ${
+                    mode.disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'
+                  }`}
                   tabIndex={-1}
                   data-orientation="vertical"
                   onClick={() => {
-                    onTypeChange(mode.type as AiTaskType);
+                    if (mode.disabled) {
+                      toast.info(`${mode.name}功能即将上线，敬请期待！`);
+                      return;
+                    }
+                    // 确保使用有效的AiTaskType
+                    const validAiTaskType = ['general', 'knowledge', 'knowledge-detail', 'animation', 
+                      'solver-first', 'solver-continue', 'solver-summary', 'circuit-analyze'].includes(mode.type) 
+                      ? (mode.type as AiTaskType) 
+                      : 'general';
+                    onTypeChange(validAiTaskType);
                     setIsOpen(false);
                   }}
                 >

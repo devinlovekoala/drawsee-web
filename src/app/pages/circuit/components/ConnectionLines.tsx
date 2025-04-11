@@ -38,7 +38,7 @@ export const ConnectionLine = memo(({
 
   return (
     <>
-      <BaseEdge path={edgePath} id={id} style={{ stroke: '#333', strokeWidth: 2, ...style }} />
+      <BaseEdge path={edgePath} id={id} style={{ stroke: '#334155', strokeWidth: 2, ...style }} />
       <EdgeLabelRenderer>
         <div
           style={{
@@ -54,7 +54,7 @@ export const ConnectionLine = memo(({
               width: 20,
               height: 20,
               background: 'white',
-              border: '1px solid #999',
+              border: '1px solid #334155',
               borderRadius: '50%',
               fontSize: 12,
               display: 'flex',

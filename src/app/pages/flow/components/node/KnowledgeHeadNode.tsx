@@ -23,13 +23,15 @@ function KnowledgeHeadNode({ showSourceHandle, showTargetHandle, data, ...props 
       return;
     }
     setIsGenerated(true);
-    const createAiTaskDTO = {
+    const createAiTaskDTO: CreateAiTaskDTO = {
       type: "knowledge-detail",
       prompt: null,
       promptParams: null,
       convId: convId,
-      parentId: parseInt(props.id)
-    } as CreateAiTaskDTO;
+      parentId: parseInt(props.id),
+      model: null
+    };
+    console.log('发送知识详情AI任务', createAiTaskDTO);
     createAiTask(createAiTaskDTO).then((response) => {
       toast.success("问题已发送");
       handleAiTaskCountPlus();
@@ -43,6 +45,10 @@ function KnowledgeHeadNode({ showSourceHandle, showTargetHandle, data, ...props 
       setTimeout(() => {
         chat(response.taskId);
       }, 200);
+    }).catch(error => {
+      console.error('知识详情AI任务失败', error);
+      setIsGenerated(false);
+      toast.error(error.message || "创建任务失败，请重试");
     });
   }
 

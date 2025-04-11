@@ -75,7 +75,13 @@ function AppSideBar({activeConversationId, setActiveConversationId, className}: 
 							<button
 								onClick={() => {
 									setActiveConversationId(null);
-									navigate('/blank');
+									// 明确指定导航到通用模式的昭析智能体对话页面
+									navigate('/blank', { 
+										state: { 
+											agentType: 'GENERAL',
+											agentName: '通用对话' 
+										} 
+									});
 								}}
 								className="group px-[12px] text-[14px] select-none h-12 items-center leading-5 tracking-normal gap-2 flex w-full cursor-pointer justify-between rounded-lg bg-white py-4 text-left font-medium text-neutral-900 shadow-sm ring-1 ring-neutral-200 transition duration-200 hover:shadow-md hover:ring-neutral-300">
 								<span className="transition-colors group-hover:text-neutral-700">新建对话</span>

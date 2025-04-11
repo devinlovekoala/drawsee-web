@@ -95,14 +95,16 @@ export interface XYPosition {
 }
 
 export type AiTaskType = 
-  | 'general'      // 常规问答模式
-  | 'knowledge'    // 知识问答模式
-  | 'knowledge-detail' // 知识详情模式
-  | 'animation'    // 动画生成模式
-  | 'solver-first'     // 开始解题模式
-  | 'solver-continue'      // 继续解题模式
-  | 'solver-summary'      // 总结解题模式
-  | 'circuit-analyze' // 电路分析模式
+  | 'GENERAL'      // 常规问答模式
+  | 'KNOWLEDGE'    // 知识问答模式
+  | 'KNOWLEDGE_DETAIL' // 知识详情模式
+  | 'ANIMATION'    // 动画生成模式
+  | 'SOLVER_FIRST'     // 开始解题模式
+  | 'SOLVER_CONTINUE'      // 继续解题模式
+  | 'SOLVER_SUMMARY'      // 总结解题模式
+  | 'PLANNER'       // 目标解析模式
+  | 'HTML_MAKER'    // 网页生成模式
+  | 'CIRCUIT_ANALYZE' // 电路分析模式
 
 export interface CreateAiTaskVO {
   taskId: number;

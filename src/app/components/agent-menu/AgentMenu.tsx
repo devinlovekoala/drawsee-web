@@ -111,12 +111,18 @@ export function AgentMenu() {
     }
 
     // 根据不同的agent类型导航到相应页面，并携带参数
-    navigate('/blank', { 
-      state: { 
-        agentType: agent.type,
-        agentName: agent.name 
-      } 
-    });
+    if (agent.type === 'circuit-analyze') {
+      // 电路分析模式直接导航到电路分析页面
+      navigate('/circuit');
+    } else {
+      // 其他模式导航到blank页面
+      navigate('/blank', { 
+        state: { 
+          agentType: agent.type,
+          agentName: agent.name 
+        } 
+      });
+    }
   };
   
   const handleLearningToolClick = (tool: typeof learningTools[0]) => {

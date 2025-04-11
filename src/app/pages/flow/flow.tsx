@@ -4,6 +4,7 @@ import QueryNode from "@/app/pages/flow/components/node/QueryNode";
 import AnswerNode from "@/app/pages/flow/components/node/AnswerNode";
 import KnowledgeHeadNode from "@/app/pages/flow/components/node/KnowledgeHeadNode";
 import KnowledgeDetailNode from "@/app/pages/flow/components/node/KnowledgeDetailNode";
+import CircuitAnalysisNode from "@/app/pages/flow/components/node/CircuitAnalysisNode";
 import {useCallback, useState, useEffect} from "react";
 import {useLocation} from "react-router-dom";
 import {useWatcher} from "alova/client";
@@ -34,6 +35,7 @@ const nodeTypes = {
   'knowledge-head': KnowledgeHeadNode,
   'knowledge-detail': KnowledgeDetailNode,
   'resource': ResourceNode,
+  'circuit-analysis': CircuitAnalysisNode,
 } as const;
 
 function Flow() {

@@ -74,7 +74,12 @@ const elementMenuItems = [
   },
 ];
 
-export const CircuitFlow = () => {
+// 在文件顶部添加接口定义
+interface CircuitFlowProps {
+  onCircuitDesignChange?: (design: CircuitDesign) => void;
+}
+
+export const CircuitFlow = ({ onCircuitDesignChange }: CircuitFlowProps) => {
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -103,14 +108,8 @@ export const CircuitFlow = () => {
         ...connection,
         id: `edge-${connection.source}-${connection.sourceHandle}-${connection.target}-${connection.targetHandle}`,
         type: 'default',
-        animated: false,
-        style: { stroke: '#555', strokeWidth: 2 },
-        markerEnd: {
-          type: MarkerType.ArrowClosed,
-          width: 15,
-          height: 15,
-          color: '#555',
-        },
+        animated: true,
+        style: { stroke: '#334155', strokeWidth: 2 },
       };
       setEdges((eds) => addEdge(newEdge, eds));
     },
@@ -203,7 +202,7 @@ export const CircuitFlow = () => {
       };
     });
 
-    return {
+    const circuitDesign = {
       elements,
       connections,
       metadata: {
@@ -213,7 +212,21 @@ export const CircuitFlow = () => {
         updatedAt: new Date().toISOString()
       }
     };
-  }, [nodes, edges]);
+    
+    // 如果提供了回调函数，则调用它通知父组件电路设计已经改变
+    if (onCircuitDesignChange) {
+      onCircuitDesignChange(circuitDesign);
+    }
+    
+    return circuitDesign;
+  }, [nodes, edges, onCircuitDesignChange]);
+
+  // 每当节点或边发生变化时，更新电路设计
+  useEffect(() => {
+    if (nodes.length > 0 || edges.length > 0) {
+      convertToCircuitDesign();
+    }
+  }, [nodes, edges, convertToCircuitDesign]);
 
   // 分析电路
   const handleAnalyzeCircuit = useCallback(async () => {
@@ -346,14 +359,6 @@ export const CircuitFlow = () => {
             >
               分析电路
             </Button>
-            
-            <Button 
-              icon={<SaveOutlined />} 
-              onClick={handleGenerateNetlist}
-              disabled={isAnalyzing}
-            >
-              生成SPICE网表
-            </Button>
           </Space>
         </Panel>
       </ReactFlow>
@@ -380,8 +385,8 @@ export const CircuitFlow = () => {
   );
 };
 
-export const CircuitFlowWithProvider = () => (
+export const CircuitFlowWithProvider = ({ onCircuitDesignChange }: CircuitFlowProps) => (
   <ReactFlowProvider>
-    <CircuitFlow />
+    <CircuitFlow onCircuitDesignChange={onCircuitDesignChange} />
   </ReactFlowProvider>
 );
