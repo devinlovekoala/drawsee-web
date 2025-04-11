@@ -49,7 +49,7 @@ function Blank() {
         'solver-summary': 'SOLVER_SUMMARY',
         'planner': 'PLANNER',
         'html-maker': 'HTML_MAKER',
-        'circuit-analyze': 'CIRCUIT_ANALYZE'
+        'circuit-analyze': 'CIRCUIT_ANALYSIS'
       };
       
       if (typeMap[queryForm.type as string]) {
@@ -75,9 +75,9 @@ function Blank() {
         setSolvingWays([]);
       }
 
-      // 如果是电路分析模式，导航到电路分析页面
-      if (location.state.agentType === 'CIRCUIT_ANALYZE') {
-        navigate('/circuit');
+      // 电路分析模式可以在这个页面直接输入问题或者点击按钮跳转到电路设计页面
+      if (location.state.agentType === 'CIRCUIT_ANALYSIS') {
+        // 保持在当前页面，使用户可以选择输入问题或跳转
       }
     }
   }, [location.state, navigate]);
@@ -93,20 +93,30 @@ function Blank() {
     if (isProcessing) return;
     
     if (queryForm.prompt.trim() === "") {
-      // 对于电路分析模式，即使没有输入也可以直接导航到电路页面
-      if (queryForm.type === "CIRCUIT_ANALYZE") {
-        navigate('/circuit');
-        return;
+      // 对于电路分析模式，如果没有输入，用户可能想直接设计电路
+      if (queryForm.type === "CIRCUIT_ANALYSIS") {
+        const goToCircuitPage = window.confirm('您是否要跳转到电路设计页面？');
+        if (goToCircuitPage) {
+          navigate('/circuit');
+          return;
+        } else {
+          toast.info('请输入电路相关的问题进行分析');
+          return;
+        }
       }
       
       toast.error("请输入问题");
       return;
     }
 
-    // 如果是电路分析模式，直接导航到电路页面而不是发送查询
-    if (queryForm.type === "CIRCUIT_ANALYZE") {
-      navigate('/circuit');
-      return;
+    // 对于电路分析模式，用户可以选择直接提问或者跳转到设计页面
+    if (queryForm.type === "CIRCUIT_ANALYSIS" && queryForm.prompt.includes('设计')) {
+      const goToCircuitPage = window.confirm('您的问题提到了电路设计，是否要跳转到电路设计页面？');
+      if (goToCircuitPage) {
+        navigate('/circuit');
+        return;
+      }
+      // 用户选择不跳转，继续正常发送查询
     }
 
     // 如果是解题模式，检查是否选择了解题方法
@@ -120,7 +130,7 @@ function Blank() {
     try {
       // 确保任务类型是有效的
       const validTaskTypes = ['GENERAL', 'KNOWLEDGE', 'KNOWLEDGE_DETAIL', 'ANIMATION', 
-        'SOLVER_FIRST', 'SOLVER_CONTINUE', 'SOLVER_SUMMARY', 'PLANNER', 'HTML_MAKER', 'CIRCUIT_ANALYZE'];
+        'SOLVER_FIRST', 'SOLVER_CONTINUE', 'SOLVER_SUMMARY', 'PLANNER', 'HTML_MAKER', 'CIRCUIT_ANALYSIS'];
       
       if (!validTaskTypes.includes(queryForm.type)) {
         throw new Error(`不支持的任务类型: ${queryForm.type}`);
@@ -143,7 +153,7 @@ function Blank() {
         promptParams: promptParams,
         convId: null,
         parentId: null,
-        model: ["GENERAL", "KNOWLEDGE", "ANIMATION", "SOLVER_FIRST"].includes(queryForm.type) ? queryForm.model : null
+        model: ["GENERAL", "KNOWLEDGE", "ANIMATION", "SOLVER_FIRST", "CIRCUIT_ANALYSIS"].includes(queryForm.type) ? queryForm.model : null
       };
 
       console.log('发送AI任务', createAiTaskDTO);
@@ -239,7 +249,7 @@ function Blank() {
         title: "AI动画生成",
         description: "描述您想要制作的动画内容，AI将为您创建生动的动画展示"
       };
-    } else if (queryForm.type === "CIRCUIT_ANALYZE") {
+    } else if (queryForm.type === "CIRCUIT_ANALYSIS") {
       return {
         title: "AI电子电路分析",
         description: "点击'开始分析'按钮进入电路设计页面，设计并分析您的电路"
@@ -256,7 +266,7 @@ function Blank() {
 
   // 电路分析模式的指导提示
   const renderCircuitAnalysisGuide = () => {
-    if (queryForm.type !== "CIRCUIT_ANALYZE") {
+    if (queryForm.type !== "CIRCUIT_ANALYSIS") {
       return null;
     }
     
@@ -273,12 +283,12 @@ function Blank() {
           <div className="ml-3">
             <h3 className="text-sm font-medium text-blue-800">电路分析模式</h3>
             <div className="mt-2 text-sm text-blue-700">
-              <p>在这个模式下，您需要先设计电路，然后进行分析：</p>
+              <p>在这个模式下，您可以：</p>
               <ol className="mt-1 list-decimal list-inside">
-                <li>点击下面的"开始分析"按钮进入电路设计页面</li>
-                <li>在设计页面添加电路元件并连接它们</li>
-                <li>完成设计后点击"分析电路"按钮</li>
-                <li>分析结果将以对话节点的形式显示</li>
+                <li><strong>直接提问：</strong> 输入电路相关的问题进行分析</li>
+                <li><strong>设计电路：</strong> 点击"开始设计"按钮进入可视化电路设计页面</li>
+                <li>在设计页面可以添加元件、连接并分析电路</li>
+                <li>分析结果将以常规对话节点的形式显示</li>
               </ol>
             </div>
           </div>
@@ -297,7 +307,7 @@ function Blank() {
              queryForm.type === 'KNOWLEDGE' ? '知识问答' :
              queryForm.type === 'ANIMATION' ? '动画生成' :
              queryForm.type === 'SOLVER_FIRST' ? '解题推理' :
-             queryForm.type === 'CIRCUIT_ANALYZE' ? '电路分析' :
+             queryForm.type === 'CIRCUIT_ANALYSIS' ? '电路分析' :
              agentName || '智能助手'}
           </h1>
         </div>
@@ -383,7 +393,7 @@ function Blank() {
                           queryForm.type === "KNOWLEDGE" ? "请输入知识性问题..." :
                           queryForm.type === "ANIMATION" ? "请输入你想制作动画的问题..." :
                           queryForm.type === "SOLVER_FIRST" ? "请输入需要解答的题目（可通过图片上传）..." :
-                          queryForm.type === "CIRCUIT_ANALYZE" ? "请上传电路图或描述电路问题..." :
+                          queryForm.type === "CIRCUIT_ANALYSIS" ? "请上传电路图或描述电路问题..." :
                           "请输入问题"
                         }
                         className="w-full p-4 h-32 pr-0 text-xl bg-transparent outline-none resize-none scrollbar-hide"
@@ -436,8 +446,8 @@ function Blank() {
                                 </span>
                                 处理中...
                               </div>
-                            ) : queryForm.type === "CIRCUIT_ANALYZE" ? (
-                              "开始分析"
+                            ) : queryForm.type === "CIRCUIT_ANALYSIS" ? (
+                              "开始设计"
                             ) : (
                               "发送"
                             )}
@@ -557,8 +567,8 @@ function Blank() {
                     <div className="items-center justify-between block w-full md:flex">
                       <div className="mb-4 whitespace-nowrap md:mb-0">
                         <div className="flex gap-3">
-                          {/* 在通用、知识、解题和动画模式下显示模型选择器 */}
-                          {['GENERAL', 'KNOWLEDGE', 'ANIMATION', 'SOLVER_FIRST'].includes(queryForm.type) && (
+                          {/* 在通用、知识、解题、动画和电路分析模式下显示模型选择器 */}
+                          {['GENERAL', 'KNOWLEDGE', 'ANIMATION', 'SOLVER_FIRST', 'CIRCUIT_ANALYSIS'].includes(queryForm.type) && (
                             <ModelSelector 
                               selectedModel={queryForm.model} 
                               onModelChange={handleModelChange} 

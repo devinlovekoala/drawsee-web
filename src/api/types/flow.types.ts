@@ -104,7 +104,7 @@ export type AiTaskType =
   | 'SOLVER_SUMMARY'      // 总结解题模式
   | 'PLANNER'       // 目标解析模式
   | 'HTML_MAKER'    // 网页生成模式
-  | 'CIRCUIT_ANALYZE' // 电路分析模式
+  | 'CIRCUIT_ANALYSIS' // 电路分析模式
 
 export interface CreateAiTaskVO {
   taskId: number;

@@ -23,7 +23,11 @@ import 'reactflow/dist/style.css';
 import { CircuitNode } from './CircuitNode';
 import { ConnectionLine } from './ConnectionLine';
 import { CircuitElement, CircuitElementType, CircuitDesign, CircuitAnalysisResult } from '@/api/types/circuit.types';
-import { analyzeCircuit, generateSpiceNetlist } from '@/api/methods/tool.methods';
+// 导入创建AI任务的方法，不再使用废弃的tool.methods
+import { createAiTask } from '@/api/methods/flow.methods';
+import { useAppContext } from '@/app/contexts/AppContext';
+import { CreateAiTaskDTO } from '@/api/types/flow.types';
+import { useNavigate } from 'react-router-dom';
 
 // 唯一节点ID生成
 let nodeIdCounter = 1;
@@ -77,9 +81,10 @@ const elementMenuItems = [
 // 在文件顶部添加接口定义
 interface CircuitFlowProps {
   onCircuitDesignChange?: (design: CircuitDesign) => void;
+  selectedModel?: string;
 }
 
-export const CircuitFlow = ({ onCircuitDesignChange }: CircuitFlowProps) => {
+export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'doubao' }: CircuitFlowProps) => {
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -88,6 +93,8 @@ export const CircuitFlow = ({ onCircuitDesignChange }: CircuitFlowProps) => {
   
   const reactFlowInstance = useReactFlow();
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
+  const { handleBlankQuery, handleAiTaskCountPlus } = useAppContext();
   
   // 处理节点变更
   const onNodesChange = useCallback(
@@ -233,43 +240,82 @@ export const CircuitFlow = ({ onCircuitDesignChange }: CircuitFlowProps) => {
     try {
       setIsAnalyzing(true);
       const circuitDesign = convertToCircuitDesign();
-      const results = await analyzeCircuit({ circuitDesign });
-      setAnalysisResults(results as CircuitAnalysisResult);
-      setAnalysisModalVisible(true);
+      
+      // 检查电路是否为空
+      if (circuitDesign.elements.length === 0) {
+        message.error('电路中没有元件，请先添加元件');
+        setIsAnalyzing(false);
+        return;
+      }
+      
+      // 检查电路连接
+      if (circuitDesign.connections.length === 0) {
+        message.error('电路中没有连接，请先连接元件');
+        setIsAnalyzing(false);
+        return;
+      }
+
+      // 不再需要生成文本描述，直接使用CircuitDesign对象作为prompt
+      
+      // 创建AI任务，直接使用createAiTask接口
+      const createAiTaskDTO: CreateAiTaskDTO = {
+        type: 'CIRCUIT_ANALYSIS',
+        // 将CircuitDesign对象转为字符串作为prompt
+        prompt: JSON.stringify(circuitDesign),
+        // 不再需要使用promptParams传递电路数据
+        promptParams: null,
+        convId: null,
+        parentId: null,
+        model: selectedModel
+      };
+      
+      console.log('发送电路分析AI任务', createAiTaskDTO);
+      
+      // 创建AI任务并获取结果
+      const response = await createAiTask(createAiTaskDTO);
+      
+      // 计数+1
+      handleAiTaskCountPlus();
+      
+      // 成功提示
+      message.success('电路分析已发送，正在处理...');
+      
+      // 跳转到Flow页面展示结果
+      handleBlankQuery(response);
+      
+      // 关闭分析弹窗
+      setAnalysisModalVisible(false);
       setIsAnalyzing(false);
     } catch (error) {
       console.error('电路分析失败:', error);
-      message.error('电路分析失败，请检查电路连接是否完整');
+      if (error instanceof Error) {
+        // 对于参数错误，给出更具体的提示
+        if (error.message.includes('参数错误')) {
+          Modal.error({
+            title: '电路分析请求发送失败',
+            content: (
+              <div>
+                <p>服务器拒绝了分析请求，可能是因为电路设计不完整或存在错误：</p>
+                <ul>
+                  <li>检查电路是否有完整的闭合回路</li>
+                  <li>确保所有元件的参数设置合理</li>
+                  <li>您可能需要连接接地或补充缺失的元件</li>
+                </ul>
+                <p>技术错误信息: {error.message}</p>
+              </div>
+            )
+          });
+        } else {
+          message.error(`电路分析失败: ${error.message || '未知错误'}`);
+        }
+      } else {
+        message.error('电路分析失败，请检查电路连接是否完整');
+      }
       setIsAnalyzing(false);
     }
-  }, [convertToCircuitDesign]);
+  }, [convertToCircuitDesign, selectedModel, handleBlankQuery, handleAiTaskCountPlus]);
 
-  // 获取SPICE网表
-  const handleGenerateNetlist = useCallback(async () => {
-    try {
-      setIsAnalyzing(true);
-      const circuitDesign = convertToCircuitDesign();
-      const response = await generateSpiceNetlist({ circuitDesign });
-      
-      Modal.info({
-        title: 'SPICE 网表',
-        content: (
-          <div>
-            <pre style={{ maxHeight: '400px', overflow: 'auto' }}>
-              {response.netlist}
-            </pre>
-          </div>
-        ),
-        width: 600,
-      });
-      
-      setIsAnalyzing(false);
-    } catch (error) {
-      console.error('生成网表失败:', error);
-      message.error('生成SPICE网表失败');
-      setIsAnalyzing(false);
-    }
-  }, [convertToCircuitDesign]);
+  // SPICE网表生成功能已废弃，现在通过AI任务分析电路
 
   // 分析结果弹窗
   const renderAnalysisResults = () => {
@@ -287,34 +333,117 @@ export const CircuitFlow = ({ onCircuitDesignChange }: CircuitFlowProps) => {
           </Button>
         ]}
       >
-        <div>
-          <h3>节点电压</h3>
-          <ul>
-            {Object.entries(analysisResults.voltages).map(([node, value], index) => (
-              <li key={index}>
-                节点 {node}: {value}V
-              </li>
-            ))}
-          </ul>
+        <div className="circuit-analysis-results">
+          {/* 统计信息 */}
+          {analysisResults.statistics && (
+            <div style={{ marginBottom: '20px', backgroundColor: '#f5f5f5', padding: '16px', borderRadius: '4px' }}>
+              <h3>电路统计</h3>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <div>
+                  <p><strong>节点数:</strong> {analysisResults.statistics.nodes}</p>
+                  <p><strong>元件数:</strong> {analysisResults.statistics.components}</p>
+                </div>
+                <div>
+                  <p><strong>方程数:</strong> {analysisResults.statistics.equations || 'N/A'}</p>
+                  <p><strong>求解时间:</strong> {analysisResults.statistics.solveTime ? `${analysisResults.statistics.solveTime}ms` : 'N/A'}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 节点电压 */}
+          <div style={{ marginBottom: '20px' }}>
+            <h3>节点电压</h3>
+            {analysisResults.voltages && Object.keys(analysisResults.voltages).length > 0 ? (
+              <ul style={{ listStyleType: 'none', padding: 0 }}>
+                {Object.entries(analysisResults.voltages).map(([node, value], index) => (
+                  <li key={index} style={{ padding: '8px', backgroundColor: index % 2 === 0 ? '#f9f9f9' : 'white', borderRadius: '4px' }}>
+                    <strong>节点 {node}:</strong> {typeof value === 'number' ? value.toFixed(3) : value}V
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p>无节点电压数据</p>
+            )}
+          </div>
           
+          {/* 分支电流 */}
+          {analysisResults.currents && Object.keys(analysisResults.currents).length > 0 && (
+            <div style={{ marginBottom: '20px' }}>
+              <h3>分支电流</h3>
+              <ul style={{ listStyleType: 'none', padding: 0 }}>
+                {Object.entries(analysisResults.currents).map(([branch, value], index) => (
+                  <li key={index} style={{ padding: '8px', backgroundColor: index % 2 === 0 ? '#f9f9f9' : 'white', borderRadius: '4px' }}>
+                    <strong>分支 {branch}:</strong> {typeof value === 'number' ? value.toFixed(6) : value}A
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          
+          {/* 功率消耗 */}
+          {analysisResults.powerConsumption && Object.keys(analysisResults.powerConsumption).length > 0 && (
+            <div style={{ marginBottom: '20px' }}>
+              <h3>功率消耗</h3>
+              <ul style={{ listStyleType: 'none', padding: 0 }}>
+                {Object.entries(analysisResults.powerConsumption).map(([component, value], index) => (
+                  <li key={index} style={{ padding: '8px', backgroundColor: index % 2 === 0 ? '#f9f9f9' : 'white', borderRadius: '4px' }}>
+                    <strong>元件 {component}:</strong> {typeof value === 'number' ? value.toFixed(3) : value}W
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          
+          {/* 频率响应 */}
           {analysisResults.frequencyResponse && (
-            <div>
+            <div style={{ marginBottom: '20px' }}>
               <h3>频率响应</h3>
-              <p>图表应显示在此处 (需集成图表库)</p>
+              <div style={{ border: '1px solid #ddd', padding: '16px', borderRadius: '4px', backgroundColor: '#fafafa' }}>
+                <p style={{ textAlign: 'center', color: '#666' }}>频率响应图表将显示在此处 (需集成图表库)</p>
+              </div>
             </div>
           )}
           
+          {/* 瞬态响应 */}
           {analysisResults.transientResponse && (
-            <div>
+            <div style={{ marginBottom: '20px' }}>
               <h3>瞬态响应</h3>
-              <p>图表应显示在此处 (需集成图表库)</p>
+              <div style={{ border: '1px solid #ddd', padding: '16px', borderRadius: '4px', backgroundColor: '#fafafa' }}>
+                <p style={{ textAlign: 'center', color: '#666' }}>瞬态响应图表将显示在此处 (需集成图表库)</p>
+              </div>
             </div>
           )}
           
-          <h3>分析摘要</h3>
-          <p>{analysisResults.warnings && analysisResults.warnings.length > 0 ? 
-              `警告: ${analysisResults.warnings.join(', ')}` : 
-              '分析完成，无警告'}</p>
+          {/* 分析摘要 - 警告和错误 */}
+          <div style={{ marginTop: '20px' }}>
+            <h3>分析摘要</h3>
+            {/* 警告信息 */}
+            {analysisResults.warnings && analysisResults.warnings.length > 0 ? (
+              <div style={{ padding: '8px 16px', backgroundColor: '#fffbe6', border: '1px solid #ffe58f', borderRadius: '4px', marginBottom: '10px' }}>
+                <h4 style={{ color: '#d4b106', margin: '8px 0' }}>警告</h4>
+                <ul>
+                  {analysisResults.warnings.map((warning, index) => (
+                    <li key={index}>{warning}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <p style={{ color: 'green' }}>分析完成，无警告</p>
+            )}
+            
+            {/* 错误信息 */}
+            {analysisResults.errors && analysisResults.errors.length > 0 && (
+              <div style={{ padding: '8px 16px', backgroundColor: '#fff2f0', border: '1px solid #ffccc7', borderRadius: '4px' }}>
+                <h4 style={{ color: '#cf1322', margin: '8px 0' }}>错误</h4>
+                <ul>
+                  {analysisResults.errors.map((error, index) => (
+                    <li key={index}>{error}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
         </div>
       </Modal>
     );
@@ -357,7 +486,7 @@ export const CircuitFlow = ({ onCircuitDesignChange }: CircuitFlowProps) => {
               onClick={handleAnalyzeCircuit}
               loading={isAnalyzing}
             >
-              分析电路
+              发送分析任务
             </Button>
           </Space>
         </Panel>
@@ -378,15 +507,20 @@ export const CircuitFlow = ({ onCircuitDesignChange }: CircuitFlowProps) => {
           backgroundColor: 'rgba(255, 255, 255, 0.7)',
           zIndex: 1000
         }}>
-          <Spin size="large" tip="正在分析电路..." />
+          <Spin size="large" spinning={true} fullscreen tip="正在发送电路分析任务..." />
         </div>
       )}
     </div>
   );
 };
 
-export const CircuitFlowWithProvider = ({ onCircuitDesignChange }: CircuitFlowProps) => (
+interface CircuitFlowWithProviderProps extends CircuitFlowProps {}
+
+export const CircuitFlowWithProvider = ({ onCircuitDesignChange, selectedModel }: CircuitFlowWithProviderProps) => (
   <ReactFlowProvider>
-    <CircuitFlow onCircuitDesignChange={onCircuitDesignChange} />
+    <CircuitFlow 
+      onCircuitDesignChange={onCircuitDesignChange}
+      selectedModel={selectedModel}
+    />
   </ReactFlowProvider>
 );
