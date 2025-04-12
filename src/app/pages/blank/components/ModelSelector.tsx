@@ -38,11 +38,7 @@ export function ModelSelector({ selectedModel, onModelChange }: ModelSelectorPro
   useEffect(() => {
     if (isOpen && buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect();
-      const parentRect = buttonRef.current.closest('.py-6')?.getBoundingClientRect() || { 
-        left: 0, 
-        width: window.innerWidth 
-      };
-
+      
       // 计算下拉菜单的预估高度
       const estimatedDropdownHeight = 106; // 根据实际内容调整
       const viewportHeight = window.innerHeight;
@@ -50,15 +46,15 @@ export function ModelSelector({ selectedModel, onModelChange }: ModelSelectorPro
       const availableSpaceAbove = rect.top;
 
       // 判断是否需要在上面显示
-      const shouldDisplayAbove = availableSpaceBelow < estimatedDropdownHeight + 20 && 
-                                availableSpaceAbove > estimatedDropdownHeight + 20;
+      const shouldDisplayAbove = availableSpaceBelow < estimatedDropdownHeight + 5 && 
+                                availableSpaceAbove > estimatedDropdownHeight + 5;
 
       setPosition({
         top: shouldDisplayAbove 
-          ? rect.top - estimatedDropdownHeight - 25 // 在按钮上方显示
-          : rect.bottom + 25, // 在按钮下方显示
-        left: parentRect.left,
-        width: parentRect.width
+          ? rect.top - estimatedDropdownHeight - 5 // 在按钮上方显示，减小间距
+          : rect.bottom + 5, // 在按钮下方显示，减小间距
+        left: rect.left, // 按钮的左侧对齐
+        width: Math.max(rect.width, 250) // 设定最小宽度，确保能够容纳两个模型选项
       });
     }
   }, [isOpen]);
@@ -107,7 +103,7 @@ export function ModelSelector({ selectedModel, onModelChange }: ModelSelectorPro
           style={{ 
             top: `${position.top}px`, 
             left: `${position.left}px`,
-            width: `${position.width}px`,
+            width: 'auto', // 自适应宽度
             transform: 'translate(0, 0)',
             willChange: 'transform',
             minWidth: 'max-content',
@@ -117,7 +113,7 @@ export function ModelSelector({ selectedModel, onModelChange }: ModelSelectorPro
           data-state="open"
         >
           <div 
-            className="min-w-fit scrollbar-nice overflow-hidden text-neutral-800 shadow bg-white/90 backdrop-blur-xl rounded-xl mx-2 sm:mx-0 w-9/12 sm:w-[768px] p-2 ring-1 ring-neutral-200/50"
+            className="min-w-fit scrollbar-nice overflow-hidden text-neutral-800 shadow bg-white/90 backdrop-blur-xl rounded-xl p-2 ring-1 ring-neutral-200/50 mx-0"
             tabIndex={-1}
             data-orientation="vertical"
             style={{ 
@@ -125,7 +121,7 @@ export function ModelSelector({ selectedModel, onModelChange }: ModelSelectorPro
               pointerEvents: 'auto'
             }}
           >
-            <div className="block sm:grid sm:gap-2 sm:grid-cols-4">
+            <div className="grid gap-2 grid-cols-2">
               {modelOptions.map((model) => (
                 <div
                   key={model.type}
@@ -138,44 +134,12 @@ export function ModelSelector({ selectedModel, onModelChange }: ModelSelectorPro
                     setIsOpen(false);
                   }}
                 >
-                  {/* 移动端视图 */}
-                  <div className="block w-full sm:hidden">
-                    <div className={`flex items-center gap-2 px-3 py-2.5 rounded-lg transition-all duration-300 w-full ${
-                      selectedModel === model.type 
-                        ? 'bg-neutral-100 dark:bg-neutral-800 ring-1 ring-neutral-200 dark:ring-neutral-700' 
-                        : 'hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:ring-1 hover:ring-neutral-200 dark:hover:ring-neutral-700'
-                    }`}>
-                      <div className="flex items-center justify-center w-5 h-5 rounded-md ring-1 bg-neutral-100/80 dark:bg-neutral-800/80 ring-neutral-200/50 dark:ring-neutral-700/50">
-                        <div className="transition-all duration-300 text-neutral-700 dark:text-neutral-400">
-                          <model.icon className='w-5 h-5' />
-                        </div>
-                      </div>
-                      <div className="flex flex-col flex-1">
-                        <p className="text-[13px] font-medium tracking-tight text-neutral-700 dark:text-neutral-300">
-                          {model.name}
-                        </p>
-                        <p className="text-[11px] leading-[14px] tracking-tight line-clamp-2 text-neutral-400 dark:text-neutral-400">
-                          {model.description}
-                        </p>
-                      </div>
-                      {selectedModel === model.type && (
-                        <div className="ml-2 shrink-0">
-                          <div className="size-[14px] flex items-center justify-center rounded-full bg-neutral-200/80 dark:bg-neutral-700/80 ring-1 ring-neutral-300/60 dark:ring-neutral-600/60">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-check size-2.5 text-neutral-600 dark:text-neutral-300">
-                              <path d="M20 6 9 17l-5-5"></path>
-                            </svg>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  
-                  {/* 桌面端视图 */}
-                  <div className={`hidden w-full sm:flex relative flex-col rounded-lg border transition-all duration-300 cursor-pointer group bg-gradient-to-br from-white to-neutral-50/80 dark:from-neutral-900 dark:to-neutral-900/95 h-[100px] p-2 ${
+                  {/* 卡片式模型选项 */}
+                  <div className="flex w-full relative flex-col rounded-lg border transition-all duration-300 cursor-pointer group bg-gradient-to-br from-white to-neutral-50/80 dark:from-neutral-900 dark:to-neutral-900/95 h-[100px] p-2 ${
                     selectedModel === model.type 
                       ? 'border-neutral-300/80 dark:border-neutral-600/80' 
                       : 'border-neutral-200/60 dark:border-neutral-800/60 hover:border-neutral-300/80 dark:hover:border-neutral-700/80'
-                  }`}>
+                  }">
                     <div className={`absolute inset-0 transition-all duration-300 rounded-lg bg-gradient-to-br ${
                       selectedModel === model.type 
                         ? 'from-neutral-100/50 to-neutral-50/30 dark:from-neutral-700/[0.08] dark:to-neutral-800/[0.03]' 

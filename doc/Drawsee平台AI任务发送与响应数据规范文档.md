@@ -499,6 +499,7 @@
   "parentId": 345678,
   "taskId": "task_uuid",
   "type": "CIRCUIT_ANALYSIS",
+  "model": "deepseekV3",  // 使用的AI模型
   "prompt": {
     "elements": [
       {
@@ -562,14 +563,96 @@
       "createdAt": "2024-04-01T10:00:00Z",
       "updatedAt": "2024-04-01T10:00:00Z"
     }
+  },
+  "promptParams": {
   }
 }
 ```
 
 #### 响应节点
-1. **查询节点** (同上)
+1. **查询节点**
+```json
+{
+  "type": "NODE",
+  "data": {
+    "id": 123,
+    "type": "QUERY",
+    "data": {
+      "title": "电路分析请求",
+      "text": "电路分析请求",
+      "circuitDesign": {
+        "elements": [
+          {
+            "id": "r1",
+            "type": "resistor",
+            "position": {"x": 100, "y": 100},
+            "rotation": 0,
+            "properties": {"resistance": "1k"},
+            "ports": [
+              {
+                "id": "p1",
+                "name": "端口1",
+                "type": "input",
+                "position": {"side": "left", "x": 0, "y": 0, "align": "start"}
+              },
+              {
+                "id": "p2",
+                "name": "端口2",
+                "type": "output",
+                "position": {"side": "right", "x": 0, "y": 0, "align": "start"}
+              }
+            ]
+          },
+          {
+            "id": "v1",
+            "type": "voltage_source",
+            "position": {"x": 50, "y": 100},
+            "rotation": 90,
+            "properties": {"voltage": "5V"},
+            "ports": [
+              {
+                "id": "p1",
+                "name": "正极",
+                "type": "output",
+                "position": {"side": "top", "x": 0, "y": 0, "align": "center"}
+              },
+              {
+                "id": "p2",
+                "name": "负极",
+                "type": "input",
+                "position": {"side": "bottom", "x": 0, "y": 0, "align": "center"}
+              }
+            ]
+          }
+        ],
+        "connections": [
+          {
+            "id": "conn1",
+            "source": {"elementId": "v1", "portId": "p1"},
+            "target": {"elementId": "r1", "portId": "p1"}
+          },
+          {
+            "id": "conn2",
+            "source": {"elementId": "r1", "portId": "p2"},
+            "target": {"elementId": "v1", "portId": "p2"}
+          }
+        ],
+        "metadata": {
+          "title": "简单电路示例",
+          "description": "一个包含电阻和电压源的电路",
+          "createdAt": "2024-04-01T10:00:00Z",
+          "updatedAt": "2024-04-01T10:00:00Z"
+        }
+      },
+      "mode": "CIRCUIT_ANALYSIS"
+    },
+    "position": {"x": 0, "y": 0},
+    "parentId": 345678
+  }
+}
+```
 
-2. **SPICE网表节点**
+2. **电路基本分析节点**
 ```json
 {
   "type": "NODE",
@@ -577,11 +660,10 @@
     "id": 137,
     "type": "ANSWER",
     "data": {
-      "title": "SPICE网表生成",
-      "subtype": "CIRCUIT_SPICE",
-      "progress": "正在生成SPICE网表...",
-      "spiceNetlist": "* 简单电路示例\nV1 1 0 5V\nR1 1 0 1k\n.END",
-      "spiceAnalysis": "电路网表解析..."
+      "title": "电路基本分析",
+      "subtype": "CIRCUIT_BASIC",
+      "progress": "正在分析电路基本情况...",
+      "basicAnalysis": "这个电路由一个5V电压源和一个1kΩ电阻组成。根据欧姆定律，电路中的电流为I=V/R=5V/1kΩ=5mA。"
     },
     "position": {"x": 0, "y": 0},
     "parentId": 123
@@ -589,7 +671,7 @@
 }
 ```
 
-3. **电路分析节点**
+3. **节点分析节点**
 ```json
 {
   "type": "NODE",
@@ -597,11 +679,12 @@
     "id": 138,
     "type": "ANSWER",
     "data": {
-      "title": "电路分析",
-      "subtype": "CIRCUIT_ANALYSIS",
-      "progress": "正在分析电路...",
-      "analysisPrompt": "请分析这个电路...",
-      "analysisResult": "这是一个简单的直流电路，由5V电压源和1k电阻组成..."
+      "title": "节点[N1]分析",
+      "subtype": "CIRCUIT_NODE_ANALYSIS",
+      "progress": "正在分析节点[N1]...",
+      "nodeName": "N1",
+      "nodeDescription": "电压源正极与电阻连接点",
+      "nodeAnalysis": "节点N1连接电压源的正极和电阻的一端，维持在5V电位。"
     },
     "position": {"x": 0, "y": 0},
     "parentId": 137
@@ -609,7 +692,7 @@
 }
 ```
 
-4. **优化建议节点**
+4. **电路功能分析节点**
 ```json
 {
   "type": "NODE",
@@ -617,25 +700,43 @@
     "id": 139,
     "type": "ANSWER",
     "data": {
-      "title": "电路优化建议",
-      "subtype": "CIRCUIT_OPTIMIZATION",
-      "progress": "正在生成优化建议...",
-      "optimizationPrompt": "请提供优化建议...",
-      "optimizationResult": "可以添加一个滤波电容以稳定电压输出..."
+      "title": "电路功能分析",
+      "subtype": "CIRCUIT_FUNCTION",
+      "progress": "正在分析电路功能...",
+      "functionAnalysis": "这是一个简单的负载电路，电压源提供恒定电压，电阻作为负载消耗电能，将电能转换为热能。"
     },
     "position": {"x": 0, "y": 0},
-    "parentId": 138
+    "parentId": 137
   }
 }
 ```
 
-5. **完成进度信息**
+5. **电路优化建议节点**
+```json
+{
+  "type": "NODE",
+  "data": {
+    "id": 140,
+    "type": "ANSWER",
+    "data": {
+      "title": "电路优化建议",
+      "subtype": "CIRCUIT_OPTIMIZATION",
+      "progress": "正在生成优化建议...",
+      "optimizationResult": "可以考虑添加一个并联电容以滤除可能的电压波动，提高电路稳定性。"
+    },
+    "position": {"x": 0, "y": 0},
+    "parentId": 139
+  }
+}
+```
+
+6. **完成进度信息**
 ```json
 {
   "type": "DATA",
   "data": {
     "progress": "电路分析完成",
-    "nodeId": 139
+    "nodeId": 140
   }
 }
 ```
@@ -658,3 +759,4 @@
 3. **提示内容格式**：大多数任务使用字符串作为`prompt`，但`CIRCUIT_ANALYSIS`使用`CircuitDesign`对象。
 4. **任务链接顺序**：解题类任务通常按照`SOLVER_FIRST` → `SOLVER_CONTINUE` → `SOLVER_SUMMARY`的顺序使用。
 5. **模型选择**：可以通过`model`字段指定使用的AI模型，不指定时使用默认模型。
+6. **电路节点获取**：使用`/tool/circuit/nodes`接口获取电路节点标号信息，便于前端渲染节点标识。

@@ -1,33 +1,54 @@
 // 电路分析相关类型定义
 
-export interface Position {
-  x: number;
-  y: number;
+// 标准电路元件类型
+export enum CircuitElementType {
+  RESISTOR = 'resistor',
+  CAPACITOR = 'capacitor',
+  INDUCTOR = 'inductor',
+  VOLTAGE_SOURCE = 'dc_source',
+  CURRENT_SOURCE = 'ac_source',
+  DIODE = 'diode',
+  TRANSISTOR_NPN = 'bjt',
+  TRANSISTOR_PNP = 'bjt_pnp',
+  OPAMP = 'opamp',
+  GROUND = 'ground',
+  WIRE = 'wire',
+  JUNCTION = 'junction'
 }
 
-// 电路端口定义
-export interface CircuitPort {
+// 基础坐标类型
+export type Vector2D = { x: number; y: number };
+
+// 元件端口定义
+export type PortType = 'input' | 'output' | 'bidirectional';
+
+// 端口位置定义
+export interface PortPosition {
+  side: 'left' | 'right' | 'top' | 'bottom';
+  x: number;  // 相对于元件边界的百分比位置 (0-100)
+  y: number;  // 相对于元件边界的百分比位置 (0-100)
+  offset?: number; // 可选的偏移量，用于微调位置
+  align?: 'start' | 'center' | 'end'; // 可选的对齐方式
+}
+
+// 端口定义
+export interface Port {
   id: string;
   name: string;
-  type: string;
-  position: {
-    side: string;
-    x: number;
-    y: number;
-    align: string;
-  };
+  type: PortType;
+  position: PortPosition;
 }
 
 // 电路元件定义
 export interface CircuitElement {
   id: string;
   type: CircuitElementType;
-  label: string;
-  value: string;
-  position: Position;
+  position: Vector2D;
   rotation: number;
-  properties: Record<string, string>;
-  ports: CircuitPort[];
+  label?: string;
+  value?: string;
+  ports: Port[];
+  properties: Record<string, any>;
 }
 
 // 电路连接定义
@@ -41,6 +62,7 @@ export interface CircuitConnection {
     elementId: string;
     portId: string;
   };
+  path?: Vector2D[];
 }
 
 // 电路设计定义
@@ -54,6 +76,64 @@ export interface CircuitDesign {
     updatedAt: string;
   };
 }
+
+// 可视化配置
+export interface ComponentVisualConfig {
+  width: number;
+  height: number;
+}
+
+// 电路元件类型映射
+export const ComponentVisualConfig: Record<CircuitElementType, ComponentVisualConfig> = {
+  [CircuitElementType.GROUND]: {
+    width: 40,
+    height: 40
+  },
+  [CircuitElementType.RESISTOR]: {
+    width: 60,
+    height: 20
+  },
+  [CircuitElementType.CAPACITOR]: {
+    width: 40,
+    height: 40
+  },
+  [CircuitElementType.INDUCTOR]: {
+    width: 40,
+    height: 40
+  },
+  [CircuitElementType.DIODE]: {
+    width: 40,
+    height: 40
+  },
+  [CircuitElementType.TRANSISTOR_NPN]: {
+    width: 60,
+    height: 60
+  },
+  [CircuitElementType.TRANSISTOR_PNP]: {
+    width: 60,
+    height: 60
+  },
+  [CircuitElementType.OPAMP]: {
+    width: 60,
+    height: 40
+  },
+  [CircuitElementType.VOLTAGE_SOURCE]: {
+    width: 40,
+    height: 40
+  },
+  [CircuitElementType.CURRENT_SOURCE]: {
+    width: 40,
+    height: 40
+  },
+  [CircuitElementType.WIRE]: {
+    width: 40,
+    height: 40
+  },
+  [CircuitElementType.JUNCTION]: {
+    width: 40,
+    height: 40
+  }
+};
 
 // SPICE网表响应
 export interface SpiceNetlistResponse {
@@ -105,20 +185,4 @@ export interface CircuitAnalysisResult {
 // 用于API请求的DTO
 export interface CircuitAnalysisDTO {
   circuitDesign: CircuitDesign;
-}
-
-// 标准电路元件类型
-export enum CircuitElementType {
-  RESISTOR = 'resistor',
-  CAPACITOR = 'capacitor',
-  INDUCTOR = 'inductor',
-  VOLTAGE_SOURCE = 'voltageSource',
-  CURRENT_SOURCE = 'currentSource',
-  DIODE = 'diode',
-  TRANSISTOR_NPN = 'transistorNPN',
-  TRANSISTOR_PNP = 'transistorPNP',
-  OPAMP = 'opamp',
-  GROUND = 'ground',
-  WIRE = 'wire',
-  JUNCTION = 'junction'
 }

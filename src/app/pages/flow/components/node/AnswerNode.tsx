@@ -63,7 +63,10 @@ function AnswerNode({ data, ...props }: ExtendedNodeProps<'answer'>) {
   const modelSelectorElement = useMemo(() => (
     <div className="mt-2 mb-1">
       <div className="w-full">
-        <ModelSelector selectedModel={selectedModel} onModelChange={handleModelChange} />
+        <ModelSelector 
+          selectedModel={selectedModel} 
+          onModelChange={handleModelChange} 
+        />
       </div>
     </div>
   ), [selectedModel, handleModelChange]);

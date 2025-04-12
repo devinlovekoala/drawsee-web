@@ -21,13 +21,21 @@ import { Button, Dropdown, message, Space, Modal, Spin } from 'antd';
 import { DownOutlined, PlusOutlined, SaveOutlined, PlayCircleOutlined } from '@ant-design/icons';
 import 'reactflow/dist/style.css';
 import { CircuitNode } from './CircuitNode';
-import { ConnectionLine } from './ConnectionLine';
-import { CircuitElement, CircuitElementType, CircuitDesign, CircuitAnalysisResult } from '@/api/types/circuit.types';
-// 导入创建AI任务的方法，不再使用废弃的tool.methods
+import ConnectionEdge, { ConnectionPreview } from './ConnectionEdge';
+import { 
+  CircuitElement, 
+  CircuitElementType, 
+  CircuitDesign, 
+  Port,
+  ComponentVisualConfig
+} from '@/api/types/circuit.types';
 import { createAiTask } from '@/api/methods/flow.methods';
 import { useAppContext } from '@/app/contexts/AppContext';
 import { CreateAiTaskDTO } from '@/api/types/flow.types';
 import { useNavigate } from 'react-router-dom';
+import { useHotkeys } from 'react-hotkeys-hook';
+import { ModelSelector } from '@/app/pages/blank/components/ModelSelector';
+import { ModelType } from '@/app/pages/flow/components/input/FlowInputPanel';
 
 // 唯一节点ID生成
 let nodeIdCounter = 1;
@@ -36,6 +44,11 @@ const getNewNodeId = () => `node-${nodeIdCounter++}`;
 // 定义节点类型
 const nodeTypes = {
   circuitNode: CircuitNode,
+};
+
+// 定义边类型
+const edgeTypes = {
+  default: ConnectionEdge,
 };
 
 // 电路元件菜单配置
@@ -76,7 +89,57 @@ const elementMenuItems = [
     key: CircuitElementType.GROUND,
     label: '接地 (GND)',
   },
+  {
+    key: CircuitElementType.OPAMP,
+    label: '运算放大器',
+  },
 ];
+
+// 默认端口配置
+const defaultPorts = {
+  [CircuitElementType.RESISTOR]: [
+    { id: 'port1', name: '端口1', type: 'bidirectional' as const, position: { side: 'left' as const, x: 0, y: 50, align: 'center' as const } },
+    { id: 'port2', name: '端口2', type: 'bidirectional' as const, position: { side: 'right' as const, x: 100, y: 50, align: 'center' as const } }
+  ],
+  [CircuitElementType.CAPACITOR]: [
+    { id: 'port1', name: '端口1', type: 'bidirectional' as const, position: { side: 'left' as const, x: 0, y: 50, align: 'center' as const } },
+    { id: 'port2', name: '端口2', type: 'bidirectional' as const, position: { side: 'right' as const, x: 100, y: 50, align: 'center' as const } }
+  ],
+  [CircuitElementType.INDUCTOR]: [
+    { id: 'port1', name: '端口1', type: 'bidirectional' as const, position: { side: 'left' as const, x: 0, y: 50, align: 'center' as const } },
+    { id: 'port2', name: '端口2', type: 'bidirectional' as const, position: { side: 'right' as const, x: 100, y: 50, align: 'center' as const } }
+  ],
+  [CircuitElementType.VOLTAGE_SOURCE]: [
+    { id: 'positive', name: '正极', type: 'output' as const, position: { side: 'right' as const, x: 100, y: 50, align: 'center' as const } },
+    { id: 'negative', name: '负极', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 50, align: 'center' as const } }
+  ],
+  [CircuitElementType.CURRENT_SOURCE]: [
+    { id: 'positive', name: '正极', type: 'output' as const, position: { side: 'right' as const, x: 100, y: 50, align: 'center' as const } },
+    { id: 'negative', name: '负极', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 50, align: 'center' as const } }
+  ],
+  [CircuitElementType.DIODE]: [
+    { id: 'anode', name: '阳极', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 50, align: 'center' as const } },
+    { id: 'cathode', name: '阴极', type: 'output' as const, position: { side: 'right' as const, x: 100, y: 50, align: 'center' as const } }
+  ],
+  [CircuitElementType.TRANSISTOR_NPN]: [
+    { id: 'base', name: '基极', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 50, align: 'center' as const } },
+    { id: 'collector', name: '集电极', type: 'input' as const, position: { side: 'right' as const, x: 100, y: 15, align: 'center' as const } },
+    { id: 'emitter', name: '发射极', type: 'output' as const, position: { side: 'right' as const, x: 100, y: 85, align: 'center' as const } }
+  ],
+  [CircuitElementType.TRANSISTOR_PNP]: [
+    { id: 'base', name: '基极', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 50, align: 'center' as const } },
+    { id: 'collector', name: '集电极', type: 'output' as const, position: { side: 'right' as const, x: 100, y: 15, align: 'center' as const } },
+    { id: 'emitter', name: '发射极', type: 'input' as const, position: { side: 'right' as const, x: 100, y: 85, align: 'center' as const } }
+  ],
+  [CircuitElementType.GROUND]: [
+    { id: 'ground', name: '接地点', type: 'input' as const, position: { side: 'top' as const, x: 50, y: 0, align: 'center' as const } }
+  ],
+  [CircuitElementType.OPAMP]: [
+    { id: 'input1', name: '输入1', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 30, align: 'center' as const } },
+    { id: 'input2', name: '输入2', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 70, align: 'center' as const } },
+    { id: 'output', name: '输出', type: 'output' as const, position: { side: 'right' as const, x: 100, y: 50, align: 'center' as const } }
+  ],
+};
 
 // 在文件顶部添加接口定义
 interface CircuitFlowProps {
@@ -88,13 +151,13 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'doubao' }:
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analysisResults, setAnalysisResults] = useState<CircuitAnalysisResult | null>(null);
-  const [analysisModalVisible, setAnalysisModalVisible] = useState(false);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [currentModel, setCurrentModel] = useState<ModelType>(selectedModel as ModelType);
   
   const reactFlowInstance = useReactFlow();
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
-  const { handleBlankQuery, handleAiTaskCountPlus } = useAppContext();
+  const { handleBlankQuery, handleAiTaskCountPlus, userInfo } = useAppContext();
   
   // 处理节点变更
   const onNodesChange = useCallback(
@@ -111,121 +174,208 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'doubao' }:
   // 处理连接创建
   const onConnect = useCallback(
     (connection: Connection) => {
+      // 检查连接是否有效
+      if (!connection.source || !connection.target || !connection.sourceHandle || !connection.targetHandle) {
+        message.warning('无效的连接，请确保正确连接两个端口');
+        return;
+      }
+
+      // 检查是否已存在相同的连接
+      const connectionExists = edges.some(
+        edge => 
+          edge.source === connection.source && 
+          edge.sourceHandle === connection.sourceHandle && 
+          edge.target === connection.target && 
+          edge.targetHandle === connection.targetHandle
+      );
+
+      if (connectionExists) {
+        message.warning('此连接已存在');
+        return;
+      }
+
+      // 创建新的边对象
       const newEdge = {
         ...connection,
         id: `edge-${connection.source}-${connection.sourceHandle}-${connection.target}-${connection.targetHandle}`,
         type: 'default',
-        animated: true,
+        animated: false,
         style: { stroke: '#334155', strokeWidth: 2 },
       };
+      
       setEdges((eds) => addEdge(newEdge, eds));
     },
-    []
+    [edges]
   );
 
   // 创建新节点
   const addNewNode = useCallback(
     (type: CircuitElementType) => {
+      // 使用ReactFlow实例计算新节点的位置
       const position = reactFlowInstance.project({
         x: Math.random() * 400 + 50,
         y: Math.random() * 400 + 50,
       });
 
+      // 生成唯一ID
+      const nodeId = getNewNodeId();
+      
+      // 节点标签
+      const elementLabel = `${type}${nodeIdCounter - 1}`;
+      
+      // 获取节点默认值
+      const defaultValues: Record<string, string> = {
+        [CircuitElementType.RESISTOR]: '1kΩ',
+        [CircuitElementType.CAPACITOR]: '1μF',
+        [CircuitElementType.INDUCTOR]: '1mH',
+        [CircuitElementType.VOLTAGE_SOURCE]: '5V',
+        [CircuitElementType.CURRENT_SOURCE]: '10mA',
+        [CircuitElementType.DIODE]: '',
+        [CircuitElementType.TRANSISTOR_NPN]: '',
+        [CircuitElementType.TRANSISTOR_PNP]: '',
+        [CircuitElementType.GROUND]: '',
+        [CircuitElementType.OPAMP]: '',
+      };
+      
+      const elementValue = defaultValues[type] || '';
+      
+      // 获取节点默认端口配置
+      const ports = (type in defaultPorts) 
+        ? [...(defaultPorts[type as keyof typeof defaultPorts] || [])]
+        : [];
+      
+      // 创建完整的CircuitElement对象
+      const element: CircuitElement = {
+        id: nodeId,
+        type,
+        position: { x: position.x, y: position.y },
+        rotation: 0,
+        ports,
+        properties: {
+          value: elementValue,
+          label: elementLabel
+        },
+        label: elementLabel,
+        value: elementValue
+      };
+
+      // 创建ReactFlow节点
       const newNode: Node = {
-        id: getNewNodeId(),
+        id: nodeId,
         type: 'circuitNode',
         position,
         data: {
           type,
-          label: `${type}${nodeIdCounter}`,
-          value: type === CircuitElementType.RESISTOR ? '1k' : 
-                 type === CircuitElementType.CAPACITOR ? '1u' : 
-                 type === CircuitElementType.INDUCTOR ? '1m' : 
-                 type === CircuitElementType.VOLTAGE_SOURCE ? '5V' : 
-                 type === CircuitElementType.CURRENT_SOURCE ? '10mA' : '',
+          label: elementLabel,
+          value: elementValue,
+          element
         },
       };
 
       setNodes((nds) => [...nds, newNode]);
+      
+      // 添加元件后显示简短提示
+      message.success(`已添加${elementMenuItems.find(item => item.key === type)?.label || type}`, 1);
     },
     [reactFlowInstance]
   );
 
   // 将Flow画布数据转换为CircuitDesign格式
   const convertToCircuitDesign = useCallback((): CircuitDesign => {
-    const elements = nodes.map(node => {
-      return {
-        id: node.id,
-        type: node.data.type as CircuitElementType,
-        label: node.data.label,
-        value: node.data.value,
-        position: {
-          x: node.position.x,
-          y: node.position.y
-        },
-        rotation: 0,
-        properties: {
-          value: node.data.value,
-          label: node.data.label
-        },
-        ports: [
-          {
-            id: 'input',
-            name: 'Input',
-            type: 'input',
-            position: {
-              side: 'left',
-              x: 0,
-              y: 25,
-              align: 'center'
-            }
-          },
-          {
-            id: 'output',
-            name: 'Output',
-            type: 'output',
-            position: {
-              side: 'right',
-              x: 100, 
-              y: 25,
-              align: 'center'
-            }
+    try {
+      // 从节点中提取电路元件数据
+      const elements = nodes.map(node => {
+        // 如果节点已经包含完整的element数据，直接使用
+        if (node.data.element) {
+          return {
+            ...node.data.element,
+            position: node.position // 确保位置是最新的
+          };
+        }
+        
+        // 获取节点类型
+        const nodeType = node.data.type as CircuitElementType;
+        
+        // 默认值设置
+        const defaultValues: Record<string, string> = {
+          [CircuitElementType.RESISTOR]: '1kΩ',
+          [CircuitElementType.CAPACITOR]: '1μF',
+          [CircuitElementType.INDUCTOR]: '1mH',
+          [CircuitElementType.VOLTAGE_SOURCE]: '5V',
+          [CircuitElementType.CURRENT_SOURCE]: '10mA',
+          [CircuitElementType.DIODE]: '',
+          [CircuitElementType.TRANSISTOR_NPN]: '',
+          [CircuitElementType.TRANSISTOR_PNP]: '',
+          [CircuitElementType.GROUND]: '',
+          [CircuitElementType.OPAMP]: '',
+        };
+        
+        // 获取默认端口配置
+        const nodePorts = nodeType in defaultPorts 
+          ? [...(defaultPorts[nodeType as keyof typeof defaultPorts] || [])]
+          : [];
+        
+        // 构造元件对象
+        return {
+          id: node.id,
+          type: nodeType,
+          position: node.position,
+          rotation: 0,
+          label: node.data.label,
+          value: node.data.value || defaultValues[nodeType] || '',
+          ports: nodePorts,
+          properties: {
+            value: node.data.value || defaultValues[nodeType] || '',
+            label: node.data.label
           }
-        ]
-      };
-    });
+        };
+      });
 
-    const connections = edges.map(edge => {
-      return {
+      // 从边中提取连接数据
+      const connections = edges.map(edge => ({
         id: edge.id,
         source: {
           elementId: edge.source,
-          portId: edge.sourceHandle || 'output'
+          portId: edge.sourceHandle || ''
         },
         target: {
           elementId: edge.target,
-          portId: edge.targetHandle || 'input'
+          portId: edge.targetHandle || ''
+        }
+      }));
+
+      // 创建电路设计对象
+      const circuitDesign: CircuitDesign = {
+        elements,
+        connections,
+        metadata: {
+          title: '电路设计',
+          description: '使用DrawSee创建的电路',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
         }
       };
-    });
-
-    const circuitDesign = {
-      elements,
-      connections,
-      metadata: {
-        title: '电路设计',
-        description: '使用DrawSee创建的电路',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+      
+      // 如果提供了回调函数，则调用它通知父组件电路设计已经改变
+      if (onCircuitDesignChange) {
+        onCircuitDesignChange(circuitDesign);
       }
-    };
-    
-    // 如果提供了回调函数，则调用它通知父组件电路设计已经改变
-    if (onCircuitDesignChange) {
-      onCircuitDesignChange(circuitDesign);
+      
+      return circuitDesign;
+    } catch (error) {
+      console.error('转换电路设计时出错:', error);
+      message.error('转换电路设计时出错');
+      return {
+        elements: [],
+        connections: [],
+        metadata: {
+          title: '电路设计',
+          description: '使用DrawSee创建的电路',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        }
+      };
     }
-    
-    return circuitDesign;
   }, [nodes, edges, onCircuitDesignChange]);
 
   // 每当节点或边发生变化时，更新电路设计
@@ -254,19 +404,23 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'doubao' }:
         setIsAnalyzing(false);
         return;
       }
-
-      // 不再需要生成文本描述，直接使用CircuitDesign对象作为prompt
       
-      // 创建AI任务，直接使用createAiTask接口
+      // 验证电路是否有接地元件
+      const hasGround = circuitDesign.elements.some(el => el.type === CircuitElementType.GROUND);
+      if (!hasGround) {
+        message.error('电路中没有接地元件(GND)，请先添加接地点');
+        setIsAnalyzing(false);
+        return;
+      }
+      
+      // 创建AI任务
       const createAiTaskDTO: CreateAiTaskDTO = {
         type: 'CIRCUIT_ANALYSIS',
-        // 将CircuitDesign对象转为字符串作为prompt
         prompt: JSON.stringify(circuitDesign),
-        // 不再需要使用promptParams传递电路数据
-        promptParams: null,
+        promptParams: {},
         convId: null,
         parentId: null,
-        model: selectedModel
+        model: currentModel
       };
       
       console.log('发送电路分析AI任务', createAiTaskDTO);
@@ -283,8 +437,6 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'doubao' }:
       // 跳转到Flow页面展示结果
       handleBlankQuery(response);
       
-      // 关闭分析弹窗
-      setAnalysisModalVisible(false);
       setIsAnalyzing(false);
     } catch (error) {
       console.error('电路分析失败:', error);
@@ -300,6 +452,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'doubao' }:
                   <li>检查电路是否有完整的闭合回路</li>
                   <li>确保所有元件的参数设置合理</li>
                   <li>您可能需要连接接地或补充缺失的元件</li>
+                  <li>确保电路有接地点(GND)元件</li>
                 </ul>
                 <p>技术错误信息: {error.message}</p>
               </div>
@@ -313,141 +466,77 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'doubao' }:
       }
       setIsAnalyzing(false);
     }
-  }, [convertToCircuitDesign, selectedModel, handleBlankQuery, handleAiTaskCountPlus]);
+  }, [convertToCircuitDesign, currentModel, handleBlankQuery, handleAiTaskCountPlus]);
 
-  // SPICE网表生成功能已废弃，现在通过AI任务分析电路
+  // 旋转选中的节点
+  const rotateSelectedNode = useCallback(() => {
+    if (!selectedNodeId) return;
 
-  // 分析结果弹窗
-  const renderAnalysisResults = () => {
-    if (!analysisResults) return null;
-    
-    return (
-      <Modal
-        title="电路分析结果"
-        open={analysisModalVisible}
-        onCancel={() => setAnalysisModalVisible(false)}
-        width={800}
-        footer={[
-          <Button key="close" onClick={() => setAnalysisModalVisible(false)}>
-            关闭
-          </Button>
-        ]}
-      >
-        <div className="circuit-analysis-results">
-          {/* 统计信息 */}
-          {analysisResults.statistics && (
-            <div style={{ marginBottom: '20px', backgroundColor: '#f5f5f5', padding: '16px', borderRadius: '4px' }}>
-              <h3>电路统计</h3>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <div>
-                  <p><strong>节点数:</strong> {analysisResults.statistics.nodes}</p>
-                  <p><strong>元件数:</strong> {analysisResults.statistics.components}</p>
-                </div>
-                <div>
-                  <p><strong>方程数:</strong> {analysisResults.statistics.equations || 'N/A'}</p>
-                  <p><strong>求解时间:</strong> {analysisResults.statistics.solveTime ? `${analysisResults.statistics.solveTime}ms` : 'N/A'}</p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* 节点电压 */}
-          <div style={{ marginBottom: '20px' }}>
-            <h3>节点电压</h3>
-            {analysisResults.voltages && Object.keys(analysisResults.voltages).length > 0 ? (
-              <ul style={{ listStyleType: 'none', padding: 0 }}>
-                {Object.entries(analysisResults.voltages).map(([node, value], index) => (
-                  <li key={index} style={{ padding: '8px', backgroundColor: index % 2 === 0 ? '#f9f9f9' : 'white', borderRadius: '4px' }}>
-                    <strong>节点 {node}:</strong> {typeof value === 'number' ? value.toFixed(3) : value}V
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p>无节点电压数据</p>
-            )}
-          </div>
+    setNodes((nds) =>
+      nds.map((node) => {
+        if (node.id === selectedNodeId) {
+          // 获取当前旋转角度
+          const currentRotation = node.data.element?.rotation || 0;
+          // 计算新的旋转角度 (0 -> 90 -> 180 -> 270 -> 0)
+          const newRotation = (currentRotation + 90) % 360;
           
-          {/* 分支电流 */}
-          {analysisResults.currents && Object.keys(analysisResults.currents).length > 0 && (
-            <div style={{ marginBottom: '20px' }}>
-              <h3>分支电流</h3>
-              <ul style={{ listStyleType: 'none', padding: 0 }}>
-                {Object.entries(analysisResults.currents).map(([branch, value], index) => (
-                  <li key={index} style={{ padding: '8px', backgroundColor: index % 2 === 0 ? '#f9f9f9' : 'white', borderRadius: '4px' }}>
-                    <strong>分支 {branch}:</strong> {typeof value === 'number' ? value.toFixed(6) : value}A
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-          
-          {/* 功率消耗 */}
-          {analysisResults.powerConsumption && Object.keys(analysisResults.powerConsumption).length > 0 && (
-            <div style={{ marginBottom: '20px' }}>
-              <h3>功率消耗</h3>
-              <ul style={{ listStyleType: 'none', padding: 0 }}>
-                {Object.entries(analysisResults.powerConsumption).map(([component, value], index) => (
-                  <li key={index} style={{ padding: '8px', backgroundColor: index % 2 === 0 ? '#f9f9f9' : 'white', borderRadius: '4px' }}>
-                    <strong>元件 {component}:</strong> {typeof value === 'number' ? value.toFixed(3) : value}W
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-          
-          {/* 频率响应 */}
-          {analysisResults.frequencyResponse && (
-            <div style={{ marginBottom: '20px' }}>
-              <h3>频率响应</h3>
-              <div style={{ border: '1px solid #ddd', padding: '16px', borderRadius: '4px', backgroundColor: '#fafafa' }}>
-                <p style={{ textAlign: 'center', color: '#666' }}>频率响应图表将显示在此处 (需集成图表库)</p>
-              </div>
-            </div>
-          )}
-          
-          {/* 瞬态响应 */}
-          {analysisResults.transientResponse && (
-            <div style={{ marginBottom: '20px' }}>
-              <h3>瞬态响应</h3>
-              <div style={{ border: '1px solid #ddd', padding: '16px', borderRadius: '4px', backgroundColor: '#fafafa' }}>
-                <p style={{ textAlign: 'center', color: '#666' }}>瞬态响应图表将显示在此处 (需集成图表库)</p>
-              </div>
-            </div>
-          )}
-          
-          {/* 分析摘要 - 警告和错误 */}
-          <div style={{ marginTop: '20px' }}>
-            <h3>分析摘要</h3>
-            {/* 警告信息 */}
-            {analysisResults.warnings && analysisResults.warnings.length > 0 ? (
-              <div style={{ padding: '8px 16px', backgroundColor: '#fffbe6', border: '1px solid #ffe58f', borderRadius: '4px', marginBottom: '10px' }}>
-                <h4 style={{ color: '#d4b106', margin: '8px 0' }}>警告</h4>
-                <ul>
-                  {analysisResults.warnings.map((warning, index) => (
-                    <li key={index}>{warning}</li>
-                  ))}
-                </ul>
-              </div>
-            ) : (
-              <p style={{ color: 'green' }}>分析完成，无警告</p>
-            )}
-            
-            {/* 错误信息 */}
-            {analysisResults.errors && analysisResults.errors.length > 0 && (
-              <div style={{ padding: '8px 16px', backgroundColor: '#fff2f0', border: '1px solid #ffccc7', borderRadius: '4px' }}>
-                <h4 style={{ color: '#cf1322', margin: '8px 0' }}>错误</h4>
-                <ul>
-                  {analysisResults.errors.map((error, index) => (
-                    <li key={index}>{error}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-        </div>
-      </Modal>
+          // 更新节点数据
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              element: {
+                ...node.data.element,
+                rotation: newRotation,
+              },
+            },
+          };
+        }
+        return node;
+      })
     );
-  };
+  }, [selectedNodeId, setNodes]);
+  
+  // 删除选中的节点
+  const deleteSelectedNode = useCallback(() => {
+    if (!selectedNodeId) return;
+    
+    // 删除连接到该节点的所有边
+    setEdges((edges) => 
+      edges.filter(
+        (edge) => edge.source !== selectedNodeId && edge.target !== selectedNodeId
+      )
+    );
+    
+    // 删除节点
+    setNodes((nodes) => nodes.filter((node) => node.id !== selectedNodeId));
+    
+    // 清除选中状态
+    setSelectedNodeId(null);
+    
+    message.info('元件已删除');
+  }, [selectedNodeId]);
+  
+  // 处理节点选择
+  const onNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
+    setSelectedNodeId(node.id);
+  }, []);
+  
+  // 处理画布点击（取消选择）
+  const onPaneClick = useCallback(() => {
+    setSelectedNodeId(null);
+  }, []);
+  
+  // 注册快捷键
+  useHotkeys('ctrl+r', (event) => {
+    event.preventDefault();
+    rotateSelectedNode();
+  }, [rotateSelectedNode]);
+  
+  useHotkeys('ctrl+d, delete', (event) => {
+    event.preventDefault();
+    deleteSelectedNode();
+  }, [deleteSelectedNode]);
 
   return (
     <div style={{ width: '100%', height: '80vh' }} ref={reactFlowWrapper}>
@@ -458,7 +547,10 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'doubao' }:
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         nodeTypes={nodeTypes}
-        connectionLineComponent={ConnectionLine}
+        edgeTypes={edgeTypes}
+        connectionLineComponent={ConnectionPreview}
+        onNodeClick={onNodeClick}
+        onPaneClick={onPaneClick}
         fitView
       >
         <Background color="#aaa" gap={16} />
@@ -481,6 +573,11 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'doubao' }:
               </Button>
             </Dropdown>
             
+            <ModelSelector 
+              selectedModel={currentModel}
+              onModelChange={setCurrentModel}
+            />
+            
             <Button 
               icon={<PlayCircleOutlined />} 
               onClick={handleAnalyzeCircuit}
@@ -492,7 +589,20 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'doubao' }:
         </Panel>
       </ReactFlow>
       
-      {renderAnalysisResults()}
+      {/* 快捷键说明 */}
+      <div style={{ 
+        position: 'absolute', 
+        bottom: 10, 
+        right: 10, 
+        padding: '5px 10px',
+        background: 'rgba(255, 255, 255, 0.8)',
+        borderRadius: '4px',
+        fontSize: '12px',
+        color: '#666'
+      }}>
+        <div>Ctrl+R: 旋转元件</div>
+        <div>Delete/Ctrl+D: 删除元件</div>
+      </div>
       
       {isAnalyzing && (
         <div style={{ 
@@ -507,16 +617,14 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'doubao' }:
           backgroundColor: 'rgba(255, 255, 255, 0.7)',
           zIndex: 1000
         }}>
-          <Spin size="large" spinning={true} fullscreen tip="正在发送电路分析任务..." />
+          <Spin size="large" spinning={true} tip="正在发送电路分析任务..." />
         </div>
       )}
     </div>
   );
 };
 
-interface CircuitFlowWithProviderProps extends CircuitFlowProps {}
-
-export const CircuitFlowWithProvider = ({ onCircuitDesignChange, selectedModel }: CircuitFlowWithProviderProps) => (
+export const CircuitFlowWithProvider = ({ onCircuitDesignChange, selectedModel }: CircuitFlowProps) => (
   <ReactFlowProvider>
     <CircuitFlow 
       onCircuitDesignChange={onCircuitDesignChange}
