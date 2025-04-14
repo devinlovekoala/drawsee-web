@@ -73,6 +73,9 @@ function Blank() {
         setSelectedWay('');
         setCustomWay('');
         setSolvingWays([]);
+      } else {
+        // 如果不是解题模式，确保关闭图片上传器
+        setShowImageUploader(false);
       }
 
       // 电路分析模式可以在这个页面直接输入问题或者点击按钮跳转到电路设计页面
@@ -403,15 +406,17 @@ function Blank() {
                     {/* 底部按钮，需要和输入区域分开成左右两边 */}
                     <div className="min-w-[165px]">
                       <div className="absolute flex gap-2 bottom-2 right-2">
-                        {/* 图片上传按钮 */}
-                        <button 
-                          onClick={toggleImageUploader}
-                          className="cursor-pointer bg-neutral-400/20 text-[rgba(101,101,101,1)] rounded-md 
-                          px-3 py-2 flex items-center gap-1 hover:scale-[0.95] hover:opacity-90 hover:ring-1 
-                          hover:ring-indigo-500/50 transition-all duration-200 font-medium"
-                        >
-                          <ImageUpIcon size={20} />
-                        </button>
+                        {/* 图片上传按钮 - 仅在解题模式下显示 */}
+                        {queryForm.type === "SOLVER_FIRST" && (
+                          <button 
+                            onClick={toggleImageUploader}
+                            className="cursor-pointer bg-neutral-400/20 text-[rgba(101,101,101,1)] rounded-md 
+                            px-3 py-2 flex items-center gap-1 hover:scale-[0.95] hover:opacity-90 hover:ring-1 
+                            hover:ring-indigo-500/50 transition-all duration-200 font-medium"
+                          >
+                            <ImageUpIcon size={20} />
+                          </button>
+                        )}
                         
                         {/* 提问按钮 */}
                         <div className="w-full flex justify-end gap-2">
@@ -457,8 +462,8 @@ function Blank() {
                     </div>
                   </div>
 
-                  {/* 图片上传组件 */}
-                  {showImageUploader && (
+                  {/* 图片上传组件 - 仅在解题模式下显示 */}
+                  {showImageUploader && queryForm.type === "SOLVER_FIRST" && (
                     <div className="mt-3 animate-fade-down animate-duration-300">
                       <div className="relative px-2 py-3 rounded-xl border border-neutral-200 bg-white/80">
                         <button 
