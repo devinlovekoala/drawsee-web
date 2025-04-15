@@ -10,6 +10,7 @@ import {SSE} from "sse.js";
 import { TOKEN_KEY } from "@/common/constant/storage-key.constant";
 import useFlowTools from "./useFlowTools";
 import { TEMP_QUERY_NODE_ID_PREFIX } from "../constants";
+import { processSectionMarkers } from "../utils/sectionParser";
 
 /**
  * 流程图状态管理Hook
@@ -114,28 +115,45 @@ function useFlowState(convId: number) {
         // 新增文本
         case 'text': {
           const textData = task.data as TextData;
-          const nodeId = textData.nodeId.toString();
+          
+          console.log(`收到文本数据，nodeId: ${textData.nodeId}，内容: ${textData.content.substring(0, 50)}${textData.content.length > 50 ? '...' : ''}`);
+          
           setElements(({nodes, edges}) => {
-            const targetNode = nodes.find(node => node.id === nodeId);
-            if (!targetNode) return {nodes, edges};
-            // 更新节点数据
-            const updatedNodes = nodes.map(node =>
-              node.id === nodeId ? 
-              {
-                ...node, 
-                data: {
-                  ...node.data, 
-                  text: node.data.text + textData.content
-                }
-              } : node
-            );
-            // 调整视口以显示最新内容
-            setTimeout(() => {
-              adjustViewportToShowLatestContent(targetNode);
-            }, 300);
+            // 使用sectionParser处理SECTION标记
+            const { nodes: updatedNodes, edges: updatedEdges, newNodeId, hasSection } = 
+              processSectionMarkers(textData, nodes, edges);
+              
+            // 如果找到了SECTION标记并创建了新节点
+            if (hasSection && newNodeId) {
+              console.log(`创建了新的SECTION节点，ID: ${newNodeId}`);
+              
+              // 更新最后聚焦的节点ID
+              lastFocusNodeId.current = newNodeId;
+              
+              // 找到新创建的节点
+              const newNode = updatedNodes.find(node => node.id === newNodeId);
+              if (newNode) {
+                console.log(`新节点标题: ${newNode.data.title}`);
+                // 调整视口以显示最新内容
+                setTimeout(() => {
+                  adjustViewportToShowLatestContent(newNode);
+                }, 300);
+              }
+            } else {
+              // 没有SECTION标记，显示原始节点
+              const nodeId = textData.nodeId.toString();
+              const targetNode = nodes.find(node => node.id === nodeId);
+              if (targetNode) {
+                console.log(`更新现有节点，ID: ${nodeId}`);
+                setTimeout(() => {
+                  adjustViewportToShowLatestContent(targetNode);
+                }, 300);
+              }
+            }
+            
             return {
               nodes: updatedNodes,
-              edges,
+              edges: updatedEdges,
             };
           });
           break;
