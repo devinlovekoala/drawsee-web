@@ -13,6 +13,11 @@ interface PortPosition {
   x: number;  // 相对于元件边界的百分比位置 (0-100)
   y: number;  // 相对于元件边界的百分比位置 (0-100)
   align?: 'start' | 'center' | 'end'; // 可选的对齐方式
+  rotatedOffset?: {  // 添加旋转后的位置偏移
+    '90'?: { top?: string; bottom?: string; left?: string; right?: string };
+    '180'?: { top?: string; bottom?: string; left?: string; right?: string };
+    '270'?: { top?: string; bottom?: string; left?: string; right?: string };
+  };
 }
 
 // 端口定义
@@ -66,9 +71,9 @@ const SVGComponents: Record<CircuitElementType, React.FC<React.SVGProps<SVGSVGEl
   [CircuitElementType.CURRENT_SOURCE]: (props: React.SVGProps<SVGSVGElement>) => (
     <svg {...props} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
       <circle cx="20" cy="20" r="15" stroke="#334155" strokeWidth="2" fill="none" />
-      <path d="M20,5 L20,35" stroke="#334155" strokeWidth="2" />
-      <path d="M20,5 L15,10" stroke="#334155" strokeWidth="2" />
-      <path d="M20,5 L25,10" stroke="#334155" strokeWidth="2" />
+      <path d="M5,20 L35,20" stroke="#334155" strokeWidth="2" />
+      <path d="M35,20 L30,15" stroke="#334155" strokeWidth="2" />
+      <path d="M35,20 L30,25" stroke="#334155" strokeWidth="2" />
     </svg>
   ),
   [CircuitElementType.DIODE]: (props: React.SVGProps<SVGSVGElement>) => (
@@ -132,46 +137,297 @@ const SVGComponents: Record<CircuitElementType, React.FC<React.SVGProps<SVGSVGEl
 // 为每种元件类型定义默认端口
 const defaultPorts: Record<string, Port[]> = {
   [CircuitElementType.RESISTOR]: [
-    { id: 'port1', name: '左端口', type: 'bidirectional', position: { side: 'left', x: 0, y: 50 } },
-    { id: 'port2', name: '右端口', type: 'bidirectional', position: { side: 'right', x: 100, y: 50 } }
+    { 
+      id: 'port1', 
+      name: '左端口', 
+      type: 'bidirectional', 
+      position: { 
+        side: 'left', 
+        x: 10, 
+        y: 50,
+        rotatedOffset: {
+          90: { top: '-17px' },
+          180: { top: '5px',left: '90%' },
+          270: { top: '30px' }
+        }
+      } 
+    },
+    { 
+      id: 'port2', 
+      name: '右端口', 
+      type: 'bidirectional', 
+      position: { 
+        side: 'right', 
+        x: 100, 
+        y: 50,
+        rotatedOffset: {
+          90: { top: '35px' },
+          180: { top: '5px',left: '5%' },
+          270: { top: '-23px' }
+        }
+      } 
+    }
   ],
   [CircuitElementType.CAPACITOR]: [
-    { id: 'port1', name: '左端口', type: 'bidirectional', position: { side: 'left', x: 0, y: 50 } },
-    { id: 'port2', name: '右端口', type: 'bidirectional', position: { side: 'right', x: 100, y: 50 } }
+    { 
+      id: 'port1', 
+      name: '左端口', 
+      type: 'bidirectional', 
+      position: { 
+        side: 'left', 
+        x: 20, 
+        y: 50,
+        rotatedOffset: {
+          90: { bottom: '25px' },
+          180: { top: '15px',left: '80%' },
+          270: { top: '30px' }
+        }
+      } 
+    },
+    { 
+      id: 'port2', 
+      name: '右端口', 
+      type: 'bidirectional', 
+      position: { 
+        side: 'right', 
+        x: 100, 
+        y: 50,
+        rotatedOffset: {
+          '90': { top: '25px' },
+          '180': { top: '15px',left: '20%' },
+          '270': { top: '5px' }
+        }
+      } 
+    }
   ],
   [CircuitElementType.INDUCTOR]: [
-    { id: 'port1', name: '左端口', type: 'bidirectional', position: { side: 'left', x: 0, y: 50 } },
-    { id: 'port2', name: '右端口', type: 'bidirectional', position: { side: 'right', x: 100, y: 50 } }
+    { id: 'port1', name: '左端口', type: 'bidirectional',       position: { 
+        side: 'right', 
+        x: 20, 
+        y: 50,
+        rotatedOffset: {
+          90: { bottom: '-25px' },
+          180: { top: '17px',left: '100%' },
+          270: { top: '35px' }
+        }
+      }  
+    },
+    { id: 'port2', name: '右端口', type: 'bidirectional',       position: { 
+        side: 'right', 
+        x: 122, 
+        y: 50,
+        rotatedOffset: {
+          '90': { top: '36px' },
+          '180': { top: '15px',left: '0%' },
+          '270': { top: '-5px' }
+        }
+      } }
   ],
   [CircuitElementType.VOLTAGE_SOURCE]: [
-    { id: 'positive', name: '正极', type: 'output', position: { side: 'right', x: 100, y: 50 } },
-    { id: 'negative', name: '负极', type: 'input', position: { side: 'left', x: 0, y: 50 } }
+    { id: 'positive', name: '正极', type: 'output',       position: { 
+        side: 'left', 
+        x: 0, 
+        y: 50,
+        rotatedOffset: {
+          90: { bottom: '35px' },
+          180: { top: '16px',left: '100%' },
+          270: { top: '37px' }
+        }
+      }   },
+    { id: 'negative', name: '负极', type: 'input',       position: { 
+        side: 'right', 
+        x: 120, 
+        y: 50,
+        rotatedOffset: {
+          '90': { top: '35px' },
+          '180': { top: '16px',left: '0%' },
+          '270': { top: '-5px' }
+        }
+      }  }
   ],
   [CircuitElementType.CURRENT_SOURCE]: [
-    { id: 'positive', name: '正极', type: 'output', position: { side: 'right', x: 100, y: 50 } },
-    { id: 'negative', name: '负极', type: 'input', position: { side: 'left', x: 0, y: 50 } }
+    { id: 'positive', name: '正极', type: 'output', position: { 
+        side: 'left', 
+        x: 0, 
+        y: 50,
+        rotatedOffset: {
+          90: { bottom: '35px' },
+          180: { top: '16px',left: '100%' },
+          270: { top: '37px' }
+        }
+      }   },
+    { id: 'negative', name: '负极', type: 'input', position: { 
+        side: 'right', 
+        x: 120, 
+        y: 50,
+        rotatedOffset: {
+          '90': { top: '35px' },
+          '180': { top: '16px',left: '0%' },
+          '270': { top: '-5px' }
+        }
+      } }
   ],
   [CircuitElementType.DIODE]: [
-    { id: 'anode', name: '阳极', type: 'input', position: { side: 'left', x: 0, y: 50 } },
-    { id: 'cathode', name: '阴极', type: 'output', position: { side: 'right', x: 100, y: 50 } }
+    { id: 'anode', name: '阳极', type: 'input', position: { 
+      side: 'left', 
+      x: 0, 
+      y: 50,
+      rotatedOffset: {
+        90: { bottom: '35px' },
+        180: { top: '16px',left: '100%' },
+        270: { top: '37px' }
+      }
+    } },
+    { id: 'cathode', name: '阴极', type: 'output', position: { 
+      side: 'right', 
+      x: 120, 
+      y: 50,
+      rotatedOffset: {
+        '90': { top: '35px' },
+        '180': { top: '16px',left: '0%' },
+        '270': { top: '-5px' }
+      }
+    }
+  }
   ],
   [CircuitElementType.TRANSISTOR_NPN]: [
-    { id: 'base', name: '基极', type: 'input', position: { side: 'left', x: 0, y: 50 } },
-    { id: 'collector', name: '集电极', type: 'input', position: { side: 'right', x: 100, y: 15 } },
-    { id: 'emitter', name: '发射极', type: 'output', position: { side: 'right', x: 100, y: 85 } }
+    { 
+      id: 'base', 
+      name: '基极', 
+      type: 'input', 
+      position: { 
+        side: 'left', 
+        x: 0, 
+        y: 50,
+        rotatedOffset: {
+          '90': { top: '0px' },
+          '180': { top: '26px',left: '90%' },
+          '270': { top: '50px',left:'50' }
+        }
+      } 
+    },
+    { 
+      id: 'emitter', 
+      name: '发射极', 
+      type: 'output', 
+      position: { 
+        side: 'left', 
+        x: 80, 
+        y: 0,
+        rotatedOffset: {
+          '90': { top: '40px',left: '10%' },
+          '180': { top: '0px',left: '20%' },
+          '270': { top: '10px',left: '10%' }
+        }
+      } 
+    },
+    { 
+      id: 'collector', 
+      name: '集电极', 
+      type: 'input', 
+      position: { 
+        side: 'right', 
+        x: 100, 
+        y: 100,
+        rotatedOffset: {
+          '90': { top: '40px',left: '90%' },
+          '180': { top: '50px',left: '25%' },
+          '270': { top: '10px',left: '90%' }
+        }
+      } 
+    }
   ],
   [CircuitElementType.TRANSISTOR_PNP]: [
-    { id: 'base', name: '基极', type: 'input', position: { side: 'left', x: 0, y: 50 } },
-    { id: 'collector', name: '集电极', type: 'output', position: { side: 'right', x: 100, y: 15 } },
-    { id: 'emitter', name: '发射极', type: 'input', position: { side: 'right', x: 100, y: 85 } }
+    { 
+      id: 'base', 
+      name: '基极', 
+      type: 'input', 
+      position: { 
+        side: 'left', 
+        x: 0, 
+        y: 50,
+        rotatedOffset: {
+          '90': { top: '0px' },
+          '180': { top: '26px',left: '90%' },
+          '270': { top: '50px',left:'50' }
+        }
+      } 
+    },
+    { 
+      id: 'emitter', 
+      name: '发射极', 
+      type: 'input', 
+      position: { 
+        side: 'left', 
+        x: 80, 
+        y: 0,
+        rotatedOffset: {
+          '90': { top: '40px',left: '10%' },
+          '180': { top: '0px',left: '20%' },
+          '270': { top: '10px',left: '10%' }
+        }
+      } 
+    },
+    { 
+      id: 'collector', 
+      name: '集电极', 
+      type: 'output', 
+      position: { 
+        side: 'right', 
+        x: 100, 
+        y: 100,
+        rotatedOffset: {
+          '90': { top: '40px',left: '90%' },
+          '180': { top: '50px',left: '25%' },
+          '270': { top: '10px',left: '90%' }
+        }
+      } 
+    }
   ],
   [CircuitElementType.GROUND]: [
-    { id: 'ground', name: '接地点', type: 'input', position: { side: 'top', x: 50, y: 0 } }
+    { id: 'ground', name: '接地点', type: 'input', 
+      position: { 
+        side: 'top', 
+        x: 50, 
+        y: 10 ,
+        rotatedOffset: {
+          '90': { top: '16px',left: '90%' },
+          '180': { top: '32px',left: '50%' },
+          '270': { top: '16px',left:'5%' }
+        }
+      } }
   ],
   [CircuitElementType.OPAMP]: [
-    { id: 'input1', name: '输入1', type: 'input', position: { side: 'left', x: 0, y: 30 } },
-    { id: 'input2', name: '输入2', type: 'input', position: { side: 'left', x: 0, y: 70 } },
-    { id: 'output', name: '输出', type: 'output', position: { side: 'right', x: 100, y: 50 } }
+    { id: 'input1', name: '输入1', type: 'input',       position: { 
+      side: 'left', 
+      x: 0, 
+      y: 40,
+      rotatedOffset: {
+        '90': { top: '-10px',left: '40%' },
+        '180': { top: '20px',left: '95%' },
+        '270': { top: '45px',left:'40%' }
+      }
+    }  },
+    { id: 'input2', name: '输入2', type: 'input',       position: { 
+      side: 'left', 
+      x: 0, 
+      y: 65,
+      rotatedOffset: {
+        '90': { top: '-10px',left: '60%' },
+        '180': { top: '10px',left: '95%' },
+        '270': { top: '45px',left: '60%' }
+      }
+    }  },
+    { id: 'output', name: '输出', type: 'output',       position: { 
+      side: 'right', 
+      x: 110, 
+      y: 50,
+      rotatedOffset: {
+        '90': { top: '40px',left: '50%' },
+        '180': { top: '15px',left: '10%' },
+        '270': { top: '-10px',left: '50%' }
+      }
+    }  }
   ],
 };
 
@@ -244,11 +500,47 @@ export const CircuitNode = memo(({ data, id }: NodeProps<CircuitNodeData>) => {
       zIndex: 10,
     };
 
-    // 应用位置样式
-    const portPos = port.position;
+    // 获取当前旋转角度
+    const currentRotation = data.element?.rotation || 0;
+    const normalizedRotation = currentRotation % 360;
     
-    // 不需要旋转样式，ReactFlow的Handle组件会处理位置
-    return baseStyle;
+    // 使用配置的旋转偏移
+    const rotatedOffset = port.position.rotatedOffset?.[normalizedRotation.toString() as '90' | '180' | '270'];
+    if (rotatedOffset) {
+      return {
+        ...baseStyle,
+        ...rotatedOffset,
+        left: rotatedOffset.left || '50%',
+        transform: 'translate(-50%, 0)'
+      };
+    }
+
+    // 处理初始位置（未旋转时）
+    const { x, y, side } = port.position;
+    const style = { ...baseStyle };
+
+    // 根据不同的side设置位置
+    switch (side) {
+      case 'left':
+        style.left = `${x}%`;
+        style.top = `${y}%`;
+        break;
+      case 'right':
+        style.right = `${100 - x}%`;
+        style.top = `${y}%`;
+        break;
+      case 'top':
+        style.left = `${x}%`;
+        style.top = `${y}%`;
+        break;
+      case 'bottom':
+        style.left = `${x}%`;
+        style.bottom = `${100 - y}%`;
+        break;
+    }
+
+    style.transform = 'translate(-50%, -50%)';
+    return style;
   };
 
   const renderSvgComponent = () => {
