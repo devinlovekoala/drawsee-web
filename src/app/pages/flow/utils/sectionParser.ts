@@ -61,7 +61,7 @@ function findAllSectionPositions(text: string): Array<{
     results.push({
       index: match.index,
       length: match[0].length,
-      title: match[1],
+      title: match[1].trim(), // 确保标题已去除前后空格
       fullMatch: match[0]
     });
   }
@@ -110,6 +110,23 @@ function splitTextBySections(text: string): Array<{title: string, content: strin
 }
 
 /**
+ * 初始化节点状态
+ * @param nodeId 节点ID
+ * @param currentTime 当前时间
+ * @returns 初始化的节点状态
+ */
+function initNodeState(nodeId: string, currentTime: number): NodeProcessState {
+  return {
+    lastProcessTime: currentTime,
+    sectionCount: 0,
+    accumulatedText: "",
+    pendingNewSection: false,
+    lastSectionEndIndex: 0,
+    currentSectionNodeId: nodeId
+  };
+}
+
+/**
  * 处理节点文本中的SECTION标记
  * 当检测到SECTION标记时，创建新的平行节点
  * 
@@ -136,17 +153,18 @@ export function processSectionMarkers(
   }
   
   // 获取或初始化节点处理状态
-  let nodeState = processedNodes.get(nodeId);
   const currentTime = Date.now();
+  // 先尝试获取现有状态
+  let nodeState = processedNodes.get(nodeId);
   
   // 如果节点中包含"_section_"但不是当前正在处理的SECTION节点，就将文本转发到正确的节点
   if (targetNode.id.includes('_section_')) {
     // 在现有的所有节点状态中查找指向这个节点的记录
-    let parentNodeState = null;
+    let parentNodeState: NodeProcessState | null = null;
     let parentNodeId = "";
     
     for (const [id, state] of processedNodes.entries()) {
-      if (state.currentSectionNodeId === targetNode.id) {
+      if (state && state.currentSectionNodeId === targetNode.id) {
         parentNodeState = state;
         parentNodeId = id;
         break;
@@ -177,7 +195,7 @@ export function processSectionMarkers(
         hasSection: false
       };
     } else {
-      console.log(`${targetNode.id}是孤立的SECTION节点，直接添加内容`);
+      console.log(`${targetNode.id}是独立的SECTION节点，直接添加内容`);
       const updatedNodes = nodes.map(node =>
         node.id === targetNode.id ? 
         {
@@ -198,33 +216,27 @@ export function processSectionMarkers(
     }
   }
   
-  // 如果是第一次处理这个节点，初始化状态
+  // 初始化节点状态（如果不存在）
   if (!nodeState) {
-    nodeState = {
-      lastProcessTime: currentTime,
-      sectionCount: 0,
-      accumulatedText: "",
-      pendingNewSection: false,
-      lastSectionEndIndex: 0,
-      currentSectionNodeId: nodeId
-    };
+    // 创建新的节点状态并存储
+    nodeState = initNodeState(nodeId, currentTime);
     processedNodes.set(nodeId, nodeState);
   } 
   // 如果节点最近处理过且没有待处理的SECTION，跳过SECTION检查
-  else if (currentTime - nodeState.lastProcessTime < MIN_PROCESSING_INTERVAL && !nodeState.pendingNewSection) {
-    console.log(`节点${nodeId}最近处理过(${currentTime - nodeState.lastProcessTime}ms < ${MIN_PROCESSING_INTERVAL}ms)，跳过SECTION检查`);
+  else if (currentTime - nodeState!.lastProcessTime < MIN_PROCESSING_INTERVAL && !nodeState!.pendingNewSection) {
+    console.log(`节点${nodeId}最近处理过(${currentTime - nodeState!.lastProcessTime}ms < ${MIN_PROCESSING_INTERVAL}ms)，跳过SECTION检查`);
     
     // 仍然累积文本以便后续识别
-    nodeState.accumulatedText += textData.content;
+    nodeState!.accumulatedText += textData.content;
     
     // 如果当前有指定的Section节点，就将内容路由到该节点
-    if (nodeState?.currentSectionNodeId && nodeState?.currentSectionNodeId !== nodeId) {
-      const sectionNode = nodes.find(node => node.id === nodeState?.currentSectionNodeId);
+    if (nodeState!.currentSectionNodeId && nodeState!.currentSectionNodeId !== nodeId) {
+      const sectionNode = nodes.find(node => node.id === nodeState!.currentSectionNodeId);
       if (sectionNode) {
-        console.log(`文本路由到当前SECTION节点: ${nodeState?.currentSectionNodeId}`);
+        console.log(`文本路由到当前SECTION节点: ${nodeState!.currentSectionNodeId}`);
         return {
           nodes: nodes.map(node => 
-            node.id === nodeState?.currentSectionNodeId ? 
+            node.id === nodeState!.currentSectionNodeId ? 
             {
               ...node, 
               data: {
@@ -260,44 +272,39 @@ export function processSectionMarkers(
     };
   }
   
-  // 确保nodeState已初始化
-  if (!nodeState) {
-    // 这种情况理论上不会发生，但为了类型安全添加此检查
-    nodeState = {
-      lastProcessTime: currentTime,
-      sectionCount: 0,
-      accumulatedText: "",
-      pendingNewSection: false,
-      lastSectionEndIndex: 0,
-      currentSectionNodeId: nodeId
-    };
-    processedNodes.set(nodeId, nodeState);
-  }
+  // 此时nodeState一定存在，使用!断言确保TypeScript识别这一点
+  // TypeScript的控制流分析应该能推断nodeState在这里不可能是undefined
+  // 如果依然有类型错误，我们使用类型断言
+  const safeNodeState = nodeState!;
   
   // 更新最后处理时间
-  nodeState.lastProcessTime = currentTime;
+  safeNodeState.lastProcessTime = currentTime;
   
   // 累积文本，然后检查累积的文本中是否包含SECTION标记
-  nodeState.accumulatedText += textData.content;
+  safeNodeState.accumulatedText += textData.content;
   
   // 查找累积文本中的所有SECTION位置
-  const sectionPositions = findAllSectionPositions(nodeState.accumulatedText);
+  const sectionPositions = findAllSectionPositions(safeNodeState.accumulatedText);
   
   // 如果没有找到SECTION标记，或者所有SECTION已处理完毕
-  if (sectionPositions.length === 0 || nodeState.sectionCount >= sectionPositions.length) {
-    // 如果有当前处理的SECTION节点，路由文本到该节点
-    if (nodeState.currentSectionNodeId && nodeState.currentSectionNodeId !== nodeId) {
-      const sectionNode = nodes.find(node => node.id === nodeState.currentSectionNodeId);
+  if (sectionPositions.length === 0 || safeNodeState.sectionCount >= sectionPositions.length) {
+    // 已处理所有SECTION，应该路由到当前活动的SECTION节点
+    if (safeNodeState.currentSectionNodeId && safeNodeState.currentSectionNodeId !== nodeId) {
+      const sectionNode = nodes.find(node => node.id === safeNodeState.currentSectionNodeId);
       if (sectionNode) {
-        console.log(`将文本路由到当前活动的SECTION节点: ${nodeState.currentSectionNodeId}`);
+        console.log(`路由文本到当前活动的SECTION节点: ${safeNodeState.currentSectionNodeId}`);
+        
+        // 清理要添加的内容，移除可能的SECTION标记
+        const cleanContent = textData.content.replace(SECTION_REGEX, '');
+        
         return {
           nodes: nodes.map(node => 
-            node.id === nodeState.currentSectionNodeId ? 
+            node.id === safeNodeState.currentSectionNodeId ? 
             {
               ...node, 
               data: {
                 ...node.data, 
-                text: node.data.text + textData.content
+                text: node.data.text + cleanContent
               }
             } : node
           ),
@@ -308,6 +315,9 @@ export function processSectionMarkers(
       }
     }
     
+    // 清理内容，移除可能存在的SECTION标记
+    const cleanContent = textData.content.replace(SECTION_REGEX, '');
+    
     // 更新当前节点内容
     const updatedNodes = nodes.map(node =>
       node.id === nodeId ? 
@@ -315,13 +325,13 @@ export function processSectionMarkers(
         ...node, 
         data: {
           ...node.data, 
-          text: node.data.text + textData.content
+          text: node.data.text + cleanContent
         }
       } : node
     );
     
     // 不需要特殊处理
-    nodeState.pendingNewSection = false;
+    safeNodeState.pendingNewSection = false;
     
     return { 
       nodes: updatedNodes, 
@@ -332,117 +342,93 @@ export function processSectionMarkers(
   }
   
   // 如果有新的SECTION需要处理
-  if (nodeState.sectionCount < sectionPositions.length) {
+  if (safeNodeState.sectionCount < sectionPositions.length) {
     // 获取需要处理的SECTION
-    const currentSectionPos = sectionPositions[nodeState.sectionCount];
-    const sectionTitle = currentSectionPos.title;
+    const currentSectionPos = sectionPositions[safeNodeState.sectionCount];
+    const sectionTitle = currentSectionPos.title.trim(); // 确保去除标题中的空格
     
-    console.log(`检测到第${nodeState.sectionCount + 1}个SECTION: ${sectionTitle}`);
+    console.log(`检测到第${safeNodeState.sectionCount + 1}个SECTION: ${sectionTitle}`);
     
-    // 如果是第一个SECTION，更新当前节点的标题
-    if (nodeState.sectionCount === 0) {
-      console.log(`更新第一个节点标题为: ${sectionTitle}`);
-      
-      // 更新节点标题 
-      const updatedNodes = nodes.map(node =>
-        node.id === nodeId ? 
-        {
-          ...node, 
-          data: {
-            ...node.data,
-            title: sectionTitle || node.data.title || 'AI解析',
-            text: node.data.text + textData.content
-          }
-        } : node
-      );
-      
-      // 增加已处理的SECTION计数
-      nodeState.sectionCount += 1;
-      nodeState.lastSectionEndIndex = currentSectionPos.index + currentSectionPos.length;
-      nodeState.currentSectionNodeId = nodeId; // 当前节点继续接收文本
-      
-      // 如果还有更多的SECTION，标记为待处理
-      nodeState.pendingNewSection = nodeState.sectionCount < sectionPositions.length;
-      
-      return {
-        nodes: updatedNodes,
-        edges,
-        newNodeId: null,
-        hasSection: false
-      };
-    } else {
-      // 第二个及以后的SECTION，创建新的平行节点
-      console.log(`创建第${nodeState.sectionCount + 1}个SECTION节点，标题: ${sectionTitle}`);
-      
-      // 为新节点准备初始内容 - 从当前SECTION标记之后到下一个SECTION标记之前的内容
-      const nextSectionPos = sectionPositions[nodeState.sectionCount + 1];
-      const sectionEndIndex = nextSectionPos ? nextSectionPos.index : nodeState.accumulatedText.length;
-      const initialContent = nodeState.accumulatedText.substring(
-        currentSectionPos.index + currentSectionPos.length,
-        sectionEndIndex
-      );
-      
-      console.log(`为新节点准备初始内容，长度: ${initialContent.length}字符`);
-      
-      // 创建新的平行节点 - 水平方向延伸
-      const newNodeId = `${targetNode.id}_section_${Date.now()}`;
-      const newParallelNode = {
-        id: newNodeId,
-        type: 'answer',
-        position: {
-          x: targetNode.position.x + 380 * nodeState.sectionCount, // 水平方向延伸
-          y: targetNode.position.y                                 // 保持相同高度
-        },
-        data: {
-          ...targetNode.data,
-          title: sectionTitle || 'AI解析',                        // 使用SECTION标题
-          text: initialContent,                                   // 包含初始内容
-          parentId: targetNode.data.parentId,                     // 与原节点保持相同的父节点
-        }
-      } as Node<NodeData<'answer'>>;
-      
-      // 创建新的边连接父节点和新节点
-      const newEdge = {
-        id: `e${targetNode.data.parentId}-${newNodeId}`,
-        source: targetNode.data.parentId ? targetNode.data.parentId.toString() : '',
-        target: newNodeId,
-        type: 'smoothstep',
-      } as Edge;
-      
-      // 更新当前节点的文本内容 
-      const updatedCurrentNode = {
-        ...targetNode,
-        data: {
-          ...targetNode.data,
-          text: targetNode.data.text // 保持当前内容不变
-        }
-      };
-      
-      // 增加已处理的SECTION计数并更新最后处理位置
-      nodeState.sectionCount += 1;
-      nodeState.lastSectionEndIndex = currentSectionPos.index + currentSectionPos.length;
-      nodeState.currentSectionNodeId = newNodeId; // 新节点将接收后续文本
-      
-      // 如果还有更多的SECTION，将它们标记为待处理
-      nodeState.pendingNewSection = nodeState.sectionCount < sectionPositions.length;
-      
-      return {
-        nodes: [...nodes.map(n => n.id === targetNode.id ? updatedCurrentNode : n), newParallelNode],
-        edges: [...edges, newEdge],
-        newNodeId,
-        hasSection: true
-      };
-    }
+    // 创建SECTION节点（所有SECTION都创建新节点，包括第一个）
+    console.log(`创建第${safeNodeState.sectionCount + 1}个SECTION节点，标题: ${sectionTitle}`);
+    
+    // 为新节点准备初始内容 - 从当前SECTION标记之后到下一个SECTION标记之前的内容
+    const nextSectionPos = sectionPositions[safeNodeState.sectionCount + 1];
+    const sectionEndIndex = nextSectionPos ? nextSectionPos.index : safeNodeState.accumulatedText.length;
+    
+    // 移除SECTION标记，只保留实际内容
+    let initialContent = safeNodeState.accumulatedText.substring(
+      currentSectionPos.index + currentSectionPos.length,
+      sectionEndIndex
+    );
+    
+    // 清理内容中可能存在的其他SECTION标记
+    initialContent = initialContent.replace(SECTION_REGEX, '');
+    
+    console.log(`为新节点准备初始内容，长度: ${initialContent.length}字符`);
+    
+    // 创建新的平行节点 - 水平方向延伸
+    const sanitizedTitle = sectionTitle.replace(/[^a-zA-Z0-9_\u4e00-\u9fa5]/g, '_').substring(0, 20); // 清理标题，只保留字母、数字、下划线和中文字符，并限制长度
+    const newNodeId = `${targetNode.id}_section_${sanitizedTitle}_${Date.now()}`;
+    const newParallelNode = {
+      id: newNodeId,
+      type: 'answer',
+      position: {
+        x: targetNode.position.x + 380 * safeNodeState.sectionCount, // 水平方向延伸
+        y: targetNode.position.y                                 // 保持相同高度
+      },
+      data: {
+        ...targetNode.data,
+        title: sectionTitle || 'AI解析',                        // 使用SECTION标题（已清理）
+        text: initialContent,                                   // 包含初始内容（已清理SECTION标记）
+        parentId: targetNode.data.parentId,                     // 与原节点保持相同的父节点
+      }
+    } as Node<NodeData<'answer'>>;
+    
+    // 创建新的边连接父节点和新节点
+    const newEdge = {
+      id: `e${targetNode.data.parentId}-${newNodeId}`,
+      source: targetNode.data.parentId ? targetNode.data.parentId.toString() : '',
+      target: newNodeId,
+      type: 'smoothstep',
+    } as Edge;
+    
+    // 更新当前节点的文本内容 
+    const updatedCurrentNode = {
+      ...targetNode,
+      data: {
+        ...targetNode.data,
+        // 如果是第一个SECTION，清空上一个节点的内容（只保留SECTION前的内容，并移除SECTION标记）
+        text: safeNodeState.sectionCount === 0 
+          ? targetNode.data.text + safeNodeState.accumulatedText.substring(0, currentSectionPos.index).replace(SECTION_REGEX, '')
+          : targetNode.data.text
+      }
+    };
+    
+    // 增加已处理的SECTION计数并更新最后处理位置
+    safeNodeState.sectionCount += 1;
+    safeNodeState.lastSectionEndIndex = currentSectionPos.index + currentSectionPos.length;
+    safeNodeState.currentSectionNodeId = newNodeId; // 新节点将接收后续文本
+    
+    // 如果还有更多的SECTION，将它们标记为待处理
+    safeNodeState.pendingNewSection = safeNodeState.sectionCount < sectionPositions.length;
+    
+    return {
+      nodes: [...nodes.map(n => n.id === targetNode.id ? updatedCurrentNode : n), newParallelNode],
+      edges: [...edges, newEdge],
+      newNodeId,
+      hasSection: true
+    };
   }
   
   // 已处理所有SECTION，应该路由到当前活动的SECTION节点
-  if (nodeState.currentSectionNodeId && nodeState.currentSectionNodeId !== nodeId) {
-    const sectionNode = nodes.find(node => node.id === nodeState.currentSectionNodeId);
+  if (safeNodeState.currentSectionNodeId && safeNodeState.currentSectionNodeId !== nodeId) {
+    const sectionNode = nodes.find(node => node.id === safeNodeState.currentSectionNodeId);
     if (sectionNode) {
-      console.log(`路由文本到当前活动的SECTION节点: ${nodeState.currentSectionNodeId}`);
+      console.log(`路由文本到当前活动的SECTION节点: ${safeNodeState.currentSectionNodeId}`);
       return {
         nodes: nodes.map(node => 
-          node.id === nodeState.currentSectionNodeId ? 
+          node.id === safeNodeState.currentSectionNodeId ? 
           {
             ...node, 
             data: {
@@ -459,13 +445,16 @@ export function processSectionMarkers(
   }
   
   // 默认情况：更新当前节点
+  // 清理内容，移除可能存在的SECTION标记
+  const cleanContent = textData.content.replace(SECTION_REGEX, '');
+  
   const updatedNodes = nodes.map(node =>
     node.id === nodeId ? 
     {
       ...node, 
       data: {
         ...node.data, 
-        text: node.data.text + textData.content
+        text: node.data.text + cleanContent
       }
     } : node
   );
