@@ -100,22 +100,57 @@ export function splitNodeByHeadings(
   // 保存新创建的节点ID
   const newNodeIds: string[] = [];
   
-  // 更新原始节点的内容
-  // 如果第一部分没有标题，则保留在原始节点中
-  // 否则，将原始节点的内容保留不变
-  let updatedTargetNode = { ...targetNode };
-  if (sections[0].title === "") {
-    updatedTargetNode.data = {
-      ...updatedTargetNode.data,
-      text: sections[0].content
-    };
-    // 移除第一个部分，剩下的都是有标题的部分
-    sections.shift();
-  }
-  
-  // 创建新节点
+  // 创建新节点和边的数组
   const newNodes: Node[] = [];
   const newEdges: Edge[] = [];
+  
+  // 直接使用第一部分内容创建节点，不再更新原始节点
+  if (sections[0].title === "") {
+    // 如果第一部分没有标题，创建一个包含这部分内容的新节点
+    const introContent = sections[0].content;
+    if (introContent.trim().length > 0) {
+      // 为引言内容创建一个新节点
+      const introNodeId = `${targetNode.id}_intro_${Date.now()}`;
+      newNodeIds.push(introNodeId);
+      
+      // 创建引言节点
+      const introNode: Node<NodeData<'answer'>> = {
+        id: introNodeId,
+        type: 'answer',
+        position: {
+          x: targetNode.position.x + 380, // 水平排列
+          y: targetNode.position.y - 200  // 稍微向上放置
+        },
+        data: {
+          ...targetNode.data,
+          title: "引言", // 使用"引言"作为标题
+          text: introContent, // 使用无标题部分内容
+          parentId: targetNode.data.parentId,
+          createdAt: targetNode.data.createdAt,
+          updatedAt: targetNode.data.updatedAt
+        } as NodeData<'answer'>
+      };
+      
+      // 创建连接边
+      const parentId = typeof targetNode.data.parentId === 'number' 
+        ? targetNode.data.parentId.toString() 
+        : (targetNode.data.parentId as string || '');
+      
+      const introEdge: Edge = {
+        id: `e${parentId}-${introNodeId}`,
+        source: parentId,
+        target: introNodeId,
+        type: 'smoothstep',
+      };
+      
+      // 添加到新节点和边集合
+      newNodes.push(introNode);
+      newEdges.push(introEdge);
+    }
+    
+    // 移除第一部分，剩下的都是有标题的部分
+    sections.shift();
+  }
   
   sections.forEach((section, index) => {
     // 为新节点创建唯一ID
@@ -159,12 +194,15 @@ export function splitNodeByHeadings(
     newEdges.push(newEdge);
   });
   
-  // 更新节点和边
-  const updatedNodes = nodes.map(node => 
-    node.id === targetNode.id ? updatedTargetNode : node
-  ).concat(newNodes);
+  // 从节点列表中完全移除原始节点，而不是保留它
+  const updatedNodes = nodes
+    .filter(node => node.id !== targetNode.id) // 过滤掉原始节点
+    .concat(newNodes);
   
-  const updatedEdges = edges.concat(newEdges);
+  // 删除与原始节点相关的所有边
+  const updatedEdges = edges
+    .filter(edge => edge.source !== targetNode.id && edge.target !== targetNode.id) // 过滤掉原始节点的所有边
+    .concat(newEdges);
   
   return {
     nodes: updatedNodes,
