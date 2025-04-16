@@ -196,6 +196,26 @@ function useFlowState(convId: number) {
             setElements(({nodes, edges}) => {
               console.log(`节点 ${completedNodeId} 内容生成完成，检查是否需要根据二级标题分割`);
               
+              // 查找完成的节点
+              const completedNode = nodes.find(node => node.id === completedNodeId);
+              
+              // 检查是否是知识问答模式生成的节点
+              const isKnowledgeNode = completedNode && 
+                // 查找它的父节点（查询节点）
+                nodes.some(node => {
+                  // 如果当前节点的父节点是查询节点，且模式是KNOWLEDGE
+                  return node.id === String(completedNode.data.parentId) && 
+                         node.type === 'query' && 
+                         node.data.mode === 'KNOWLEDGE';
+                });
+              
+              // 如果是知识问答模式的节点，跳过自动分点
+              if (isKnowledgeNode) {
+                console.log('知识问答模式生成的节点，跳过自动分点');
+                return { nodes, edges };
+              }
+              
+              // 非知识问答模式，执行正常的自动分点
               const { nodes: updatedNodes, edges: updatedEdges, newNodeIds } = 
                 processCompletedNode(nodes, edges, completedNodeId);
               

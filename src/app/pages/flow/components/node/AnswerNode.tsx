@@ -27,7 +27,19 @@ function AnswerNode({ data, ...props }: ExtendedNodeProps<'answer'>) {
     setIsGenerated(true);
     const createAiTaskDTO: CreateAiTaskDTO = {
       type: taskType,
-      prompt: "",
+      prompt: (() => {
+        // 根据任务类型返回适当的提示
+        switch(taskType) {
+          case 'SOLVER_CONTINUE':
+            return "请继续推导解题过程";
+          case 'SOLVER_SUMMARY':
+            return "请总结全部的解题过程";
+          case 'ANIMATION':
+            return "请为此内容生成动画";
+          default:
+            return "请继续解析此内容";
+        }
+      })(),  // 立即调用函数
       promptParams: {},
       convId: convId,
       parentId: parseInt(props.id),

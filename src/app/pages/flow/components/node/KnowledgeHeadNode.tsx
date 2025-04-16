@@ -3,8 +3,10 @@ import { useFlowContext } from '@/app/contexts/FlowContext';
 import { CreateAiTaskDTO } from '@/api/types/flow.types';
 import { toast } from 'sonner';
 import { createAiTask } from '@/api/methods/flow.methods';
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useAppContext } from '@/app/contexts/AppContext';
+import { ModelType } from '../input/FlowInputPanel';
+import { ModelSelector } from '../../../blank/components/ModelSelector';
 
 function KnowledgeHeadNode({ showSourceHandle, showTargetHandle, data, ...props }: ExtendedNodeProps<'knowledge-head'>) {
   
@@ -12,6 +14,12 @@ function KnowledgeHeadNode({ showSourceHandle, showTargetHandle, data, ...props 
   const {handleAiTaskCountPlus} = useAppContext();
 
   const [isGenerated, setIsGenerated] = useState(data.isGenerated || false);
+  const [selectedModel, setSelectedModel] = useState<ModelType>('doubao'); // 默认使用豆包模型
+
+  // 处理模型变更
+  const handleModelChange = useCallback((model: ModelType) => {
+    setSelectedModel(model);
+  }, []);
 
   const handleKnowledgeDetailChat = () => {
     if (isChatting) {
@@ -25,11 +33,11 @@ function KnowledgeHeadNode({ showSourceHandle, showTargetHandle, data, ...props 
     setIsGenerated(true);
     const createAiTaskDTO: CreateAiTaskDTO = {
       type: "KNOWLEDGE_DETAIL",
-      prompt: "",
+      prompt: "请详细解析该知识点",
       promptParams: {},
       convId: convId,
       parentId: parseInt(props.id),
-      model: null
+      model: selectedModel // 使用用户选择的模型，而不是固定的'doubao'
     };
     console.log('发送知识详情AI任务', createAiTaskDTO);
     createAiTask(createAiTaskDTO).then((response) => {
@@ -52,10 +60,22 @@ function KnowledgeHeadNode({ showSourceHandle, showTargetHandle, data, ...props 
     });
   }
 
+  // 模型选择器内容
+  const modelSelector = (
+    <div className="mt-2 mb-3">
+      <div className="w-full">
+        <ModelSelector 
+          selectedModel={selectedModel} 
+          onModelChange={handleModelChange} 
+        />
+      </div>
+    </div>
+  );
+
   return (
     <BaseNode
       {...props}
-      data={data}
+      data={{...data, customContent: !isGenerated ? modelSelector : null}}
       showSourceHandle={showSourceHandle}
       showTargetHandle={showTargetHandle}
       footerContent={
