@@ -10,7 +10,7 @@ import {SSE} from "sse.js";
 import { TOKEN_KEY } from "@/common/constant/storage-key.constant";
 import useFlowTools from "./useFlowTools";
 import { TEMP_QUERY_NODE_ID_PREFIX } from "../constants";
-import { processSectionMarkers } from "../utils/sectionParser";
+import { processCompletedNode, processTextUpdate } from "../utils/sectionParser";
 
 /**
  * 流程图状态管理Hook
@@ -40,6 +40,8 @@ function useFlowState(convId: number) {
   const isChatTaskProcessing = useRef(false);
   // 最后需要聚焦的节点id
   const lastFocusNodeId = useRef<string | null>(null);
+  // 跟踪正在生成内容的节点
+  const activeNodeIds = useRef<Set<string>>(new Set());
 
   /**
    * 处理聊天消息
@@ -57,6 +59,8 @@ function useFlowState(convId: number) {
           const nodeVO = task.data as NodeVO;
           if (nodeVO.type === 'answer' || nodeVO.type === 'knowledge-detail') {
             lastFocusNodeId.current = nodeVO.id.toString();
+            // 添加到活跃节点跟踪列表
+            activeNodeIds.current.add(nodeVO.id.toString());
           }
           setElements(({nodes, edges}) => {
             const tempQueryNode = nodes.find(node => node.id.startsWith(TEMP_QUERY_NODE_ID_PREFIX));
@@ -119,36 +123,18 @@ function useFlowState(convId: number) {
           console.log(`收到文本数据，nodeId: ${textData.nodeId}，内容: ${textData.content.substring(0, 50)}${textData.content.length > 50 ? '...' : ''}`);
           
           setElements(({nodes, edges}) => {
-            // 使用sectionParser处理SECTION标记
-            const { nodes: updatedNodes, edges: updatedEdges, newNodeId, hasSection } = 
-              processSectionMarkers(textData, nodes, edges);
+            // 使用processTextUpdate更新节点文本内容
+            const { nodes: updatedNodes, edges: updatedEdges } = 
+              processTextUpdate(textData, nodes, edges);
               
-            // 如果找到了SECTION标记并创建了新节点
-            if (hasSection && newNodeId) {
-              console.log(`创建了新的SECTION节点，ID: ${newNodeId}`);
-              
-              // 更新最后聚焦的节点ID
-              lastFocusNodeId.current = newNodeId;
-              
-              // 找到新创建的节点
-              const newNode = updatedNodes.find(node => node.id === newNodeId);
-              if (newNode) {
-                console.log(`新节点标题: ${newNode.data.title}`);
-                // 调整视口以显示最新内容
-                setTimeout(() => {
-                  adjustViewportToShowLatestContent(newNode);
-                }, 300);
-              }
-            } else {
-              // 没有SECTION标记，显示原始节点
-              const nodeId = textData.nodeId.toString();
-              const targetNode = nodes.find(node => node.id === nodeId);
-              if (targetNode) {
-                console.log(`更新现有节点，ID: ${nodeId}`);
-                setTimeout(() => {
-                  adjustViewportToShowLatestContent(targetNode);
-                }, 300);
-              }
+            // 找到更新的节点进行视图调整
+            const nodeId = textData.nodeId.toString();
+            const targetNode = updatedNodes.find(node => node.id === nodeId);
+            if (targetNode) {
+              console.log(`更新现有节点，ID: ${nodeId}`);
+              setTimeout(() => {
+                adjustViewportToShowLatestContent(targetNode);
+              }, 300);
             }
             
             return {
@@ -199,6 +185,34 @@ function useFlowState(convId: number) {
         }
         // 完成
         case 'done': {
+          // 首先检查活跃节点，执行Markdown二级标题分割
+          if (lastFocusNodeId.current) {
+            const completedNodeId = lastFocusNodeId.current;
+            
+            // 将节点从活跃列表中移除
+            activeNodeIds.current.delete(completedNodeId);
+            
+            // 执行节点处理 - 根据二级标题拆分节点
+            setElements(({nodes, edges}) => {
+              console.log(`节点 ${completedNodeId} 内容生成完成，检查是否需要根据二级标题分割`);
+              
+              const { nodes: updatedNodes, edges: updatedEdges, newNodeIds } = 
+                processCompletedNode(nodes, edges, completedNodeId);
+              
+              // 如果创建了新节点，更新最后聚焦的节点ID
+              if (newNodeIds.length > 0) {
+                console.log(`根据二级标题创建了 ${newNodeIds.length} 个新节点`);
+                // 聚焦到最后一个新创建的节点
+                lastFocusNodeId.current = newNodeIds[newNodeIds.length - 1];
+              }
+              
+              return {
+                nodes: updatedNodes,
+                edges: updatedEdges
+              };
+            });
+          }
+          
           // 延时执行布局
           setTimeout(() => {
             setElements(({nodes, edges}) => {
@@ -211,6 +225,7 @@ function useFlowState(convId: number) {
             // 设置聊天状态为false
             setIsChatting(false);
           }, 400);
+          
           // 执行fitView
           if (lastFocusNodeId.current) {
             console.log('最终布局执行fitView', lastFocusNodeId.current);
@@ -254,6 +269,8 @@ function useFlowState(convId: number) {
     setIsChatting(true);
     // 设置最后需要聚焦的节点id
     lastFocusNodeId.current = null;
+    // 清空活跃节点列表
+    activeNodeIds.current.clear();
 
     // SSE请求
     const source = new SSE(
