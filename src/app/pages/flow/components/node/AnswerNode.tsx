@@ -27,8 +27,8 @@ function AnswerNode({ data, ...props }: ExtendedNodeProps<'answer'>) {
     setIsGenerated(true);
     const createAiTaskDTO: CreateAiTaskDTO = {
       type: taskType,
-      prompt: null,
-      promptParams: null,
+      prompt: "",
+      promptParams: {},
       convId: convId,
       parentId: parseInt(props.id),
       model: selectedModel // 使用选定的模型，适用于所有任务类型

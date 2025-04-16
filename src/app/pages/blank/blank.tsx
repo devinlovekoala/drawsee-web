@@ -11,6 +11,7 @@ import { getSolverWays } from '@/api/methods/tool.methods';
 import { ModelSelector } from "./components/ModelSelector";
 import { ModelType } from "../flow/components/input/FlowInputPanel";
 import { useLocation, useNavigate } from "react-router-dom";
+import { Switch } from "@/app/components/ui/switch";
 
 function Blank() {
   const {handleBlankQuery, handleAiTaskCountPlus} = useAppContext();
@@ -28,6 +29,9 @@ function Blank() {
   const agentType = location.state?.agentType as AiTaskType || 'GENERAL';
   const agentName = location.state?.agentName as string;
 
+  // 添加是否启用知识问答模式的状态
+  const [isKnowledgeMode, setIsKnowledgeMode] = useState<boolean>(agentType === 'KNOWLEDGE');
+
   const [queryForm, setQueryForm] = useState<QueryForm>({
     type: agentType,
     prompt: "",
@@ -35,6 +39,14 @@ function Blank() {
     model: "doubao"
   });
   
+  // 当知识问答模式切换时，更新 queryForm 的 type
+  useEffect(() => {
+    setQueryForm(prev => ({
+      ...prev,
+      type: isKnowledgeMode ? 'KNOWLEDGE' : 'GENERAL'
+    }));
+  }, [isKnowledgeMode]);
+
   // 确保类型值的大写格式
   useEffect(() => {
     if (queryForm.type) {
@@ -82,6 +94,9 @@ function Blank() {
       if (location.state.agentType === 'CIRCUIT_ANALYSIS') {
         // 保持在当前页面，使用户可以选择输入问题或跳转
       }
+
+      // 更新知识问答模式状态
+      setIsKnowledgeMode(location.state.agentType === 'KNOWLEDGE');
     }
   }, [location.state, navigate]);
 
@@ -577,6 +592,15 @@ function Blank() {
                             <ModelSelector 
                               selectedModel={queryForm.model} 
                               onModelChange={handleModelChange} 
+                            />
+                          )}
+                          
+                          {/* 只在通用对话模式下显示知识问答切换开关 */}
+                          {['GENERAL', 'KNOWLEDGE'].includes(queryForm.type) && (
+                            <Switch
+                              label="知识问答模式"
+                              checked={isKnowledgeMode}
+                              onChange={setIsKnowledgeMode}
                             />
                           )}
                         </div>

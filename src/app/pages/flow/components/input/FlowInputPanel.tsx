@@ -11,6 +11,7 @@ import '@/app/components/text-selection/TextSelectionToolbar.css';
 import { Node as FlowNode } from "@xyflow/react";
 import { DeepSeek, Doubao } from "./ModelIcons";
 import { DropdownOption, SelectDropdown } from "./SelectDropdown";
+import { Switch } from "@/app/components/ui/switch";
 
 interface FlowInputPanelProps {
   prompt: string;
@@ -34,56 +35,6 @@ export function FlowInputPanel({
   parentIdOfTempQueryNode
 }: FlowInputPanelProps) {
 
-  const chatModes = useMemo(() => {
-    const defaultModes = [
-      {
-        name: '常规问答模式',
-        description: '最常规的 AI 生成模式，一问一答。',
-        icon: MessageCircleIcon,
-        type: 'general' satisfies AiTaskType
-      },
-      {
-        name: '知识问答模式',
-        description: '基于知识库的 AI 生成模式，能识别用户提问中的相关知识点。',
-        icon: BookOpenIcon,
-        type: 'knowledge' satisfies AiTaskType
-      },
-      {
-        name: '目标解析模式',
-        description: '基于目标解析引擎，能够对用户目标进行有效拆解。',
-        icon: TargetIcon,
-        type: 'planner' satisfies AiTaskType
-      },
-      {
-        name: '网页生成模式',
-        description: '基于网页生成引擎，能够基于用户提问生成可预览的html网页。',
-        icon: CodeXmlIcon,
-        type: 'html-maker' satisfies AiTaskType
-      }
-    ];
-    if (selectedNode?.data.subtype === 'planner-split') {
-      // 把planner模式排在第一位
-      const plannerMode = defaultModes.find(mode => mode.type === 'planner');
-      if (plannerMode) {
-        return [
-          plannerMode,
-          ...defaultModes.filter(mode => mode.type !== 'planner')
-        ];
-      }
-    }
-    if (selectedNode?.data.subtype === 'html-maker') {
-      // 把html-maker模式排在第一位
-      const htmlMakerMode = defaultModes.find(mode => mode.type === 'html-maker');
-      if (htmlMakerMode) {
-        return [
-          htmlMakerMode,
-          ...defaultModes.filter(mode => mode.type !== 'html-maker')
-        ];
-      }
-    }
-    return defaultModes;
-  }, [selectedNode]);
-
   // 新增模型选项
   const modelOptions = useMemo<DropdownOption[]>(() => [
     {
@@ -102,7 +53,7 @@ export function FlowInputPanel({
 
   const [isExpanded, setIsExpanded] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
-  const [selectedType, setSelectedType] = useState<AiTaskType>(chatModes[0].type as AiTaskType);
+  const [isKnowledgeMode, setIsKnowledgeMode] = useState(false);
   const [selectedModel, setSelectedModel] = useState<ModelType>('doubao');
   const containerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -113,17 +64,6 @@ export function FlowInputPanel({
   
   const [isProcessing, setIsProcessing] = useState(false);
   
-  // 当selectedNode发生变化时，更新selectedType
-  useEffect(() => {
-    if (selectedNode?.data.subtype === 'planner-split') {
-      setSelectedType('planner');
-    } else if (selectedNode?.data.subtype === 'html-maker') {
-      setSelectedType('html-maker');
-    } else {
-      setSelectedType('general');
-    }
-  }, [selectedNode]);
-
   // 处理输入变化
   const handlePromptChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newText = e.target.value;
@@ -134,7 +74,7 @@ export function FlowInputPanel({
       
       // 创建临时查询节点
       if (canInput) {
-        addTempQueryNodeTask({type: 'create', text: newText, mode: selectedType});
+        addTempQueryNodeTask({type: 'create', text: newText, mode: 'GENERAL'});
       }
     } else if (newText.length > 0) {
       // 更新临时节点文本
@@ -186,16 +126,17 @@ export function FlowInputPanel({
     if (quoteText) {
       finalPrompt = `对于之前内容中的：\n\n>${quoteText.replace(/\n/g, ' ')}\n\n我的问题是：${prompt}`;
     }
+    
+    // 根据知识问答模式开关决定任务类型
+    const taskType: AiTaskType = isKnowledgeMode ? 'KNOWLEDGE' : 'GENERAL';
+    
     // 最终选择的模型
-    let finalModel = null;
-    if (selectedType === 'general' || selectedType === 'knowledge') {
-      finalModel = selectedModel;
-    }
+    let finalModel = selectedModel; // 所有模式都使用选择的模型
 
     const createAiTaskDTO = {
-      type: selectedType,
+      type: taskType,
       prompt: finalPrompt,
-      promptParams: null,
+      promptParams: {},
       convId: convId,
       parentId: parseInt(parentIdOfTempQueryNode),
       model: finalModel // 使用选择的模型
@@ -230,18 +171,13 @@ export function FlowInputPanel({
     }).finally(() => {
       setIsProcessing(false);
     });
-  }, [canInput, prompt, parentIdOfTempQueryNode, selectedType, selectedModel, convId, canNotInputReason, quoteText, setQuoteText, setPrompt, handleNewChat, chat, isProcessing]);
+  }, [canInput, prompt, parentIdOfTempQueryNode, isKnowledgeMode, selectedModel, convId, canNotInputReason, quoteText, setQuoteText, setPrompt, handleNewChat, chat, isProcessing, handleAiTaskCountPlus]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSubmit();
     }
-  };
-
-  // 处理模式选择
-  const handleModeSelect = (option: DropdownOption) => {
-    setSelectedType(option.type as AiTaskType);
   };
 
   // 处理模型选择
@@ -268,26 +204,21 @@ export function FlowInputPanel({
     >
       {/* 选择器按钮区域 */}
       <div className={`selectors-container flex flex-row justify-center gap-2`}>
-        {/* 模式选择器 */}
-        <SelectDropdown
-          options={chatModes}
-          selectedType={selectedType}
-          onSelect={handleModeSelect}
-          buttonLabel={chatModes.find(mode => mode.type === selectedType)?.name || '常规问答模式'}
-          dropdownTitle="选择对话模式"
+        {/* 知识问答模式开关 */}
+        <Switch
+          label="知识问答模式"
+          checked={isKnowledgeMode}
+          onChange={setIsKnowledgeMode}
         />
         
         {/* 模型选择器 */}
-        {
-          (selectedType === 'general' || selectedType === 'knowledge') &&
-          <SelectDropdown
-            options={modelOptions}
-            selectedType={selectedModel}
-            onSelect={handleModelSelect}
-            buttonLabel={modelOptions.find(model => model.type === selectedModel)?.name || '默认模型'}
-            dropdownTitle="选择使用模型"
-          />
-        }
+        <SelectDropdown
+          options={modelOptions}
+          selectedType={selectedModel}
+          onSelect={handleModelSelect}
+          buttonLabel={modelOptions.find(model => model.type === selectedModel)?.name || '默认模型'}
+          dropdownTitle="选择使用模型"
+        />
       </div>
 
       {/* 输入框 */}

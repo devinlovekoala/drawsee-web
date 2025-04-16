@@ -24,9 +24,9 @@ function KnowledgeHeadNode({ showSourceHandle, showTargetHandle, data, ...props 
     }
     setIsGenerated(true);
     const createAiTaskDTO: CreateAiTaskDTO = {
-      type: "knowledge-detail",
-      prompt: null,
-      promptParams: null,
+      type: "KNOWLEDGE_DETAIL",
+      prompt: "",
+      promptParams: {},
       convId: convId,
       parentId: parseInt(props.id),
       model: null
