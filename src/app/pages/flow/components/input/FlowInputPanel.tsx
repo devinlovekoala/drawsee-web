@@ -60,6 +60,7 @@ export function FlowInputPanel({
   const inputContainerRef = useRef<HTMLDivElement>(null);
 
   const {chat, convId} = useFlowContext();
+  
   const {handleNewChat, quoteText, setQuoteText, handleAiTaskCountPlus} = useAppContext();
   
   const [isProcessing, setIsProcessing] = useState(false);

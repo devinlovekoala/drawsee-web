@@ -5,6 +5,8 @@ import AnswerNode from "@/app/pages/flow/components/node/AnswerNode";
 import KnowledgeHeadNode from "@/app/pages/flow/components/node/KnowledgeHeadNode";
 import KnowledgeDetailNode from "@/app/pages/flow/components/node/KnowledgeDetailNode";
 import CircuitAnalysisNode from "@/app/pages/flow/components/node/CircuitAnalysisNode";
+import AnswerPointNode from "@/app/pages/flow/components/node/AnswerPointNode";
+import AnswerDetailNode from "@/app/pages/flow/components/node/AnswerDetailNode";
 import {useCallback, useState, useEffect} from "react";
 import {useLocation} from "react-router-dom";
 import {useWatcher} from "alova/client";
@@ -32,6 +34,10 @@ const nodeTypes = {
   'root': RootNode,
   'query': QueryNode,
   'answer': AnswerNode,
+  'answer-point': AnswerPointNode,
+  'answer-detail': AnswerDetailNode,
+  'ANSWER_POINT': AnswerPointNode,
+  'ANSWER_DETAIL': AnswerDetailNode,
   'knowledge-head': KnowledgeHeadNode,
   'knowledge-detail': KnowledgeDetailNode,
   'resource': ResourceNode,
@@ -211,6 +217,14 @@ function Flow() {
         if (node.type === 'knowledge-head') {
           apiNodes.forEach(apiNode => {
             if (apiNode.parentId === node.id && apiNode.type === 'knowledge-detail') {
+              data.isGenerated = true;
+            }
+          });
+        }
+        // 处理answer-point节点
+        if (node.type === 'answer-point' || node.type === 'ANSWER_POINT') {
+          apiNodes.forEach(apiNode => {
+            if (apiNode.parentId === node.id && (apiNode.type === 'answer-detail' || apiNode.type === 'ANSWER_DETAIL')) {
               data.isGenerated = true;
             }
           });

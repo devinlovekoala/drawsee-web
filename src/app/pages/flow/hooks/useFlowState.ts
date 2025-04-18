@@ -107,6 +107,18 @@ function useFlowState(convId: number) {
                 knowledgeHeadNode.data.isGenerated = true;
               }
             }
+            
+            // 如果节点类型是answer-detail，则修改其父节点(answer-point)的isGenerated为true
+            if (nodeVO.type === 'answer-detail' || nodeVO.type === 'ANSWER_DETAIL') {
+              const answerPointNode = layoutedNodes.find(node => 
+                (node.type === 'answer-point' || node.type === 'ANSWER_POINT') && 
+                nodeVO.parentId && 
+                node.id === nodeVO.parentId.toString()
+              );
+              if (answerPointNode) {
+                answerPointNode.data.isGenerated = true;
+              }
+            }
 
             // 更新节点和边
             return {
@@ -185,54 +197,12 @@ function useFlowState(convId: number) {
         }
         // 完成
         case 'done': {
-          // 首先检查活跃节点，执行Markdown二级标题分割
+          // 将最后聚焦的节点从活跃列表中移除
           if (lastFocusNodeId.current) {
-            const completedNodeId = lastFocusNodeId.current;
-            
-            // 将节点从活跃列表中移除
-            activeNodeIds.current.delete(completedNodeId);
-            
-            // 执行节点处理 - 根据二级标题拆分节点
-            setElements(({nodes, edges}) => {
-              console.log(`节点 ${completedNodeId} 内容生成完成，检查是否需要根据二级标题分割`);
-              
-              // 查找完成的节点
-              const completedNode = nodes.find(node => node.id === completedNodeId);
-              
-              // 检查是否是知识问答模式生成的节点
-              const isKnowledgeNode = completedNode && 
-                // 查找它的父节点（查询节点）
-                nodes.some(node => {
-                  // 如果当前节点的父节点是查询节点，且模式是KNOWLEDGE
-                  return node.id === String(completedNode.data.parentId) && 
-                         node.type === 'query' && 
-                         node.data.mode === 'KNOWLEDGE';
-                });
-              
-              // 如果是知识问答模式的节点，跳过自动分点
-              if (isKnowledgeNode) {
-                console.log('知识问答模式生成的节点，跳过自动分点');
-                return { nodes, edges };
-              }
-              
-              // 非知识问答模式，执行正常的自动分点
-              const { nodes: updatedNodes, edges: updatedEdges, newNodeIds } = 
-                processCompletedNode(nodes, edges, completedNodeId);
-              
-              // 如果创建了新节点，更新最后聚焦的节点ID
-              if (newNodeIds.length > 0) {
-                console.log(`根据二级标题创建了 ${newNodeIds.length} 个新节点`);
-                // 聚焦到最后一个新创建的节点
-                lastFocusNodeId.current = newNodeIds[newNodeIds.length - 1];
-              }
-              
-              return {
-                nodes: updatedNodes,
-                edges: updatedEdges
-              };
-            });
+            activeNodeIds.current.delete(lastFocusNodeId.current);
           }
           
+          // 不再执行自动分点功能，直接进入布局调整
           // 延时执行布局
           setTimeout(() => {
             setElements(({nodes, edges}) => {

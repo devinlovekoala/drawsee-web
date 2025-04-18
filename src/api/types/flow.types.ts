@@ -1,4 +1,4 @@
-export type NodeType = "root" | "query" | "answer" | "knowledge-head" | "knowledge-detail" | "resource";
+export type NodeType = "root" | "query" | "answer" | "answer-point" | "answer-detail" | "ANSWER_POINT" | "ANSWER_DETAIL" | "knowledge-head" | "knowledge-detail" | "resource";
 
 export interface ConversationVO {
   id: number;
@@ -64,6 +64,10 @@ export type NodeData = {
   root: RootNodeData;
   query: QueryNodeData;
   answer: AnswerNodeData;
+  'answer-point': AnswerNodeData;
+  'answer-detail': AnswerNodeData;
+  'ANSWER_POINT': AnswerNodeData;
+  'ANSWER_DETAIL': AnswerNodeData;
   'knowledge-head': KnowledgeHeadNodeData;
   'knowledge-detail': KnowledgeDetailNodeData;
   'animation': AnimationNodeData;
@@ -96,6 +100,7 @@ export interface XYPosition {
 
 export type AiTaskType = 
   | 'GENERAL'      // 常规问答模式
+  | 'GENERAL_DETAIL' // 通用详情模式
   | 'KNOWLEDGE'    // 知识问答模式
   | 'KNOWLEDGE_DETAIL' // 知识详情模式
   | 'ANIMATION'    // 动画生成模式

@@ -66,15 +66,16 @@
 }
 ```
 
-2. **回答节点**
+2. **回答角度节点**
 ```json
 {
   "type": "NODE",
   "data": {
     "id": 124,
-    "type": "ANSWER",
+    "type": "ANSWER_POINT",
     "data": {
-      "title": "AI解析",
+      "title": "回答角度",
+      "subtype": "ANSWER_POINT",
       "text": ""
     },
     "position": {"x": 0, "y": 0},
@@ -89,12 +90,30 @@
   "type": "TEXT",
   "data": {
     "nodeId": 124,
-    "content": "Java是一种..."
+    "content": "[{\"title\":\"语法基础\",\"description\":\"Java的基本语法规则和代码结构\"},...}]"
   }
 }
 ```
 
-4. **完成信号**
+4. **角度节点**
+```json
+{
+  "type": "NODE",
+  "data": {
+    "id": 125,
+    "type": "ANSWER_POINT",
+    "data": {
+      "title": "语法基础",
+      "text": "Java的基本语法规则和代码结构",
+      "subtype": "ANSWER_POINT"
+    },
+    "position": {"x": 0, "y": 0},
+    "parentId": 124
+  }
+}
+```
+
+5. **完成信号**
 ```json
 {
   "type": "DONE",
@@ -102,7 +121,60 @@
 }
 ```
 
-### 2. 知识点识别 (KNOWLEDGE)
+### 2. 通用对话详情模式 (GENERAL_DETAIL)
+
+#### 发送结构
+```json
+{
+  "userId": 123456,
+  "convId": 789012,
+  "parentId": 125,  // 回答角度节点ID
+  "taskId": "task_uuid",
+  "type": "GENERAL_DETAIL",
+  "model": "deepseekV3"
+}
+```
+
+#### 响应节点
+1. **详细回答节点**
+```json
+{
+  "type": "NODE",
+  "data": {
+    "id": 126,
+    "type": "ANSWER_DETAIL",
+    "data": {
+      "title": "详细解析",
+      "subtype": "ANSWER_DETAIL",
+      "text": "",
+      "angle": "语法基础"
+    },
+    "position": {"x": 0, "y": 0},
+    "parentId": 125
+  }
+}
+```
+
+2. **文本流**
+```json
+{
+  "type": "TEXT",
+  "data": {
+    "nodeId": 126,
+    "content": "Java的基本语法..."
+  }
+}
+```
+
+3. **完成信号**
+```json
+{
+  "type": "DONE",
+  "data": ""
+}
+```
+
+### 3. 知识点识别 (KNOWLEDGE)
 
 #### 发送结构
 ```json
@@ -119,14 +191,14 @@
 #### 响应节点
 1. **查询节点** (同上)
 
-2. **回答节点** (同上)
+2. **回答节点** (同通用对话中的回答节点)
 
 3. **知识点头节点**
 ```json
 {
   "type": "NODE",
   "data": {
-    "id": 125,
+    "id": 127,
     "type": "KNOWLEDGE_HEAD",
     "data": {
       "title": "知识点",
@@ -138,14 +210,14 @@
 }
 ```
 
-### 3. 知识点详情 (KNOWLEDGE_DETAIL)
+### 4. 知识点详情 (KNOWLEDGE_DETAIL)
 
 #### 发送结构
 ```json
 {
   "userId": 123456,
   "convId": 789012,
-  "parentId": 125,  // 知识点头节点ID
+  "parentId": 127,  // 知识点头节点ID
   "taskId": "task_uuid",
   "type": "KNOWLEDGE_DETAIL"
 }
@@ -157,7 +229,7 @@
 {
   "type": "NODE",
   "data": {
-    "id": 126,
+    "id": 128,
     "type": "KNOWLEDGE_DETAIL",
     "data": {
       "title": "知识详情",
@@ -170,7 +242,7 @@
       }
     },
     "position": {"x": 0, "y": 0},
-    "parentId": 125
+    "parentId": 127
   }
 }
 ```
@@ -180,7 +252,7 @@
 {
   "type": "NODE",
   "data": {
-    "id": 127,
+    "id": 129,
     "type": "RESOURCE",
     "data": {
       "title": "教学动画",
@@ -188,7 +260,7 @@
       "objectNames": ["animation1.mp4", "animation2.mp4"]
     },
     "position": {"x": 0, "y": 0},
-    "parentId": 126
+    "parentId": 128
   }
 }
 ```
@@ -198,7 +270,7 @@
 {
   "type": "NODE",
   "data": {
-    "id": 128,
+    "id": 130,
     "type": "RESOURCE",
     "data": {
       "title": "B站视频",
@@ -206,7 +278,7 @@
       "urls": ["https://www.bilibili.com/video/xxx"]
     },
     "position": {"x": 0, "y": 0},
-    "parentId": 126
+    "parentId": 128
   }
 }
 ```
@@ -216,7 +288,7 @@
 {
   "type": "NODE",
   "data": {
-    "id": 129,
+    "id": 131,
     "type": "RESOURCE",
     "data": {
       "title": "Word文档",
@@ -224,7 +296,7 @@
       "urls": ["https://example.com/doc.docx"]
     },
     "position": {"x": 0, "y": 0},
-    "parentId": 126
+    "parentId": 128
   }
 }
 ```
@@ -234,7 +306,7 @@
 {
   "type": "NODE",
   "data": {
-    "id": 130,
+    "id": 132,
     "type": "RESOURCE",
     "data": {
       "title": "PDF文档",
@@ -242,12 +314,12 @@
       "urls": ["https://example.com/document.pdf"]
     },
     "position": {"x": 0, "y": 0},
-    "parentId": 126
+    "parentId": 128
   }
 }
 ```
 
-### 4. 动画生成 (ANIMATION)
+### 5. 动画生成 (ANIMATION)
 
 #### 发送结构
 ```json
@@ -271,7 +343,7 @@
 {
   "type": "NODE",
   "data": {
-    "id": 131,
+    "id": 133,
     "type": "RESOURCE",
     "data": {
       "title": "生成动画",
@@ -290,7 +362,7 @@
   "type": "DATA",
   "data": {
     "progress": "正在生成动画分镜...",
-    "nodeId": 131
+    "nodeId": 133
   }
 }
 ```
@@ -300,13 +372,13 @@
 {
   "type": "DATA",
   "data": {
-    "nodeId": 131,
+    "nodeId": 133,
     "frame": "base64编码的图像数据"
   }
 }
 ```
 
-### 5. 解题分析 (SOLVER_FIRST)
+### 6. 解题分析 (SOLVER_FIRST)
 
 #### 发送结构
 ```json
@@ -331,7 +403,7 @@
 {
   "type": "NODE",
   "data": {
-    "id": 132,
+    "id": 134,
     "type": "ANSWER",
     "data": {
       "title": "题目分析",
@@ -344,14 +416,14 @@
 }
 ```
 
-### 6. 解题推导 (SOLVER_CONTINUE)
+### 7. 解题推导 (SOLVER_CONTINUE)
 
 #### 发送结构
 ```json
 {
   "userId": 123456,
   "convId": 789012,
-  "parentId": 132,  // 解题分析节点ID
+  "parentId": 134,  // 解题分析节点ID
   "taskId": "task_uuid",
   "type": "SOLVER_CONTINUE"
 }
@@ -363,7 +435,7 @@
 {
   "type": "NODE",
   "data": {
-    "id": 133,
+    "id": 135,
     "type": "ANSWER",
     "data": {
       "title": "题目推导",
@@ -371,7 +443,7 @@
       "text": ""
     },
     "position": {"x": 0, "y": 0},
-    "parentId": 132
+    "parentId": 134
   }
 }
 ```
@@ -381,20 +453,20 @@
 {
   "type": "DATA",
   "data": {
-    "nodeId": 133,
+    "nodeId": 135,
     "isDone": true
   }
 }
 ```
 
-### 7. 解题总结 (SOLVER_SUMMARY)
+### 8. 解题总结 (SOLVER_SUMMARY)
 
 #### 发送结构
 ```json
 {
   "userId": 123456,
   "convId": 789012,
-  "parentId": 133,  // 解题推导节点ID
+  "parentId": 135,  // 解题推导节点ID
   "taskId": "task_uuid",
   "type": "SOLVER_SUMMARY"
 }
@@ -406,7 +478,7 @@
 {
   "type": "NODE",
   "data": {
-    "id": 134,
+    "id": 136,
     "type": "ANSWER",
     "data": {
       "title": "题目总结",
@@ -414,12 +486,12 @@
       "text": ""
     },
     "position": {"x": 0, "y": 0},
-    "parentId": 133
+    "parentId": 135
   }
 }
 ```
 
-### 8. 目标规划 (PLANNER)
+### 9. 目标规划 (PLANNER)
 
 #### 发送结构
 ```json
@@ -428,7 +500,7 @@
   "convId": 789012,
   "parentId": 345678,
   "taskId": "task_uuid",
-  "type": "GENERAL",
+  "type": "PLANNER",
   "prompt": "如何准备高考数学考试？"
 }
 ```
@@ -441,7 +513,7 @@
 {
   "type": "NODE",
   "data": {
-    "id": 135,
+    "id": 137,
     "type": "ANSWER",
     "data": {
       "title": "目标分析",
@@ -454,7 +526,25 @@
 }
 ```
 
-### 9. HTML制作 (HTML_MAKER)
+3. **目标拆解节点**
+```json
+{
+  "type": "NODE",
+  "data": {
+    "id": 138,
+    "type": "ANSWER",
+    "data": {
+      "title": "目标拆解",
+      "subtype": "PLANNER_SPLIT",
+      "text": "制定每日复习计划"
+    },
+    "position": {"x": 0, "y": 0},
+    "parentId": 137
+  }
+}
+```
+
+### 10. HTML制作 (HTML_MAKER)
 
 #### 发送结构
 ```json
@@ -463,7 +553,7 @@
   "convId": 789012,
   "parentId": 345678,
   "taskId": "task_uuid",
-  "type": "GENERAL",
+  "type": "HTML_MAKER",
   "prompt": "制作一个简单的个人介绍网页"
 }
 ```
@@ -476,7 +566,7 @@
 {
   "type": "NODE",
   "data": {
-    "id": 136,
+    "id": 139,
     "type": "ANSWER",
     "data": {
       "title": "HTML制作",
@@ -489,7 +579,7 @@
 }
 ```
 
-### 10. 电路分析 (CIRCUIT_ANALYSIS)
+### 11. 电路分析 (CIRCUIT_ANALYZE)
 
 #### 发送结构
 ```json
@@ -498,7 +588,7 @@
   "convId": 789012,
   "parentId": 345678,
   "taskId": "task_uuid",
-  "type": "CIRCUIT_ANALYSIS",
+  "type": "CIRCUIT_ANALYZE",
   "model": "deepseekV3",  // 使用的AI模型
   "prompt": {
     "elements": [
@@ -563,8 +653,6 @@
       "createdAt": "2024-04-01T10:00:00Z",
       "updatedAt": "2024-04-01T10:00:00Z"
     }
-  },
-  "promptParams": {
   }
 }
 ```
@@ -575,7 +663,7 @@
 {
   "type": "NODE",
   "data": {
-    "id": 123,
+    "id": 140,
     "type": "QUERY",
     "data": {
       "title": "电路分析请求",
@@ -588,20 +676,7 @@
             "position": {"x": 100, "y": 100},
             "rotation": 0,
             "properties": {"resistance": "1k"},
-            "ports": [
-              {
-                "id": "p1",
-                "name": "端口1",
-                "type": "input",
-                "position": {"side": "left", "x": 0, "y": 0, "align": "start"}
-              },
-              {
-                "id": "p2",
-                "name": "端口2",
-                "type": "output",
-                "position": {"side": "right", "x": 0, "y": 0, "align": "start"}
-              }
-            ]
+            "ports": [/* ... */]
           },
           {
             "id": "v1",
@@ -609,40 +684,11 @@
             "position": {"x": 50, "y": 100},
             "rotation": 90,
             "properties": {"voltage": "5V"},
-            "ports": [
-              {
-                "id": "p1",
-                "name": "正极",
-                "type": "output",
-                "position": {"side": "top", "x": 0, "y": 0, "align": "center"}
-              },
-              {
-                "id": "p2",
-                "name": "负极",
-                "type": "input",
-                "position": {"side": "bottom", "x": 0, "y": 0, "align": "center"}
-              }
-            ]
+            "ports": [/* ... */]
           }
         ],
-        "connections": [
-          {
-            "id": "conn1",
-            "source": {"elementId": "v1", "portId": "p1"},
-            "target": {"elementId": "r1", "portId": "p1"}
-          },
-          {
-            "id": "conn2",
-            "source": {"elementId": "r1", "portId": "p2"},
-            "target": {"elementId": "v1", "portId": "p2"}
-          }
-        ],
-        "metadata": {
-          "title": "简单电路示例",
-          "description": "一个包含电阻和电压源的电路",
-          "createdAt": "2024-04-01T10:00:00Z",
-          "updatedAt": "2024-04-01T10:00:00Z"
-        }
+        "connections": [/* ... */],
+        "metadata": {/* ... */}
       },
       "mode": "CIRCUIT_ANALYSIS"
     },
@@ -657,7 +703,7 @@
 {
   "type": "NODE",
   "data": {
-    "id": 137,
+    "id": 141,
     "type": "ANSWER",
     "data": {
       "title": "电路基本分析",
@@ -666,7 +712,7 @@
       "basicAnalysis": "这个电路由一个5V电压源和一个1kΩ电阻组成。根据欧姆定律，电路中的电流为I=V/R=5V/1kΩ=5mA。"
     },
     "position": {"x": 0, "y": 0},
-    "parentId": 123
+    "parentId": 140
   }
 }
 ```
@@ -676,7 +722,7 @@
 {
   "type": "NODE",
   "data": {
-    "id": 138,
+    "id": 142,
     "type": "ANSWER",
     "data": {
       "title": "节点[N1]分析",
@@ -687,7 +733,7 @@
       "nodeAnalysis": "节点N1连接电压源的正极和电阻的一端，维持在5V电位。"
     },
     "position": {"x": 0, "y": 0},
-    "parentId": 137
+    "parentId": 141
   }
 }
 ```
@@ -697,7 +743,7 @@
 {
   "type": "NODE",
   "data": {
-    "id": 139,
+    "id": 143,
     "type": "ANSWER",
     "data": {
       "title": "电路功能分析",
@@ -706,7 +752,7 @@
       "functionAnalysis": "这是一个简单的负载电路，电压源提供恒定电压，电阻作为负载消耗电能，将电能转换为热能。"
     },
     "position": {"x": 0, "y": 0},
-    "parentId": 137
+    "parentId": 141
   }
 }
 ```
@@ -716,7 +762,7 @@
 {
   "type": "NODE",
   "data": {
-    "id": 140,
+    "id": 144,
     "type": "ANSWER",
     "data": {
       "title": "电路优化建议",
@@ -725,7 +771,7 @@
       "optimizationResult": "可以考虑添加一个并联电容以滤除可能的电压波动，提高电路稳定性。"
     },
     "position": {"x": 0, "y": 0},
-    "parentId": 139
+    "parentId": 143
   }
 }
 ```
@@ -736,7 +782,7 @@
   "type": "DATA",
   "data": {
     "progress": "电路分析完成",
-    "nodeId": 140
+    "nodeId": 144
   }
 }
 ```
@@ -755,8 +801,59 @@
 ## 四、任务配置注意事项
 
 1. **任务类型必须正确**：确保`type`字段使用`AiTaskType`类中定义的常量值。
-2. **父节点类型匹配**：某些任务类型（如`KNOWLEDGE_DETAIL`）要求特定类型的父节点。
-3. **提示内容格式**：大多数任务使用字符串作为`prompt`，但`CIRCUIT_ANALYSIS`使用`CircuitDesign`对象。
-4. **任务链接顺序**：解题类任务通常按照`SOLVER_FIRST` → `SOLVER_CONTINUE` → `SOLVER_SUMMARY`的顺序使用。
+2. **父节点类型匹配**：某些任务类型（如`KNOWLEDGE_DETAIL`、`GENERAL_DETAIL`）要求特定类型的父节点。
+3. **提示内容格式**：大多数任务使用字符串作为`prompt`，但`CIRCUIT_ANALYZE`使用`CircuitDesign`对象。
+4. **任务链接顺序**：
+   - 解题类任务通常按照：`SOLVER_FIRST` → `SOLVER_CONTINUE` → `SOLVER_SUMMARY`的顺序使用。
+   - 通用对话类任务通常按照：`GENERAL`(生成角度) → `GENERAL_DETAIL`(展开具体角度)的顺序使用。
 5. **模型选择**：可以通过`model`字段指定使用的AI模型，不指定时使用默认模型。
-6. **电路节点获取**：使用`/tool/circuit/nodes`接口获取电路节点标号信息，便于前端渲染节点标识。
+6. **GENERAL_DETAIL不需要传递角度参数**：最新版本已优化，前端发送`GENERAL_DETAIL`任务时不需要在promptParams中包含`angle`参数，系统会自动从父节点中读取角度信息。
+7. **电路节点获取**：使用`/tool/circuit/nodes`接口获取电路节点标号信息，便于前端渲染节点标识。
+
+## 五、节点类型说明
+
+本系统中使用的主要节点类型包括：
+
+1. **ROOT**：根节点，每个会话的起始点
+2. **QUERY**：用户查询节点，存储用户的提问
+3. **ANSWER**：AI回答节点，存储常规AI回答内容
+4. **ANSWER_POINT**：回答角度节点，存储问题可能的不同回答角度
+5. **ANSWER_DETAIL**：详细回答节点，存储特定角度的详细解析
+6. **KNOWLEDGE_HEAD**：知识点头节点，存储识别出的知识点
+7. **KNOWLEDGE_DETAIL**：知识点详情节点，存储知识点的详细内容
+8. **RESOURCE**：资源节点，存储各类资源（动画、视频、文档等）
+
+不同的节点类型可能有不同的子类型(subtype)，用于更细致地区分节点的用途和内容格式。
+
+## 六、节点数据获取模式
+
+### 1. 通用对话详情模式 (GENERAL_DETAIL)
+
+系统采用"从父节点获取数据"的设计模式，与知识点详情类似：
+
+1. **角度信息获取**：
+   - 从父节点(`ANSWER_POINT`)的数据中提取`title`字段作为角度信息
+   - 不再需要前端传递角度参数
+
+2. **原始问题获取**：
+   - 通过`findOriginalQuestion`方法向上回溯查找`QUERY`节点
+   - 从`QUERY`节点的数据中提取`text`字段作为原始问题
+
+3. **执行流程**：
+   - 验证父节点类型是否为`ANSWER_POINT`
+   - 从父节点读取角度信息创建`ANSWER_DETAIL`节点
+   - 回溯查找原始问题
+   - 调用`StreamAiService.answerDetailChat`方法生成详细回答
+
+### 2. 知识点详情模式 (KNOWLEDGE_DETAIL)
+
+类似地，知识点详情也采用从父节点获取知识点名称的模式：
+
+1. **知识点名称获取**：
+   - 从父节点(`KNOWLEDGE_HEAD`)的数据中提取`text`字段作为知识点名称
+
+2. **执行流程**：
+   - 验证父节点类型是否为`KNOWLEDGE_HEAD`
+   - 从父节点读取知识点名称
+   - 调用`StreamAiService.knowledgeDetailChat`方法生成知识点详情
+   - 查找相关资源并创建资源节点

@@ -7,8 +7,19 @@ import { createAiTask } from '@/api/methods/flow.methods';
 import { useAppContext } from '@/app/contexts/AppContext';
 import { ModelSelector } from '../../../blank/components/ModelSelector';
 import { ModelType } from '../../../flow/components/input/FlowInputPanel';
+import AnswerPointNode from './AnswerPointNode';
+import AnswerDetailNode from './AnswerDetailNode';
 
 function AnswerNode({ data, ...props }: ExtendedNodeProps<'answer'>) {
+  // 根据subtype渲染不同的节点组件
+  if (data.subtype === 'ANSWER_POINT') {
+    return <AnswerPointNode data={data} {...props} />;
+  }
+  
+  if (data.subtype === 'ANSWER_DETAIL') {
+    return <AnswerDetailNode data={data} {...props} />;
+  }
+  
   const {chat, convId, isChatting, addChatTask} = useFlowContext();
   const {handleAiTaskCountPlus} = useAppContext();
   const { subtype, isDone } = data;

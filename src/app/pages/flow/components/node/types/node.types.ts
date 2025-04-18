@@ -22,12 +22,13 @@ export interface QueryNodeData extends BaseNodeData {
   [key: string]: unknown;
 }
 
-type AnswerSubType = 'solver-first' | 'solver-continue' | 'solver-summary' | 'html-maker' | 'planner-first' | 'planner-split' | 'animation';
+type AnswerSubType = 'solver-first' | 'solver-continue' | 'solver-summary' | 'html-maker' | 'planner-first' | 'planner-split' | 'animation' | 'ANSWER_POINT' | 'ANSWER_DETAIL';
 
 export interface AnswerNodeData extends BaseNodeData {
   subtype?: AnswerSubType;
   isDone?: boolean;
   isGenerated?: boolean;
+  angle?: string;
   [key: string]: unknown;
 }
 
@@ -48,6 +49,8 @@ export type NodeData<T extends string> =
   T extends 'root' ? RootNodeData :
   T extends 'query' ? QueryNodeData :
   T extends 'answer' ? AnswerNodeData :
+  T extends 'answer-point' | 'ANSWER_POINT' ? AnswerNodeData :
+  T extends 'answer-detail' | 'ANSWER_DETAIL' ? AnswerNodeData :
   T extends 'knowledge-head' ? KnowledgeHeadNodeData :
   T extends 'knowledge-detail' ? KnowledgeDetailNodeData :
   T extends 'resource' ? ResourceNodeData :
@@ -57,6 +60,8 @@ export type FlowNode<T extends NodeType> = Node<NodeData<T>>;
 export type RootNode = FlowNode<'root'>;
 export type QueryNode = FlowNode<'query'>;
 export type AnswerNode = FlowNode<'answer'>;
+export type AnswerPointNode = FlowNode<'answer-point' | 'ANSWER_POINT'>;
+export type AnswerDetailNode = FlowNode<'answer-detail' | 'ANSWER_DETAIL'>;
 export type KnowledgeHeadNode = FlowNode<'knowledge-head'>;
 export type KnowledgeDetailNode = FlowNode<'knowledge-detail'>;
 export type ResourceNode = FlowNode<'resource'>;
