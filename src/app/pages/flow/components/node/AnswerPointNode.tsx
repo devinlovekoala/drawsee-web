@@ -37,10 +37,13 @@ function AnswerPointNode({ data, ...props }: ExtendedNodeProps<'answer-point' | 
     
     setIsLoading(true); // 设置加载状态
     
+    // 使用节点本身的文本内容作为问题
+    const originalQuestion = data.text || "请完成以该角度为切入点对用户提问的回答";
+    
     const createAiTaskDTO: CreateAiTaskDTO = {
       type: "GENERAL_DETAIL",
-      prompt: "请完成以该角度为切入点对用户提问的回答",
-      promptParams: {},
+      prompt: originalQuestion,
+      promptParams: null, // 修改为null以修复类型错误
       convId: convId,
       parentId: parseInt(props.id),
       model: selectedModel

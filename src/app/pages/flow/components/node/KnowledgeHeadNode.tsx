@@ -34,7 +34,7 @@ function KnowledgeHeadNode({ showSourceHandle, showTargetHandle, data, ...props 
     const createAiTaskDTO: CreateAiTaskDTO = {
       type: "KNOWLEDGE_DETAIL",
       prompt: "请详细解析该知识点",
-      promptParams: {},
+      promptParams: null,
       convId: convId,
       parentId: parseInt(props.id),
       model: selectedModel

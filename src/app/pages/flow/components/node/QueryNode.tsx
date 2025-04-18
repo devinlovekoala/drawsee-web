@@ -46,6 +46,36 @@ const QueryNode = React.memo(function QueryNode({
   showTargetHandle, 
   ...props 
 }: ExtendedNodeProps<'query'>) {
+  // 处理显示文本，确保只显示用户的原始提问内容
+  const cleanQueryText = useMemo(() => {
+    if (!data.text) return '';
+    
+    // 处理包含引用的情况
+    if (data.text.includes('对于之前内容中的：')) {
+      const parts = data.text.split('\n\n');
+      if (parts.length >= 3) {
+        const lastPart = parts[parts.length - 1];
+        if (lastPart.startsWith('我的问题是：')) {
+          return lastPart.replace('我的问题是：', '').trim();
+        }
+      }
+    }
+    
+    // 处理包含"我的问题是："的情况
+    const questionMatch = data.text.match(/我的问题是：([\s\S]*)/);
+    if (questionMatch && questionMatch[1]) {
+      return questionMatch[1].trim();
+    }
+    
+    // 移除可能的分析部分（通常在第一个双换行后出现）
+    const firstParagraphMatch = data.text.split(/\n\n|\r\n\r\n/);
+    if (firstParagraphMatch && firstParagraphMatch.length > 0) {
+      return firstParagraphMatch[0].trim();
+    }
+    
+    return data.text;
+  }, [data.text]);
+
   // 使用useMemo缓存footerContent
   const footerContent = useMemo(() => (
     data.mode ? <span className="inline-flex items-center px-5 py-1 rounded-full font-medium bg-blue-100 text-blue-800">
@@ -59,7 +89,10 @@ const QueryNode = React.memo(function QueryNode({
       showSourceHandle={showSourceHandle}
       showTargetHandle={showTargetHandle}
       footerContent={footerContent}
-      data={data}
+      data={{
+        ...data,
+        text: cleanQueryText // 使用清理后的查询文本
+      }}
     />
   );
 }, arePropsEqual);
