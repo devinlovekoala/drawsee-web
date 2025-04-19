@@ -592,7 +592,10 @@ export const CircuitNode = memo(({ data, id }: NodeProps<CircuitNodeData>) => {
               style={{
                 ...getPortStyle(port),
                 background: '#3B82F6',
+                zIndex: 20,
+                cursor: 'crosshair'
               }}
+              isConnectable={true}
             />
             
             {/* 目标端口 - 可以接收连接的端口 */}
@@ -604,7 +607,10 @@ export const CircuitNode = memo(({ data, id }: NodeProps<CircuitNodeData>) => {
                 ...getPortStyle(port),
                 background: 'transparent', // 透明背景，只有边框可见
                 pointerEvents: 'all', // 确保可以接收鼠标事件
+                zIndex: 10,
+                cursor: 'crosshair'
               }}
+              isConnectable={true}
             />
           </React.Fragment>
         ))}
