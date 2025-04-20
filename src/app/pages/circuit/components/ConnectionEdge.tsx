@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useMemo } from 'react';
-import { EdgeProps, ConnectionLineComponentProps, getSmoothStepPath } from 'reactflow';
+import React, { useMemo, useEffect, useState } from 'react';
+import { EdgeProps, ConnectionLineComponentProps, getSmoothStepPath, getBezierPath } from 'reactflow';
 
 // 统一边缘线样式
 const edgeStyles = {
@@ -40,9 +40,26 @@ export function ConnectionEdge({
   selected,
   animated,
   data,
+  source,
+  target,
+  sourceHandleId,
+  targetHandleId,
 }: EdgeProps) {
-  // 使用useMemo缓存路径计算，确保每次位置改变时都重新计算
+  // 跟踪是否需要重新计算连线
+  const [needsUpdate, setNeedsUpdate] = useState(false);
+  
+  // 当源节点或目标节点旋转时强制更新
+  useEffect(() => {
+    if (data && data.forceRefresh) {
+      setNeedsUpdate(true);
+      // 重置状态
+      setTimeout(() => setNeedsUpdate(false), 50);
+    }
+  }, [data]);
+  
+  // 使用useMemo缓存路径计算
   const edgePath = useMemo(() => {
+    // 使用getSmoothStepPath确保类型兼容性
     const [path] = getSmoothStepPath({
       sourceX,
       sourceY,
@@ -50,11 +67,12 @@ export function ConnectionEdge({
       targetX,
       targetY,
       targetPosition,
-      borderRadius: 0, // 设置为0以获得直角转弯
-      offset: 15, // 添加偏移以避开节点
+      borderRadius: 0,
+      offset: 5, // 较小的偏移量
     });
+    
     return path;
-  }, [sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition]);
+  }, [sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, needsUpdate]);
 
   // 合并默认样式和自定义样式，根据是否选中应用不同样式
   const customStyle = {
@@ -70,6 +88,10 @@ export function ConnectionEdge({
         className="react-flow__edge-path"
         d={edgePath}
         markerEnd={markerEnd}
+        data-source={source}
+        data-target={target}
+        data-source-handle={sourceHandleId}
+        data-target-handle={targetHandleId}
       />
       {animated && (
         <path
@@ -84,13 +106,25 @@ export function ConnectionEdge({
           d={edgePath}
         />
       )}
+
+      {/* 端点标记 - 使端点位置可见，并提高连接的精确度 */}
+      <circle
+        cx={sourceX}
+        cy={sourceY}
+        r={3}
+        fill={selected ? '#F59E0B' : '#3B82F6'}
+        stroke="#fff"
+        strokeWidth={1}
+        pointerEvents="none" // 防止干扰用户操作
+      />
       <circle
         cx={targetX}
         cy={targetY}
         r={3}
         fill={selected ? '#F59E0B' : '#3B82F6'}
         stroke="#fff"
-        strokeWidth={1.5}
+        strokeWidth={1}
+        pointerEvents="none" // 防止干扰用户操作
       />
     </>
   );
@@ -107,6 +141,7 @@ export function ConnectionPreview({
 }: ConnectionLineComponentProps) {
   // 使用useMemo缓存预览路径计算
   const path = useMemo(() => {
+    // 使用getSmoothStepPath确保类型兼容性
     const [previewPath] = getSmoothStepPath({
       sourceX: fromX,
       sourceY: fromY,
@@ -114,16 +149,18 @@ export function ConnectionPreview({
       targetX: toX,
       targetY: toY,
       targetPosition: toPosition,
-      borderRadius: 0, // 设置为0以获得直角转弯
-      offset: 15, // 添加偏移以避开节点
+      borderRadius: 0,
+      offset: 5,
     });
+    
     return previewPath;
   }, [fromX, fromY, toX, toY, fromPosition, toPosition]);
 
   return (
     <g>
       <path style={previewLineStyle} d={path} />
-      <circle cx={toX} cy={toY} r={4} fill="#3B82F6" stroke="#fff" strokeWidth={1.5} />
+      <circle cx={fromX} cy={fromY} r={3} fill="#3B82F6" stroke="#fff" strokeWidth={1} />
+      <circle cx={toX} cy={toY} r={3} fill="#3B82F6" stroke="#fff" strokeWidth={1.5} />
     </g>
   );
 }

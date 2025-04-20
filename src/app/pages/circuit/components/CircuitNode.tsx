@@ -446,52 +446,6 @@ export const CircuitNode = memo(({ data, id }: NodeProps<CircuitNodeData>) => {
   // 获取元件当前的旋转角度
   const rotation = data.element?.rotation || 0;
 
-  // 添加副作用来处理旋转变化
-  useEffect(() => {
-    // 当旋转角度变化时，触发DOM更新以便ReactFlow重新计算边的位置
-    // 这一步很重要，因为ReactFlow需要检测到DOM变化才能重新计算边
-    const handles = document.querySelectorAll(`[data-nodeid="${id}"] .react-flow__handle`);
-    handles.forEach(handle => {
-      // 触发一个无害的DOM变化
-      handle.setAttribute('data-rotation', `${rotation}`);
-    });
-  }, [rotation, id]);
-
-  // 根据旋转角度计算端口位置
-  const getPortPosition = (side: 'left' | 'right' | 'top' | 'bottom', rotation: number): Position => {
-    // 根据旋转角度映射端口位置
-    const rotationMap: Record<number, Record<string, Position>> = {
-      0: { 
-        'left': Position.Left, 
-        'right': Position.Right, 
-        'top': Position.Top, 
-        'bottom': Position.Bottom 
-      },
-      90: { 
-        'left': Position.Bottom, 
-        'right': Position.Top, 
-        'top': Position.Right, 
-        'bottom': Position.Left 
-      },
-      180: { 
-        'left': Position.Right, 
-        'right': Position.Left, 
-        'top': Position.Bottom, 
-        'bottom': Position.Top 
-      },
-      270: { 
-        'left': Position.Top, 
-        'right': Position.Bottom, 
-        'top': Position.Left, 
-        'bottom': Position.Right 
-      },
-    };
-    
-    // 使用规范化的旋转角度索引
-    const normalizedRotation = rotation % 360;
-    return rotationMap[normalizedRotation]?.[side] || Position.Left;
-  };
-
   // 获取当前元件的端口配置
   const ports = useMemo(() => {
     const elementType = data.element?.type || '';
@@ -499,59 +453,190 @@ export const CircuitNode = memo(({ data, id }: NodeProps<CircuitNodeData>) => {
     return getDefaultPorts(elementType);
   }, [data.element?.type]);
 
+  useEffect(() => {
+    // 当旋转角度变化时，触发DOM更新以便ReactFlow重新计算边的位置
+    // 这一步很重要，因为ReactFlow需要检测到DOM变化才能重新计算边
+    const handles = document.querySelectorAll(`[data-nodeid="${id}"] .react-flow__handle`);
+    handles.forEach(handle => {
+      // 触发一个无害的DOM变化
+      handle.setAttribute('data-rotation', `${rotation}`);
+      
+      // 明确设置handle的数据属性，帮助调试和查找
+      const portId = handle.getAttribute('data-handleid');
+      if (portId) {
+        // 查找对应的端口
+        const port = ports.find(p => p.id === portId);
+        if (port) {
+          // 设置明确的数据属性
+          handle.setAttribute('data-port-type', port.type);
+          handle.setAttribute('data-port-side', port.position.side);
+        }
+      }
+    });
+    
+    // 添加50ms后的边缘更新，确保连线跟随端口
+    setTimeout(() => {
+      // 触发ReactFlow实例的节点更新
+      const event = new CustomEvent('circuit-node-rotated', { 
+        detail: { nodeId: id, rotation } 
+      });
+      document.dispatchEvent(event);
+    }, 50);
+  }, [rotation, id, ports]);
+
   // 获取端口的位置样式
   const getPortStyle = (port: Port): React.CSSProperties => {
     const baseStyle: React.CSSProperties = {
       position: 'absolute',
-      width: 8,
+      width: 8,  // 调整端口大小
       height: 8,
       background: '#fff',
       border: '2px solid #3B82F6',
       borderRadius: '50%',
       zIndex: 10,
+      transform: 'translate(-50%, -50%)',
     };
 
     // 获取当前旋转角度
     const currentRotation = data.element?.rotation || 0;
     const normalizedRotation = currentRotation % 360;
     
-    // 使用配置的旋转偏移
-    const rotatedOffset = port.position.rotatedOffset?.[normalizedRotation.toString() as '90' | '180' | '270'];
-    if (rotatedOffset) {
-      return {
-        ...baseStyle,
-        ...rotatedOffset,
-        left: rotatedOffset.left || '50%',
-        transform: 'translate(-50%, 0)'
-      };
-    }
-
     // 处理初始位置（未旋转时）
     const { x, y, side } = port.position;
     const style = { ...baseStyle };
 
-    // 根据不同的side设置位置
-    switch (side) {
-      case 'left':
-        style.left = `${x}%`;
-        style.top = `${y}%`;
+    // 根据旋转角度计算端口位置
+    switch(normalizedRotation) {
+      case 0: // 0度旋转
+        switch(side) {
+          case 'left':
+            style.left = '0%';
+            style.top = `${y}%`;
+            break;
+          case 'right':
+            style.left = '100%';
+            style.top = `${y}%`;
+            break;
+          case 'top':
+            style.left = `${x}%`;
+            style.top = '0%';
+            break;
+          case 'bottom':
+            style.left = `${x}%`;
+            style.top = '100%';
+            break;
+        }
         break;
-      case 'right':
-        style.right = `${100 - x}%`;
-        style.top = `${y}%`;
+      
+      case 90: // 90度旋转
+        switch(side) {
+          case 'left': // 左边变成了底部
+            style.left = `${y}%`;
+            style.top = '100%';
+            break;
+          case 'right': // 右边变成了顶部
+            style.left = `${y}%`;
+            style.top = '0%';
+            break;
+          case 'top': // 顶部变成了右边
+            style.left = '100%';
+            style.top = `${100-x}%`;
+            break;
+          case 'bottom': // 底部变成了左边
+            style.left = '0%';
+            style.top = `${100-x}%`;
+            break;
+        }
         break;
-      case 'top':
-        style.left = `${x}%`;
-        style.top = `${y}%`;
+      
+      case 180: // 180度旋转
+        switch(side) {
+          case 'left': // 左边变成了右边
+            style.left = '100%';
+            style.top = `${100-y}%`;
+            break;
+          case 'right': // 右边变成了左边
+            style.left = '0%';
+            style.top = `${100-y}%`;
+            break;
+          case 'top': // 顶部变成了底部
+            style.left = `${100-x}%`;
+            style.top = '100%';
+            break;
+          case 'bottom': // 底部变成了顶部
+            style.left = `${100-x}%`;
+            style.top = '0%';
+            break;
+        }
         break;
-      case 'bottom':
-        style.left = `${x}%`;
-        style.bottom = `${100 - y}%`;
+      
+      case 270: // 270度旋转
+        switch(side) {
+          case 'left': // 左边变成了顶部
+            style.left = `${100-y}%`;
+            style.top = '0%';
+            break;
+          case 'right': // 右边变成了底部
+            style.left = `${100-y}%`;
+            style.top = '100%';
+            break;
+          case 'top': // 顶部变成了左边
+            style.left = '0%';
+            style.top = `${x}%`;
+            break;
+          case 'bottom': // 底部变成了右边
+            style.left = '100%';
+            style.top = `${x}%`;
+            break;
+        }
         break;
     }
 
-    style.transform = 'translate(-50%, -50%)';
     return style;
+  };
+
+  // 根据旋转角度计算端口位置
+  const getPortPosition = (side: 'left' | 'right' | 'top' | 'bottom', rotation: number): Position => {
+    // 规范化旋转角度
+    const normalizedRotation = rotation % 360;
+    
+    // 根据旋转角度映射端口位置
+    switch(normalizedRotation) {
+      case 0:
+        switch(side) {
+          case 'left': return Position.Left;
+          case 'right': return Position.Right;
+          case 'top': return Position.Top;
+          case 'bottom': return Position.Bottom;
+          default: return Position.Left;
+        }
+      case 90:
+        switch(side) {
+          case 'left': return Position.Bottom;
+          case 'right': return Position.Top;
+          case 'top': return Position.Right;
+          case 'bottom': return Position.Left;
+          default: return Position.Left;
+        }
+      case 180:
+        switch(side) {
+          case 'left': return Position.Right;
+          case 'right': return Position.Left;
+          case 'top': return Position.Bottom;
+          case 'bottom': return Position.Top;
+          default: return Position.Left;
+        }
+      case 270:
+        switch(side) {
+          case 'left': return Position.Top;
+          case 'right': return Position.Bottom;
+          case 'top': return Position.Left;
+          case 'bottom': return Position.Right;
+          default: return Position.Left;
+        }
+      default:
+        return Position.Left;
+    }
   };
 
   const renderSvgComponent = () => {
@@ -576,6 +661,74 @@ export const CircuitNode = memo(({ data, id }: NodeProps<CircuitNodeData>) => {
     );
   };
 
+  // 特定元件的端口映射修正
+  // 这个函数用于对特定元件在旋转时保持端口与实际SVG图形中的连接点对齐
+  const getFixedPortStyle = (port: Port, portStyle: React.CSSProperties): React.CSSProperties => {
+    const { type } = data.element || { type: CircuitElementType.RESISTOR };
+    const normalizedRotation = rotation % 360;
+    
+    // 根据元件类型和旋转角度进行特殊的位置调整
+    if (type === CircuitElementType.RESISTOR) {
+      // 电阻器的端口位置修正
+      if (normalizedRotation === 0 || normalizedRotation === 180) {
+        return portStyle; // 0度和180度不需要特殊调整
+      } else if (normalizedRotation === 90 || normalizedRotation === 270) {
+        // 90度和270度时，保持水平距离不变
+        if (port.id === 'port1' || port.id === 'port2') {
+          return {
+            ...portStyle,
+            // 微调定位，确保端点与SVG图形上的连接点对齐
+            left: normalizedRotation === 90 ? 
+              (port.id === 'port1' ? '50%' : '50%') :
+              (port.id === 'port1' ? '50%' : '50%'),
+            top: normalizedRotation === 90 ?
+              (port.id === 'port1' ? '100%' : '0%') :
+              (port.id === 'port1' ? '0%' : '100%'),
+          };
+        }
+      }
+    } else if (type === CircuitElementType.CAPACITOR || type === CircuitElementType.INDUCTOR) {
+      // 电容器和电感器端口位置修正
+      if (normalizedRotation === 90 || normalizedRotation === 270) {
+        return {
+          ...portStyle,
+          // 确保端口垂直对齐
+          left: '50%', 
+          top: port.id === 'port1' ? 
+            (normalizedRotation === 90 ? '100%' : '0%') : 
+            (normalizedRotation === 90 ? '0%' : '100%')
+        };
+      }
+    } else if (type === CircuitElementType.VOLTAGE_SOURCE || type === CircuitElementType.CURRENT_SOURCE) {
+      // 电源端口位置修正
+      if (normalizedRotation === 90 || normalizedRotation === 270) {
+        return {
+          ...portStyle,
+          // 确保端口垂直对齐
+          left: '50%',
+          top: port.id === 'positive' ? 
+            (normalizedRotation === 90 ? '100%' : '0%') : 
+            (normalizedRotation === 90 ? '0%' : '100%')
+        };
+      }
+    } else if (type === CircuitElementType.DIODE) {
+      // 二极管端口位置修正
+      if (normalizedRotation === 90 || normalizedRotation === 270) {
+        return {
+          ...portStyle,
+          // 确保端口垂直对齐
+          left: '50%',
+          top: port.id === 'anode' ? 
+            (normalizedRotation === 90 ? '100%' : '0%') : 
+            (normalizedRotation === 90 ? '0%' : '100%')
+        };
+      }
+    }
+    
+    // 其他元件或旋转角度，使用默认位置
+    return portStyle;
+  };
+
   const handleDoubleClick = (e: React.MouseEvent<HTMLDivElement>) => {
     e.stopPropagation();
     if (data.onNodeDoubleClick) {
@@ -587,48 +740,83 @@ export const CircuitNode = memo(({ data, id }: NodeProps<CircuitNodeData>) => {
     <div 
       className="relative" 
       style={{ width: config.width, height: config.height }}
+      data-rotation={rotation}
+      data-element-type={data.element?.type}
     >
       <div 
         className="absolute inset-0"
         onDoubleClick={handleDoubleClick}
       >
-        {/* 渲染所有端口作为源和目标 */}
-        {ports.map((port: Port) => (
-          <React.Fragment key={port.id}>
-            {/* 源端口 - 可以开始连接的端口 */}
-            <Handle
-              type="source"
-              position={getPortPosition(port.position.side, rotation)}
-              id={port.id}
-              style={{
-                ...getPortStyle(port),
-                background: '#3B82F6',
-                zIndex: 20,
-                cursor: 'crosshair'
-              }}
-              isConnectable={true}
-            />
-            
-            {/* 目标端口 - 可以接收连接的端口 */}
-            <Handle
-              type="target"
-              position={getPortPosition(port.position.side, rotation)}
-              id={port.id}
-              style={{
-                ...getPortStyle(port),
-                background: 'transparent', // 透明背景，只有边框可见
-                pointerEvents: 'all', // 确保可以接收鼠标事件
-                zIndex: 10,
-                cursor: 'crosshair'
-              }}
-              isConnectable={true}
-            />
-          </React.Fragment>
-        ))}
-
+        {/* 先渲染SVG元件，确保它在端口下方 */}
         <div className="absolute inset-0 flex items-center justify-center">
           {renderSvgComponent()}
         </div>
+        
+        {/* 渲染所有端口 */}
+        {ports.map((port: Port) => {
+          // 获取基础端口样式
+          const basePortStyle = getPortStyle(port);
+          // 应用特定元件的端口位置修正
+          const portStyle = getFixedPortStyle(port, basePortStyle);
+          const portPosition = getPortPosition(port.position.side, rotation);
+          const isInput = port.type === 'input' || port.type === 'bidirectional';
+          const isOutput = port.type === 'output' || port.type === 'bidirectional';
+          
+          return (
+            <React.Fragment key={port.id}>
+              {/* 渲染物理可见的端口标记点 */}
+              <div
+                className="circuit-port-marker"
+                style={{
+                  ...portStyle,
+                  pointerEvents: 'none', // 不接收鼠标事件，避免干扰连线
+                  // 突出显示端口
+                  border: '2px solid #3B82F6',
+                  background: '#fff',
+                }}
+                data-port-id={port.id}
+                data-port-type={port.type}
+                data-rotation={rotation}
+              />
+              
+              {/* 输入端口句柄 - 只有输入类型的端口才能接收连线 */}
+              {isInput && (
+                <Handle
+                  type="target"
+                  position={portPosition}
+                  id={port.id}
+                  style={{
+                    ...portStyle,
+                    background: 'transparent', // 透明背景
+                    width: 16, // 增大点击区域，但保持视觉上不变
+                    height: 16,
+                    zIndex: 5,
+                    border: '2px solid transparent',
+                  }}
+                  isConnectable={true}
+                />
+              )}
+              
+              {/* 输出端口句柄 - 只有输出类型的端口才能发起连线 */}
+              {isOutput && (
+                <Handle
+                  type="source"
+                  position={portPosition}
+                  id={port.id}
+                  style={{
+                    ...portStyle,
+                    background: 'transparent', // 透明背景
+                    width: 16, // 增大点击区域，但保持视觉上不变
+                    height: 16,
+                    zIndex: 5,
+                    border: '2px solid transparent',
+                  }}
+                  isConnectable={true}
+                />
+              )}
+            </React.Fragment>
+          );
+        })}
       </div>
 
       <div className="absolute -bottom-6 left-1/2 transform -translate-x-1/2">

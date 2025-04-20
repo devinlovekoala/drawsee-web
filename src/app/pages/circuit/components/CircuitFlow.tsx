@@ -160,6 +160,49 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'doubao' }:
   const navigate = useNavigate();
   const { handleBlankQuery, handleAiTaskCountPlus, userInfo } = useAppContext();
   
+  // 监听节点旋转事件，更新连线
+  useEffect(() => {
+    const handleNodeRotated = (event: CustomEvent) => {
+      const { nodeId, rotation } = event.detail;
+      
+      // 找到与旋转节点相关的所有边
+      const relatedEdges = edges.filter(
+        edge => edge.source === nodeId || edge.target === nodeId
+      );
+      
+      if (relatedEdges.length > 0) {
+        // 强制边重新渲染
+        setEdges(currentEdges => {
+          return currentEdges.map(edge => {
+            if (edge.source === nodeId || edge.target === nodeId) {
+              return {
+                ...edge,
+                data: {
+                  ...edge.data,
+                  updateRotation: rotation,
+                  updateTimestamp: Date.now()
+                }
+              };
+            }
+            return edge;
+          });
+        });
+        
+        // 轻微延迟后重新计算流程图视图
+        setTimeout(() => {
+          reactFlowInstance.setNodes([...reactFlowInstance.getNodes()]);
+        }, 10);
+      }
+    };
+    
+    // 添加自定义事件监听
+    document.addEventListener('circuit-node-rotated', handleNodeRotated as EventListener);
+    
+    return () => {
+      document.removeEventListener('circuit-node-rotated', handleNodeRotated as EventListener);
+    };
+  }, [edges, reactFlowInstance]);
+  
   // 处理节点变更
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => setNodes((nds) => applyNodeChanges(changes, nds)),
@@ -484,6 +527,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'doubao' }:
   const rotateSelectedNode = useCallback(() => {
     if (!selectedNodeId) return;
 
+    // 先更新节点的旋转状态
     setNodes((nds) =>
       nds.map((node) => {
         if (node.id === selectedNodeId) {
@@ -508,34 +552,51 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'doubao' }:
       })
     );
     
-    // 更新连接到旋转节点的边，强制重新计算位置
+    // 等待DOM更新并处理连线重绘
     setTimeout(() => {
+      // 强制触发ReactFlow内部更新
+      reactFlowInstance.setNodes(reactFlowInstance.getNodes());
+      
       // 找到与选中节点相关的所有边
       const relatedEdges = edges.filter(
         edge => edge.source === selectedNodeId || edge.target === selectedNodeId
       );
       
       if (relatedEdges.length > 0) {
-        // 创建新的边数组，使ReactFlow重新计算边的路径
-        setEdges(currentEdges => {
-          return currentEdges.map(edge => {
-            if (edge.source === selectedNodeId || edge.target === selectedNodeId) {
-              // 为相关的边设置一个新的key触发更新
-              return {
-                ...edge,
-                // 添加一个时间戳作为临时数据，迫使ReactFlow重新计算路径
-                data: {
-                  ...edge.data,
-                  updateTimestamp: Date.now()
-                }
-              };
-            }
-            return edge;
-          });
-        });
+        // 首先删除所有相关的边，稍后会重新创建它们
+        setEdges(currentEdges => 
+          currentEdges.filter(edge => 
+            edge.source !== selectedNodeId && edge.target !== selectedNodeId
+          )
+        );
+        
+        // 稍微延迟后重新创建这些边，以便ReactFlow能重新计算连接点位置
+        setTimeout(() => {
+          setEdges(currentEdges => [
+            ...currentEdges,
+            ...relatedEdges.map(edge => ({
+              ...edge,
+              id: `${edge.id}-${Date.now()}`, // 创建新的ID以确保ReactFlow重新渲染
+              // 强制标记为需要重新计算
+              data: {
+                ...edge.data,
+                forceRefresh: true,
+                updateTimestamp: Date.now(),
+              }
+            }))
+          ]);
+          
+          // 再次强制ReactFlow重新计算所有位置
+          setTimeout(() => {
+            reactFlowInstance.fitView({ duration: 0, padding: 0.1 });
+          }, 50);
+        }, 50);
+      } else {
+        // 即使没有相关边，也强制刷新视图以确保端口位置正确
+        reactFlowInstance.fitView({ duration: 0, padding: 0.1 });
       }
-    }, 50); // 短暂延迟以确保旋转先完成
-  }, [selectedNodeId, setNodes, edges, setEdges]);
+    }, 100);
+  }, [selectedNodeId, setNodes, edges, setEdges, reactFlowInstance]);
   
   // 删除选中的节点
   const deleteSelectedNode = useCallback(() => {
