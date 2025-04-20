@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { EdgeProps, ConnectionLineComponentProps, getSmoothStepPath } from 'reactflow';
 
 // 统一边缘线样式
@@ -41,17 +41,20 @@ export function ConnectionEdge({
   animated,
   data,
 }: EdgeProps) {
-  // 使用getSmoothStepPath创建直角转弯的路径，并添加偏移以避开节点
-  const [edgePath] = getSmoothStepPath({
-    sourceX,
-    sourceY,
-    sourcePosition,
-    targetX,
-    targetY,
-    targetPosition,
-    borderRadius: 0, // 设置为0以获得直角转弯
-    offset: 15, // 添加偏移以避开节点
-  });
+  // 使用useMemo缓存路径计算，确保每次位置改变时都重新计算
+  const edgePath = useMemo(() => {
+    const [path] = getSmoothStepPath({
+      sourceX,
+      sourceY,
+      sourcePosition,
+      targetX,
+      targetY,
+      targetPosition,
+      borderRadius: 0, // 设置为0以获得直角转弯
+      offset: 15, // 添加偏移以避开节点
+    });
+    return path;
+  }, [sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition]);
 
   // 合并默认样式和自定义样式，根据是否选中应用不同样式
   const customStyle = {
@@ -102,17 +105,20 @@ export function ConnectionPreview({
   toY,
   toPosition,
 }: ConnectionLineComponentProps) {
-  // 使用getSmoothStepPath创建直角转弯的预览路径
-  const [path] = getSmoothStepPath({
-    sourceX: fromX,
-    sourceY: fromY,
-    sourcePosition: fromPosition,
-    targetX: toX,
-    targetY: toY,
-    targetPosition: toPosition,
-    borderRadius: 0, // 设置为0以获得直角转弯
-    offset: 15, // 添加偏移以避开节点
-  });
+  // 使用useMemo缓存预览路径计算
+  const path = useMemo(() => {
+    const [previewPath] = getSmoothStepPath({
+      sourceX: fromX,
+      sourceY: fromY,
+      sourcePosition: fromPosition,
+      targetX: toX,
+      targetY: toY,
+      targetPosition: toPosition,
+      borderRadius: 0, // 设置为0以获得直角转弯
+      offset: 15, // 添加偏移以避开节点
+    });
+    return previewPath;
+  }, [fromX, fromY, toX, toY, fromPosition, toPosition]);
 
   return (
     <g>

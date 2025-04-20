@@ -1,6 +1,6 @@
 'use client';
 
-import React, { memo, useMemo } from 'react';
+import React, { memo, useMemo, useEffect } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
 import { CircuitElement, CircuitElementType, ComponentVisualConfig } from '@/api/types/circuit.types';
 
@@ -445,6 +445,17 @@ export const CircuitNode = memo(({ data, id }: NodeProps<CircuitNodeData>) => {
   
   // 获取元件当前的旋转角度
   const rotation = data.element?.rotation || 0;
+
+  // 添加副作用来处理旋转变化
+  useEffect(() => {
+    // 当旋转角度变化时，触发DOM更新以便ReactFlow重新计算边的位置
+    // 这一步很重要，因为ReactFlow需要检测到DOM变化才能重新计算边
+    const handles = document.querySelectorAll(`[data-nodeid="${id}"] .react-flow__handle`);
+    handles.forEach(handle => {
+      // 触发一个无害的DOM变化
+      handle.setAttribute('data-rotation', `${rotation}`);
+    });
+  }, [rotation, id]);
 
   // 根据旋转角度计算端口位置
   const getPortPosition = (side: 'left' | 'right' | 'top' | 'bottom', rotation: number): Position => {

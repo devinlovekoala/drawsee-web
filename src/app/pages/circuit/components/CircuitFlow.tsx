@@ -426,14 +426,6 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'doubao' }:
         return;
       }
       
-      // 验证电路是否有接地元件
-      const hasGround = circuitDesign.elements.some(el => el.type === CircuitElementType.GROUND);
-      if (!hasGround) {
-        message.error('电路中没有接地元件(GND)，请先添加接地点');
-        setIsAnalyzing(false);
-        return;
-      }
-      
       // 创建AI任务
       const createAiTaskDTO: CreateAiTaskDTO = {
         type: 'CIRCUIT_ANALYSIS',
@@ -472,8 +464,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'doubao' }:
                 <ul>
                   <li>检查电路是否有完整的闭合回路</li>
                   <li>确保所有元件的参数设置合理</li>
-                  <li>您可能需要连接接地或补充缺失的元件</li>
-                  <li>确保电路有接地点(GND)元件</li>
+                  <li>您可能需要补充缺失的元件</li>
                 </ul>
                 <p>技术错误信息: {error.message}</p>
               </div>
@@ -516,7 +507,35 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'doubao' }:
         return node;
       })
     );
-  }, [selectedNodeId, setNodes]);
+    
+    // 更新连接到旋转节点的边，强制重新计算位置
+    setTimeout(() => {
+      // 找到与选中节点相关的所有边
+      const relatedEdges = edges.filter(
+        edge => edge.source === selectedNodeId || edge.target === selectedNodeId
+      );
+      
+      if (relatedEdges.length > 0) {
+        // 创建新的边数组，使ReactFlow重新计算边的路径
+        setEdges(currentEdges => {
+          return currentEdges.map(edge => {
+            if (edge.source === selectedNodeId || edge.target === selectedNodeId) {
+              // 为相关的边设置一个新的key触发更新
+              return {
+                ...edge,
+                // 添加一个时间戳作为临时数据，迫使ReactFlow重新计算路径
+                data: {
+                  ...edge.data,
+                  updateTimestamp: Date.now()
+                }
+              };
+            }
+            return edge;
+          });
+        });
+      }
+    }, 50); // 短暂延迟以确保旋转先完成
+  }, [selectedNodeId, setNodes, edges, setEdges]);
   
   // 删除选中的节点
   const deleteSelectedNode = useCallback(() => {
