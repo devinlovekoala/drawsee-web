@@ -284,8 +284,13 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'doubao' }:
       // 生成唯一ID
       const nodeId = getNewNodeId();
       
-      // 节点标签
-      const elementLabel = `${type}${nodeIdCounter - 1}`;
+      // 获取枚举键名，用于节点标签
+      const elementTypeKey = Object.keys(CircuitElementType).find(
+        key => CircuitElementType[key as keyof typeof CircuitElementType] === type
+      ) || String(type);
+      
+      // 节点标签 - 使用枚举名称作为前缀
+      const elementLabel = `${elementTypeKey}${nodeIdCounter - 1}`;
       
       // 获取节点默认值
       const defaultValues: Record<string, string> = {
@@ -311,7 +316,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'doubao' }:
       // 创建完整的CircuitElement对象
       const element: CircuitElement = {
         id: nodeId,
-        type,
+        type, // 直接使用 CircuitElementType 枚举值，这是合法的
         position: { x: position.x, y: position.y },
         rotation: 0,
         ports,
@@ -351,14 +356,39 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'doubao' }:
       const elements = nodes.map(node => {
         // 如果节点已经包含完整的element数据，直接使用
         if (node.data.element) {
-          return {
+          const elementData = { 
             ...node.data.element,
-            position: node.position // 确保位置是最新的
+            position: node.position, // 确保位置是最新的
           };
+          
+          // 确保元件类型正确
+          const validTypes = Object.values(CircuitElementType);
+          if (!validTypes.includes(elementData.type as CircuitElementType)) {
+            console.warn(`元件类型 ${elementData.type} 不在预定义类型中，请检查`);
+          }
+          
+          // 确保element.properties中必须有resistance/voltage等标准属性
+          if (!elementData.properties.hasOwnProperty('value') && elementData.value) {
+            elementData.properties.value = elementData.value;
+          }
+          
+          if (!elementData.properties.hasOwnProperty('label') && elementData.label) {
+            elementData.properties.label = elementData.label;
+          }
+          
+          // 确保每个端口都有正确的position属性
+          elementData.ports = elementData.ports.map((port: Port) => {
+            if (!port.position.hasOwnProperty('align')) {
+              port.position.align = 'center';
+            }
+            return port;
+          });
+          
+          return elementData;
         }
         
-        // 获取节点类型
-        const nodeType = node.data.type as CircuitElementType;
+        // 获取节点类型，确保类型符合后端期望
+        const nodeType = node.data.type;
         
         // 默认值设置
         const defaultValues: Record<string, string> = {
@@ -374,24 +404,36 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'doubao' }:
           [CircuitElementType.OPAMP]: '',
         };
         
-        // 获取默认端口配置
-        const nodePorts = nodeType in defaultPorts 
+        // 根据节点类型获取默认端口配置
+        const ports = (nodeType in defaultPorts) 
           ? [...(defaultPorts[nodeType as keyof typeof defaultPorts] || [])]
           : [];
         
-        // 构造元件对象
+        // 确保端口配置符合文档规范
+        const standardizedPorts = ports.map((port: Port) => ({
+          ...port,
+          position: {
+            ...port.position,
+            align: port.position.align || 'center'
+          }
+        }));
+        
+        // 构造符合文档规范的CircuitElement对象
+        const elementValue = node.data.value || defaultValues[nodeType as CircuitElementType] || '';
+        const elementLabel = node.data.label || `${nodeType}${node.id.replace('node-', '')}`;
+        
         return {
           id: node.id,
           type: nodeType,
           position: node.position,
-          rotation: 0,
-          label: node.data.label,
-          value: node.data.value || defaultValues[nodeType] || '',
-          ports: nodePorts,
+          rotation: node.data.element?.rotation || 0,
+          ports: standardizedPorts,
           properties: {
-            value: node.data.value || defaultValues[nodeType] || '',
-            label: node.data.label
-          }
+            value: elementValue,  // 元件值（如电阻值、电压值）
+            label: elementLabel   // 元件标签
+          },
+          label: elementLabel,
+          value: elementValue
         };
       });
 
@@ -408,7 +450,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'doubao' }:
         }
       }));
 
-      // 创建电路设计对象
+      // 创建符合文档规范的电路设计对象
       const circuitDesign: CircuitDesign = {
         elements,
         connections,
@@ -469,10 +511,30 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'doubao' }:
         return;
       }
       
-      // 创建AI任务
+      // 深拷贝电路设计，以便修改而不影响原始对象
+      const processedCircuitDesign = JSON.parse(JSON.stringify(circuitDesign));
+      
+      // 确保所有元件类型在 CircuitElementType 枚举中
+      const validTypes = Object.values(CircuitElementType);
+      
+      // 检查是否有无效的元件类型
+      const invalidElements = processedCircuitDesign.elements.filter(
+        (element: any) => !validTypes.includes(element.type)
+      );
+      
+      if (invalidElements.length > 0) {
+        const invalidTypes = invalidElements.map((e: any) => e.type).join(', ');
+        message.error(`电路包含无效的元件类型：${invalidTypes}`);
+        console.error('无效的元件类型：', invalidElements);
+        setIsAnalyzing(false);
+        return;
+      }
+      
+      // 按照文档规范构造电路分析任务数据
       const createAiTaskDTO: CreateAiTaskDTO = {
-        type: 'CIRCUIT_ANALYSIS',
-        prompt: JSON.stringify(circuitDesign),
+        type: 'CIRCUIT_ANALYSIS', // 实际API使用CIRCUIT_ANALYSIS
+        // 按照文档规范，prompt需要是具有特定格式的对象
+        prompt: JSON.stringify(processedCircuitDesign),
         promptParams: {},
         convId: null,
         parentId: null,
@@ -507,7 +569,8 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'doubao' }:
                 <ul>
                   <li>检查电路是否有完整的闭合回路</li>
                   <li>确保所有元件的参数设置合理</li>
-                  <li>您可能需要补充缺失的元件</li>
+                  <li>您可能需要补充缺失的元件（如接地元件）</li>
+                  <li>检查元件类型是否与API预期一致</li>
                 </ul>
                 <p>技术错误信息: {error.message}</p>
               </div>

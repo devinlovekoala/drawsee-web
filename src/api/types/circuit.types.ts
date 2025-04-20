@@ -39,6 +39,9 @@ export interface Port {
   position: PortPosition;
 }
 
+// CircuitPort 类型别名（等同于 Port 接口）
+export type CircuitPort = Port;
+
 // 电路元件定义
 export interface CircuitElement {
   id: string;
