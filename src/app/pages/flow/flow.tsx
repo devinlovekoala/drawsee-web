@@ -4,7 +4,10 @@ import QueryNode from "@/app/pages/flow/components/node/QueryNode";
 import AnswerNode from "@/app/pages/flow/components/node/AnswerNode";
 import KnowledgeHeadNode from "@/app/pages/flow/components/node/KnowledgeHeadNode";
 import KnowledgeDetailNode from "@/app/pages/flow/components/node/KnowledgeDetailNode";
-import CircuitAnalysisNode from "@/app/pages/flow/components/node/CircuitAnalysisNode";
+import CircuitBasicAnalysisNode from "@/app/pages/flow/components/node/CircuitBasicAnalysisNode";
+import CircuitNodeAnalysisNode from "@/app/pages/flow/components/node/CircuitNodeAnalysisNode";
+import CircuitFunctionNode from "@/app/pages/flow/components/node/CircuitFunctionNode";
+import CircuitOptimizationNode from "@/app/pages/flow/components/node/CircuitOptimizationNode";
 import AnswerPointNode from "@/app/pages/flow/components/node/AnswerPointNode";
 import AnswerDetailNode from "@/app/pages/flow/components/node/AnswerDetailNode";
 import {useCallback, useState, useEffect} from "react";
@@ -41,7 +44,11 @@ const nodeTypes = {
   'knowledge-head': KnowledgeHeadNode,
   'knowledge-detail': KnowledgeDetailNode,
   'resource': ResourceNode,
-  'circuit-analysis': CircuitAnalysisNode,
+  // 电路分析节点类型
+  'CIRCUIT_BASIC': CircuitBasicAnalysisNode,    // 电路基本分析节点
+  'CIRCUIT_NODE_ANALYSIS': CircuitNodeAnalysisNode, // 电路节点分析节点
+  'CIRCUIT_FUNCTION': CircuitFunctionNode,      // 电路功能分析节点
+  'CIRCUIT_OPTIMIZATION': CircuitOptimizationNode, // 电路优化建议节点
 } as const;
 
 function Flow() {

@@ -22,13 +22,27 @@ export interface QueryNodeData extends BaseNodeData {
   [key: string]: unknown;
 }
 
-type AnswerSubType = 'solver-first' | 'solver-continue' | 'solver-summary' | 'html-maker' | 'planner-first' | 'planner-split' | 'animation' | 'ANSWER_POINT' | 'ANSWER_DETAIL';
+type AnswerSubType = 
+  | 'solver-first' 
+  | 'solver-continue' 
+  | 'solver-summary' 
+  | 'html-maker' 
+  | 'planner-first' 
+  | 'planner-split' 
+  | 'animation' 
+  | 'ANSWER_POINT' 
+  | 'ANSWER_DETAIL'
+  | 'CIRCUIT_BASIC'
+  | 'CIRCUIT_NODE_ANALYSIS'
+  | 'CIRCUIT_FUNCTION'
+  | 'CIRCUIT_OPTIMIZATION';
 
 export interface AnswerNodeData extends BaseNodeData {
   subtype?: AnswerSubType;
   isDone?: boolean;
   isGenerated?: boolean;
   angle?: string;
+  progress?: string;
   [key: string]: unknown;
 }
 

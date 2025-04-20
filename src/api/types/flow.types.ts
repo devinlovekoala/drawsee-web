@@ -1,4 +1,4 @@
-export type NodeType = "root" | "query" | "answer" | "answer-point" | "answer-detail" | "ANSWER_POINT" | "ANSWER_DETAIL" | "knowledge-head" | "knowledge-detail" | "resource";
+export type NodeType = "root" | "query" | "answer" | "answer-point" | "answer-detail" | "ANSWER_POINT" | "ANSWER_DETAIL" | "knowledge-head" | "knowledge-detail" | "resource" | "CIRCUIT_BASIC" | "CIRCUIT_NODE_ANALYSIS" | "CIRCUIT_FUNCTION" | "CIRCUIT_OPTIMIZATION";
 
 export interface ConversationVO {
   id: number;
@@ -36,6 +36,23 @@ type KnowledgeDetailNodeData = BaseNodeData;
 
 type AnimationNodeData = BaseNodeData;
 
+// 电路节点数据类型
+interface CircuitBasicNodeData extends BaseNodeData {
+  subtype: 'CIRCUIT_BASIC';
+}
+
+interface CircuitNodeAnalysisNodeData extends BaseNodeData {
+  subtype: 'CIRCUIT_NODE_ANALYSIS';
+}
+
+interface CircuitFunctionNodeData extends BaseNodeData {
+  subtype: 'CIRCUIT_FUNCTION';
+}
+
+interface CircuitOptimizationNodeData extends BaseNodeData {
+  subtype: 'CIRCUIT_OPTIMIZATION';
+}
+
 export type ResourceSubType = "bilibili" | "animation" | "generated-animation";
 
 interface BilibiliResourceNodeData extends BaseNodeData {
@@ -72,6 +89,10 @@ export type NodeData = {
   'knowledge-detail': KnowledgeDetailNodeData;
   'animation': AnimationNodeData;
   'resource': ResourceNodeData;
+  'CIRCUIT_BASIC': CircuitBasicNodeData;
+  'CIRCUIT_NODE_ANALYSIS': CircuitNodeAnalysisNodeData;
+  'CIRCUIT_FUNCTION': CircuitFunctionNodeData;
+  'CIRCUIT_OPTIMIZATION': CircuitOptimizationNodeData;
 }
 
 export interface NodeVO {
