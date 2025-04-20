@@ -153,6 +153,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'doubao' }:
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [currentModel, setCurrentModel] = useState<ModelType>(selectedModel as ModelType);
+  const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
   
   const reactFlowInstance = useReactFlow();
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
@@ -167,8 +168,17 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'doubao' }:
 
   // 处理边变更
   const onEdgesChange = useCallback(
-    (changes: EdgeChange[]) => setEdges((eds) => applyEdgeChanges(changes, eds)),
-    []
+    (changes: EdgeChange[]) => {
+      setEdges((eds) => {
+        const newEdges = applyEdgeChanges(changes, eds);
+        // 如果选中的边被删除，清除选中状态
+        if (selectedEdgeId && !newEdges.some(edge => edge.id === selectedEdgeId)) {
+          setSelectedEdgeId(null);
+        }
+        return newEdges;
+      });
+    },
+    [selectedEdgeId]
   );
 
   // 处理连接创建
@@ -179,6 +189,9 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'doubao' }:
         message.warning('无效的连接，请确保正确连接两个端口');
         return;
       }
+
+      // 清除之前选中的边缘
+      setSelectedEdgeId(null);
 
       // 检查是否已存在相同的连接
       const connectionExists = edges.some(
@@ -194,16 +207,24 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'doubao' }:
         return;
       }
 
+      // 检查是否连接到同一个节点上的不同端口
+      if (connection.source === connection.target) {
+        // 允许同一节点上的端口相连，适用于某些电路设计（如电阻自连）
+        console.log('同一节点上的端口相连:', connection);
+      }
+
       // 创建新的边对象
       const newEdge = {
         ...connection,
         id: `edge-${connection.source}-${connection.sourceHandle}-${connection.target}-${connection.targetHandle}`,
         type: 'default',
         animated: false,
-        style: { stroke: '#334155', strokeWidth: 2 },
+        style: { stroke: '#3B82F6', strokeWidth: 2 },
+        data: { label: '连线' }
       };
       
       setEdges((eds) => addEdge(newEdge, eds));
+      message.success('连接成功', 0.5);
     },
     [edges]
   );
@@ -522,9 +543,35 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'doubao' }:
     setSelectedNodeId(node.id);
   }, []);
   
-  // 处理画布点击（取消选择）
+  // 处理边点击
+  const onEdgeClick = useCallback((e: React.MouseEvent, edge: Edge) => {
+    setSelectedEdgeId(edge.id);
+    // 取消选中节点
+    setSelectedNodeId(null);
+    e.stopPropagation();
+  }, []);
+  
+  // 处理删除键按下
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if ((e.key === 'Delete' || e.key === 'Backspace') && selectedEdgeId) {
+      setEdges((eds) => eds.filter((edge) => edge.id !== selectedEdgeId));
+      setSelectedEdgeId(null);
+      message.info('连线已删除');
+    }
+  }, [selectedEdgeId]);
+  
+  // 添加键盘事件监听
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [handleKeyDown]);
+  
+  // 添加画布点击处理以取消选择
   const onPaneClick = useCallback(() => {
     setSelectedNodeId(null);
+    setSelectedEdgeId(null);
   }, []);
   
   // 注册快捷键
@@ -538,8 +585,20 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'doubao' }:
     deleteSelectedNode();
   }, [deleteSelectedNode]);
 
+  // 添加边缘选中状态的更新逻辑
+  useEffect(() => {
+    if (selectedEdgeId) {
+      setEdges((eds) =>
+        eds.map((edge) => ({
+          ...edge,
+          selected: edge.id === selectedEdgeId,
+        }))
+      );
+    }
+  }, [selectedEdgeId]);
+
   return (
-    <div style={{ width: '100%', height: '80vh' }} ref={reactFlowWrapper}>
+    <div ref={reactFlowWrapper} style={{ width: '100%', height: '100%' }}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -549,35 +608,50 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'doubao' }:
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         connectionLineComponent={ConnectionPreview}
-        onNodeClick={onNodeClick}
-        onPaneClick={onPaneClick}
+        deleteKeyCode={['Backspace', 'Delete']}
+        multiSelectionKeyCode={['Control', 'Meta']}
+        snapToGrid={true}
+        snapGrid={[15, 15]}
+        defaultViewport={{ x: 0, y: 0, zoom: 1 }}
         fitView
+        attributionPosition="bottom-left"
+        // @ts-ignore
+        connectionMode="loose"
+        defaultMarkerColor="#3B82F6"
+        connectOnClick={true}
+        connectionRadius={20}
+        isValidConnection={() => true}
+        onNodeClick={(_, node) => setSelectedNodeId(node.id)}
+        onEdgeClick={onEdgeClick}
+        onPaneClick={onPaneClick}
+        elementsSelectable={true}
+        selectNodesOnDrag={false}
+        edgesFocusable={true}
+        edgesUpdatable={true}
       >
-        <Background color="#aaa" gap={16} />
+        <Background />
         <Controls />
-        
-        <Panel position="top-left">
-          <Space wrap>
+        <Panel position="top-left" style={{ marginLeft: '10px', marginTop: '10px' }}>
+          <Space wrap direction="horizontal">
             <Dropdown
               menu={{
-                items: elementMenuItems,
-                onClick: ({ key }) => addNewNode(key as CircuitElementType),
+                items: elementMenuItems.map(item => ({
+                  key: item.key,
+                  label: item.label,
+                  onClick: () => addNewNode(item.key as CircuitElementType)
+                })),
               }}
+              placement="bottomLeft"
             >
-              <Button type="primary">
-                <Space>
-                  <PlusOutlined />
-                  添加元件
-                  <DownOutlined />
-                </Space>
+              <Button type="primary" icon={<PlusOutlined />}>
+                添加元件 <DownOutlined />
               </Button>
             </Dropdown>
-            
-            <ModelSelector 
+            <Button onClick={() => setEdges([])} danger>清除所有连接</Button>
+            <ModelSelector
               selectedModel={currentModel}
               onModelChange={setCurrentModel}
             />
-            
             <Button 
               icon={<PlayCircleOutlined />} 
               onClick={handleAnalyzeCircuit}
@@ -602,6 +676,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'doubao' }:
       }}>
         <div>Ctrl+R: 旋转元件</div>
         <div>Delete/Ctrl+D: 删除元件</div>
+        <div>Delete/Backspace: 删除选中连线</div>
       </div>
       
       {isAnalyzing && (

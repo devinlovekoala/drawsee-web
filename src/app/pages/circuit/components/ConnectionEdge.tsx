@@ -1,11 +1,11 @@
 'use client';
 
 import React from 'react';
-import { EdgeProps, ConnectionLineComponentProps, getBezierPath, getSmoothStepPath } from 'reactflow';
+import { EdgeProps, ConnectionLineComponentProps, getSmoothStepPath } from 'reactflow';
 
 // 统一边缘线样式
 const edgeStyles = {
-  stroke: '#555',
+  stroke: '#3B82F6',  // 使用蓝色而不是灰色
   strokeWidth: 2,
   fill: 'none',
 };
@@ -13,9 +13,17 @@ const edgeStyles = {
 // 预览线样式
 const previewLineStyle = {
   stroke: '#3B82F6',
-  strokeWidth: 2,
-  strokeDasharray: '5 5',
+  strokeWidth: 2.5,
+  strokeDasharray: '5 3',
   fill: 'none',
+  filter: 'drop-shadow(0px 0px 2px rgba(59, 130, 246, 0.5))',
+};
+
+// 选中状态的边缘线样式
+const selectedEdgeStyles = {
+  ...edgeStyles,
+  stroke: '#F59E0B', // 选中时使用橙色
+  strokeWidth: 3,
 };
 
 // 连接线组件 - 用于已经建立的连接
@@ -29,21 +37,25 @@ export function ConnectionEdge({
   targetPosition,
   style = {},
   markerEnd,
+  selected,
+  animated,
+  data,
 }: EdgeProps) {
-  // 使用getBezierPath创建平滑的曲线路径
-  const [edgePath] = getBezierPath({
+  // 使用getSmoothStepPath创建直角转弯的路径，并添加偏移以避开节点
+  const [edgePath] = getSmoothStepPath({
     sourceX,
     sourceY,
     sourcePosition,
     targetX,
     targetY,
     targetPosition,
-    curvature: 0.25, // 控制曲线的曲率
+    borderRadius: 0, // 设置为0以获得直角转弯
+    offset: 15, // 添加偏移以避开节点
   });
 
-  // 合并默认样式和自定义样式
+  // 合并默认样式和自定义样式，根据是否选中应用不同样式
   const customStyle = {
-    ...edgeStyles,
+    ...(selected ? selectedEdgeStyles : edgeStyles),
     ...style,
   };
 
@@ -56,11 +68,24 @@ export function ConnectionEdge({
         d={edgePath}
         markerEnd={markerEnd}
       />
+      {animated && (
+        <path
+          id={`${id}-animation`}
+          style={{
+            ...customStyle,
+            strokeDasharray: '5 5',
+            strokeDashoffset: 0,
+            animation: 'flow 1s linear infinite',
+          }}
+          className="react-flow__edge-path-animation"
+          d={edgePath}
+        />
+      )}
       <circle
         cx={targetX}
         cy={targetY}
         r={3}
-        fill="#3B82F6"
+        fill={selected ? '#F59E0B' : '#3B82F6'}
         stroke="#fff"
         strokeWidth={1.5}
       />
@@ -77,7 +102,7 @@ export function ConnectionPreview({
   toY,
   toPosition,
 }: ConnectionLineComponentProps) {
-  // 使用getSmoothStepPath函数创建平滑的步进路径
+  // 使用getSmoothStepPath创建直角转弯的预览路径
   const [path] = getSmoothStepPath({
     sourceX: fromX,
     sourceY: fromY,
@@ -85,12 +110,14 @@ export function ConnectionPreview({
     targetX: toX,
     targetY: toY,
     targetPosition: toPosition,
-    borderRadius: 10, // 控制拐角的圆角半径
+    borderRadius: 0, // 设置为0以获得直角转弯
+    offset: 15, // 添加偏移以避开节点
   });
 
   return (
     <g>
       <path style={previewLineStyle} d={path} />
+      <circle cx={toX} cy={toY} r={4} fill="#3B82F6" stroke="#fff" strokeWidth={1.5} />
     </g>
   );
 }
