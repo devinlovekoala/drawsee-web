@@ -1,6 +1,7 @@
 import React, { useMemo, useEffect } from 'react';
 import { BaseNode, ExtendedNodeProps } from './base/BaseNode';
 import { CircuitDetailData } from './types/circuitNode.types';
+import { useFlowContext } from '@/app/contexts/FlowContext';
 
 /**
  * 电路分析详情节点组件
@@ -8,11 +9,32 @@ import { CircuitDetailData } from './types/circuitNode.types';
  */
 function CircuitDetailNode({ data, ...props }: ExtendedNodeProps<'circuit-detail'>) {
   const nodeData = data as unknown as CircuitDetailData;
+  const { addChatTask } = useFlowContext();
   
   // 添加日志显示接收到的数据
   useEffect(() => {
-    console.log('CircuitDetailNode received data:', nodeData);
-  }, [nodeData]);
+    console.log('CircuitDetailNode接收数据，ID:', props.id);
+    
+    // 如果有父节点ID，更新父节点的isGenerated状态
+    if (nodeData.parentPointId) {
+      // 仅在组件首次加载时更新父节点状态，避免重复更新导致布局变形
+      const parentId = parseInt(nodeData.parentPointId);
+      console.log('更新父节点状态:', parentId);
+      
+      // 使用一个小延时确保父节点已存在
+      setTimeout(() => {
+        addChatTask({
+          type: 'data',
+          data: {
+            nodeId: parentId,
+            isGenerated: true
+          }
+        });
+      }, 100);
+    }
+    // 只在组件挂载时执行一次
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   
   // 添加角度信息到标题
   const headerContent = useMemo(() => {

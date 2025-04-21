@@ -67,10 +67,12 @@ function CircuitPointNode({ data, ...props }: ExtendedNodeProps<'circuit-point'>
 
   // 处理电路详情生成
   const handleCircuitDetailGeneration = () => {
+    // 再次检查聊天状态，确保可以继续
     if (isChatting) {
       toast.error('正在聊天中，请先完成当前对话');
       return;
     }
+    
     if (isGenerated) {
       toast.error('已经生成，请勿重复生成');
       return;
@@ -81,7 +83,7 @@ function CircuitPointNode({ data, ...props }: ExtendedNodeProps<'circuit-point'>
     const createAiTaskDTO: CreateAiTaskDTO = {
       type: "CIRCUIT_DETAIL",
       prompt: nodeData.text || "请对该电路分析点进行详细解析",
-      promptParams: {},
+      promptParams: null, // 修改为null以符合API类型规范
       convId: convId,
       parentId: parseInt(props.id),
       model: selectedModel
@@ -92,28 +94,25 @@ function CircuitPointNode({ data, ...props }: ExtendedNodeProps<'circuit-point'>
       toast.success("电路分析已发送");
       handleAiTaskCountPlus();
       
-      // 先在本地更新节点状态
+      // 先在本地更新节点状态，避免重复请求
       setIsGenerated(true);
       
       // 打印调试信息
       console.log('电路详情AI任务创建成功，taskId:', response.taskId, '节点ID:', props.id);
       
-      // 更新节点数据
-      addChatTask({
-        type: 'data',
-        data: {
-          nodeId: parseInt(props.id),
-          isGenerated: true
-        }
-      });
+      // 不立即更新节点数据，让服务器响应统一更新
+      // CircuitDetailNode组件会在挂载时更新父节点状态
+      // 这样可以避免重复更新导致布局变形
       
-      // 延迟一点再开始聊天，确保前面的数据更新已处理
+      // 减少延迟时间，与AnswerPointNode保持一致
       setTimeout(() => {
         console.log('开始获取电路详情流式响应，taskId:', response.taskId);
         chat(response.taskId);
-      }, 500);
+      }, 200);
     }).catch(error => {
       console.error('电路详情AI任务失败', error);
+      // 重置生成状态
+      setIsGenerated(false);
       toast.error(error.response?.data?.message || error.message || "创建任务失败，请重试");
     }).finally(() => {
       setIsLoading(false); // 请求完成后重置加载状态
