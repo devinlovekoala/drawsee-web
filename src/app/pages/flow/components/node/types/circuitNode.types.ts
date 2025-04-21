@@ -1,62 +1,35 @@
 import { AnswerNodeData } from './node.types';
+import { CircuitDesign } from '@/api/types/circuit.types';
 
 /**
- * 电路基本分析节点数据类型
+ * 电路画布节点数据类型
+ * 用于展示电路设计图
  */
-export interface CircuitBasicAnalysisData extends AnswerNodeData {
-  subtype: 'CIRCUIT_BASIC';
-  // 基础分析信息
-  progress?: string;
-  basicAnalysis?: string;
-  circuitInfo?: {
-    componentCount?: number;
-    nodeCount?: number;
-    loopCount?: number;
-    powerSources?: string[];
-  };
+export interface CircuitCanvasData extends AnswerNodeData {
+  subtype: 'circuit-canvas';
+  circuitDesign?: CircuitDesign; // 电路设计数据
+  mode?: string;
 }
 
 /**
- * 电路节点分析数据类型
+ * 电路分析点数据类型
+ * 用于显示电路分析的不同角度或重点
  */
-export interface CircuitNodeAnalysisData extends AnswerNodeData {
-  subtype: 'CIRCUIT_NODE_ANALYSIS';
-  // 节点分析信息
-  progress?: string;
-  nodeDescription?: string;
-  nodeAnalysis?: {
-    nodeName?: string;
-    voltage?: string;
-    connectedComponents?: string[];
-    currentFlow?: string[];
-  } | string;
+export interface CircuitPointData extends AnswerNodeData {
+  subtype: 'circuit-point';
+  // 角度或重点描述，例如: 电路类型、工作原理、技术参数等
+  pointType?: string; // 分析点类型
+  pointDescription?: string; // 分析点描述
+  isGenerated?: boolean; // 是否已生成详情
 }
 
 /**
- * 电路功能分析数据类型
+ * 电路分析详情数据类型
+ * 用于详细展示某个分析点的内容
  */
-export interface CircuitFunctionData extends AnswerNodeData {
-  subtype: 'CIRCUIT_FUNCTION';
-  // 功能分析信息
-  progress?: string;
-  functionAnalysis?: {
-    mainFunction?: string;
-    subFunctions?: string[];
-    operatingPrinciple?: string;
-  } | string;
+export interface CircuitDetailData extends AnswerNodeData {
+  subtype: 'circuit-detail';
+  angle?: string; // 分析角度
+  detailContent?: string; // 详细内容
+  parentPointId?: string; // 父分析点ID
 }
-
-/**
- * 电路优化建议数据类型
- */
-export interface CircuitOptimizationData extends AnswerNodeData {
-  subtype: 'CIRCUIT_OPTIMIZATION';
-  // 优化建议信息
-  progress?: string;
-  optimizationResult?: string;
-  optimizationSuggestions?: {
-    efficiencyImprovements?: string[];
-    componentReplacements?: string[];
-    designChanges?: string[];
-  };
-} 

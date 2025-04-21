@@ -57,6 +57,14 @@ function useFlowState(convId: number) {
         // 新增节点
         case 'node': {
           const nodeVO = task.data as NodeVO;
+          
+          // 验证节点数据完整性
+          if (!nodeVO || !nodeVO.id || !nodeVO.type) {
+            console.error('处理node任务时数据不完整:', task);
+            toast.error('处理节点数据时发生错误');
+            break;
+          }
+          
           if (nodeVO.type === 'answer' || nodeVO.type === 'knowledge-detail') {
             lastFocusNodeId.current = nodeVO.id.toString();
             // 添加到活跃节点跟踪列表
@@ -79,15 +87,33 @@ function useFlowState(convId: number) {
                 ...(nodeVO.height !== null ? { height: nodeVO.height } : {}),
               },
             } as Node<NodeData<typeof nodeVO.type>>;
-            const newEdge = {
-              id: `e${nodeVO.parentId!}-${nodeVO.id}`,
-              source: nodeVO.parentId!.toString(),
+            
+            // 验证parentId是否存在，如果不存在则尝试使用根节点
+            if (!nodeVO.parentId && nodeVO.type !== 'root') {
+              console.warn(`节点 ${nodeVO.id} 缺少parentId，尝试使用根节点`);
+              const rootNode = nodes.find(node => node.type === 'root');
+              if (rootNode) {
+                nodeVO.parentId = parseInt(rootNode.id);
+              } else {
+                console.error('找不到根节点作为缺少parentId的节点的父节点');
+                return { nodes, edges }; // 如果找不到根节点则不处理
+              }
+            }
+            
+            const newEdge = !nodeVO.parentId ? null : {
+              id: `e${nodeVO.parentId}-${nodeVO.id}`,
+              source: nodeVO.parentId.toString(),
               target: nodeVO.id.toString(),
               type: 'smoothstep',
             } as Edge;
+            
             // 添加新节点和边，去除临时查询节点
             const currentNodes = [...nodes.filter(node => !node.id.startsWith(TEMP_QUERY_NODE_ID_PREFIX)), newNode];
-            const currentEdges = [...edges.filter(edge => !edge.target.startsWith(TEMP_QUERY_NODE_ID_PREFIX)), newEdge];
+            const currentEdges = [
+              ...edges.filter(edge => !edge.target.startsWith(TEMP_QUERY_NODE_ID_PREFIX)), 
+              ...(newEdge ? [newEdge] : [])
+            ];
+            
             // 执行布局
             const layoutedNodes = isUserQueryNode ? currentNodes : executeLayout(currentNodes, currentEdges, false);
             // 获得新节点布局后的位置
@@ -108,7 +134,7 @@ function useFlowState(convId: number) {
               }
             }
             
-            // 如果节点类型是answer-detail，则修改其父节点(answer-point)的isGenerated为true
+            // 如果节点类型是answer-detail或ANSWER_DETAIL，则修改其父节点(answer-point)的isGenerated为true
             if (nodeVO.type === 'answer-detail' || nodeVO.type === 'ANSWER_DETAIL') {
               const answerPointNode = layoutedNodes.find(node => 
                 (node.type === 'answer-point' || node.type === 'ANSWER_POINT') && 
@@ -117,6 +143,18 @@ function useFlowState(convId: number) {
               );
               if (answerPointNode) {
                 answerPointNode.data.isGenerated = true;
+              }
+            }
+            
+            // 如果节点类型是circuit-detail，则修改其父节点(circuit-point)的isGenerated为true
+            if (nodeVO.type === 'circuit-detail') {
+              const circuitPointNode = layoutedNodes.find(node => 
+                node.type === 'circuit-point' && 
+                nodeVO.parentId && 
+                node.id === nodeVO.parentId.toString()
+              );
+              if (circuitPointNode) {
+                circuitPointNode.data.isGenerated = true;
               }
             }
 
@@ -132,7 +170,14 @@ function useFlowState(convId: number) {
         case 'text': {
           const textData = task.data as TextData;
           
-          console.log(`收到文本数据，nodeId: ${textData.nodeId}，内容: ${textData.content.substring(0, 50)}${textData.content.length > 50 ? '...' : ''}`);
+          // 验证nodeId和content是否存在
+          if (!textData || typeof textData.nodeId === 'undefined' || typeof textData.content === 'undefined') {
+            console.error('处理text任务时数据不完整:', task);
+            toast.error('处理文本数据时发生错误');
+            break;
+          }
+          
+          console.log(`接收文本数据，nodeId: ${textData.nodeId}，内容长度: ${textData.content.length}`);
           
           setElements(({nodes, edges}) => {
             // 使用processTextUpdate更新节点文本内容
@@ -142,11 +187,15 @@ function useFlowState(convId: number) {
             // 找到更新的节点进行视图调整
             const nodeId = textData.nodeId.toString();
             const targetNode = updatedNodes.find(node => node.id === nodeId);
+            
             if (targetNode) {
-              console.log(`更新现有节点，ID: ${nodeId}`);
+              console.log(`更新节点文本内容，ID: ${nodeId}`);
               setTimeout(() => {
                 adjustViewportToShowLatestContent(targetNode);
               }, 300);
+            } else {
+              // 数据可能先于节点到达，这是正常的
+              console.log(`尚未找到节点ID: ${nodeId} 对应的节点，文本数据可能先于节点到达`);
             }
             
             return {
@@ -162,11 +211,29 @@ function useFlowState(convId: number) {
             nodeId: number;
             [key: string]: unknown;
           };
+          
+          // 验证nodeId是否存在
+          if (!data || typeof data.nodeId === 'undefined') {
+            console.error('处理data任务时nodeId不存在:', task);
+            toast.error('处理数据时发生错误');
+            break;
+          }
+          
           const nodeId = data.nodeId.toString();
+          console.log(`处理节点数据更新，nodeId: ${nodeId}`, data);
+          
           // 更新对应id节点的data
           setElements(({nodes, edges}) => {
+            // 尝试找到目标节点
             const targetNode = nodes.find(node => node.id === nodeId);
-            if (!targetNode) return {nodes, edges};
+            
+            // 如果找不到节点，不要显示警告，因为可能是数据先于节点到达
+            // 这是正常的流程，节点可能尚未创建
+            if (!targetNode) {
+              console.log(`尚未找到节点ID: ${nodeId} 对应的节点，数据可能先于节点到达`);
+              return {nodes, edges};
+            }
+            
             // 更新节点数据
             const updatedNodes = nodes.map(node =>
               node.id === nodeId ? 
@@ -181,6 +248,17 @@ function useFlowState(convId: number) {
                 }
               } : node
             );
+            
+            // 只有在实际更新了节点的情况下才执行布局，避免不必要的重新布局
+            if (JSON.stringify(nodes) !== JSON.stringify(updatedNodes)) {
+              // 执行布局时不重置高度，防止布局变形
+              const layoutedNodes = executeLayout(updatedNodes, edges, false, false);
+              return {
+                nodes: layoutedNodes,
+                edges,
+              };
+            }
+            
             return {
               nodes: updatedNodes,
               edges,
@@ -197,29 +275,49 @@ function useFlowState(convId: number) {
         }
         // 完成
         case 'done': {
+          console.log('接收到done消息，准备完成对话');
+          
           // 将最后聚焦的节点从活跃列表中移除
           if (lastFocusNodeId.current) {
             activeNodeIds.current.delete(lastFocusNodeId.current);
           }
           
-          // 不再执行自动分点功能，直接进入布局调整
           // 延时执行布局
           setTimeout(() => {
             setElements(({nodes, edges}) => {
-              const layoutedNodes = executeLayout(nodes, edges, true);
+              // 使用更保守的布局方式，避免布局变形
+              // 保持节点高度和宽度不变，只调整位置
+              const layoutedNodes = executeLayout(nodes, edges, false, false);
+              
+              // 确保所有节点都能在视图中展现
+              if (layoutedNodes.length > 0) {
+                console.log('最终布局调整，总节点数:', layoutedNodes.length);
+                // 添加一个小延迟以确保布局应用
+                setTimeout(() => {
+                  executeFitView(
+                    layoutedNodes.map(node => node.id),
+                    500,   // 动画时长
+                    200,   // 内边距
+                    0.9,   // 最大缩放
+                    0.1    // 最小缩放
+                  );
+                }, 50);
+              }
+              
               return {
                 nodes: layoutedNodes,
                 edges,
               };
             });
+            
             // 设置聊天状态为false
             setIsChatting(false);
-          }, 400);
+          }, 300);
           
-          // 执行fitView
+          // 执行fitView - 聚焦到最后活跃的节点
           if (lastFocusNodeId.current) {
-            console.log('最终布局执行fitView', lastFocusNodeId.current);
-            executeFitView([lastFocusNodeId.current], 1000);
+            console.log('执行fitView，聚焦最后活跃节点:', lastFocusNodeId.current);
+            executeFitView([lastFocusNodeId.current], 800);
           }
           break;
         }
@@ -276,9 +374,22 @@ function useFlowState(convId: number) {
     
     // 流式获取响应
     source.addEventListener("message", async (event: MessageEvent<string>) => {
-      const task = JSON.parse(event.data) as ChatTask;
-      // 添加消息到队列
-      addChatTask(task);
+      try {
+        const task = JSON.parse(event.data) as ChatTask;
+        // 添加消息到队列
+        addChatTask(task);
+        
+        // 如果接收到done消息，确保SSE连接关闭
+        if (task.type === 'done') {
+          setTimeout(() => {
+            source.close();
+          }, 500);
+        }
+      } catch (error) {
+        console.error('处理SSE消息出错:', error, event.data);
+        toast.error('处理响应数据时出错');
+        setIsChatting(false);
+      }
     });
     
     // 处理错误情况
@@ -291,10 +402,32 @@ function useFlowState(convId: number) {
         }, 1000);
       } else {
         // 错误处理
-        toast.error(`请求出错了：${event.data}`);
+        console.error('SSE连接错误:', event);
+        toast.error(`请求出错了：${event.data || '连接异常'}`);
         // 设置聊天状态为false
         setIsChatting(false);
       }
+    });
+    
+    // 添加连接关闭事件处理
+    source.addEventListener("close", () => {
+      console.log('SSE连接已关闭');
+      // 确保isChatting被设置为false
+      setTimeout(() => {
+        setIsChatting(false);
+      }, 200);
+    });
+    
+    // 添加安全超时，防止连接长时间未响应
+    const safetyTimeout = setTimeout(() => {
+      console.warn('SSE连接超时（20秒），强制关闭');
+      source.close();
+      setIsChatting(false);
+    }, 20000);
+    
+    // 在消息处理后清除安全超时
+    source.addEventListener("message", () => {
+      clearTimeout(safetyTimeout);
     });
   }, [addChatTask, isChatting]);
 

@@ -1,4 +1,4 @@
-export type NodeType = "root" | "query" | "answer" | "answer-point" | "answer-detail" | "ANSWER_POINT" | "ANSWER_DETAIL" | "knowledge-head" | "knowledge-detail" | "resource" | "CIRCUIT_BASIC" | "CIRCUIT_NODE_ANALYSIS" | "CIRCUIT_FUNCTION" | "CIRCUIT_OPTIMIZATION";
+export type NodeType = "root" | "query" | "answer" | "answer-point" | "answer-detail" | "ANSWER_POINT" | "ANSWER_DETAIL" | "knowledge-head" | "knowledge-detail" | "resource" | "circuit-canvas" | "circuit-point" | "circuit-detail";
 
 export interface ConversationVO {
   id: number;
@@ -36,21 +36,20 @@ type KnowledgeDetailNodeData = BaseNodeData;
 
 type AnimationNodeData = BaseNodeData;
 
-// 电路节点数据类型
-interface CircuitBasicNodeData extends BaseNodeData {
-  subtype: 'CIRCUIT_BASIC';
+// 新版电路节点数据类型
+interface CircuitCanvasNodeData extends BaseNodeData {
+  subtype: 'circuit-canvas';
+  circuitDesign?: any; // 电路设计数据
+  mode?: string;
 }
 
-interface CircuitNodeAnalysisNodeData extends BaseNodeData {
-  subtype: 'CIRCUIT_NODE_ANALYSIS';
+interface CircuitPointNodeData extends BaseNodeData {
+  subtype: 'circuit-point';
 }
 
-interface CircuitFunctionNodeData extends BaseNodeData {
-  subtype: 'CIRCUIT_FUNCTION';
-}
-
-interface CircuitOptimizationNodeData extends BaseNodeData {
-  subtype: 'CIRCUIT_OPTIMIZATION';
+interface CircuitDetailNodeData extends BaseNodeData {
+  subtype: 'circuit-detail';
+  angle?: string; // 分析角度
 }
 
 export type ResourceSubType = "bilibili" | "animation" | "generated-animation";
@@ -89,10 +88,9 @@ export type NodeData = {
   'knowledge-detail': KnowledgeDetailNodeData;
   'animation': AnimationNodeData;
   'resource': ResourceNodeData;
-  'CIRCUIT_BASIC': CircuitBasicNodeData;
-  'CIRCUIT_NODE_ANALYSIS': CircuitNodeAnalysisNodeData;
-  'CIRCUIT_FUNCTION': CircuitFunctionNodeData;
-  'CIRCUIT_OPTIMIZATION': CircuitOptimizationNodeData;
+  'circuit-canvas': CircuitCanvasNodeData;
+  'circuit-point': CircuitPointNodeData;
+  'circuit-detail': CircuitDetailNodeData;
 }
 
 export interface NodeVO {
@@ -120,17 +118,19 @@ export interface XYPosition {
 }
 
 export type AiTaskType = 
-  | 'GENERAL'      // 常规问答模式
-  | 'GENERAL_DETAIL' // 通用详情模式
-  | 'KNOWLEDGE'    // 知识问答模式
-  | 'KNOWLEDGE_DETAIL' // 知识详情模式
-  | 'ANIMATION'    // 动画生成模式
-  | 'SOLVER_FIRST'     // 开始解题模式
-  | 'SOLVER_CONTINUE'      // 继续解题模式
-  | 'SOLVER_SUMMARY'      // 总结解题模式
-  | 'PLANNER'       // 目标解析模式
-  | 'HTML_MAKER'    // 网页生成模式
-  | 'CIRCUIT_ANALYSIS' // 电路分析模式
+  | "GENERAL" 
+  | "GENERAL_CONTINUE" 
+  | "GENERAL_DETAIL" 
+  | "KNOWLEDGE" 
+  | "KNOWLEDGE_DETAIL" 
+  | "ANIMATION" 
+  | "ANIMATION_DETAIL" 
+  | "HTML_MAKER" 
+  | "SOLVER_FIRST" 
+  | "SOLVER_CONTINUE" 
+  | "SOLVER_SUMMARY" 
+  | "CIRCUIT_ANALYSIS"
+  | "CIRCUIT_DETAIL";
 
 export interface CreateAiTaskVO {
   taskId: number;

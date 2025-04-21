@@ -294,32 +294,39 @@ export function entitreeFlexLayout(nodes: Node[], edges: Edge[], nodeWidth: numb
     // 构建扁平树结构
     const flatTree = {} as Record<string, { width: number, height: number, children: string[], parents: string[] }>;
     
-    // 性能统计
-    //let heightCalculationTime = 0;
-    //let cachedHeightCount = 0;
+    // 保存电路点节点的ID和高度，避免重复计算导致高度变化
+    const circuitPointNodes: Record<string, number> = {};
     
     nodes.forEach(node => {
       const width = node.type !== 'root' ? nodeWidth : ROOT_NODE_SIZE;
       let height: number;
       
+      // 对特定类型节点保持高度稳定
+      if (node.type === 'circuit-point' || node.type === 'answer-point' || node.type === 'ANSWER_POINT') {
+        // 如果是电路点节点，尽量保持其高度稳定
+        if (node.data.height !== undefined && !resetHeight) {
+          height = node.data.height as number;
+          circuitPointNodes[node.id] = height;
+        } else {
+          // 如果没有缓存高度，则计算高度
+          height = calculateNodeHeight(node as Node<NodeData<NodeType>>, nodeWidth);
+          circuitPointNodes[node.id] = height;
+          node.data.height = height;
+        }
+      }
       // 获得节点高度
-      if (node.id.startsWith(TEMP_QUERY_NODE_ID_PREFIX)) {
+      else if (node.id.startsWith(TEMP_QUERY_NODE_ID_PREFIX)) {
         height = TEMP_QUERY_NODE_HEIGHT;
       } else if (node.type === 'root') {
         height = ROOT_NODE_SIZE;
       } else if (!resetHeight && node.data.height !== undefined) {
         height = node.data.height as number;
-        //cachedHeightCount++;
       } else {
         // 如果没有缓存高度，则计算高度
-        //const calcStartTime = performance.now();
         height = calculateNodeHeight(node as Node<NodeData<NodeType>>, nodeWidth);
-        //const calcEndTime = performance.now();
-        //heightCalculationTime += (calcEndTime - calcStartTime);
-        //console.log(`${node.type}节点进行calculateNodeHeight，结果：${height}，用时: ${calcEndTime - calcStartTime}毫秒`);
         
         // 将没有高度信息的节点添加到需要更新的列表中
-        if (!node.id.startsWith(TEMP_QUERY_NODE_ID_PREFIX)) {
+        if (!node.id.startsWith(TEMP_QUERY_NODE_ID_PREFIX) && shouldUpdateServer) {
           nodesToUpdate.push({
             id: parseInt(node.id),
             position: node.position,
@@ -365,11 +372,17 @@ export function entitreeFlexLayout(nodes: Node[], edges: Edge[], nodeWidth: numb
       const originalNode = nodes.find(n => n.id === id);
       if (!originalNode) return null;
       
+      // 对于电路点节点，确保其高度保持不变
+      if (circuitPointNodes[id] !== undefined) {
+        originalNode.data.height = circuitPointNodes[id];
+      }
+      
       // 检查位置是否发生变化
-      if (
-        shouldUpdateServer && 
-        (originalNode.position.x !== node.x || originalNode.position.y !== node.y)
-      ) {
+      const positionChanged = 
+        originalNode.position.x !== node.x || 
+        originalNode.position.y !== node.y;
+      
+      if (shouldUpdateServer && positionChanged) {
         // 查找节点是否已在更新列表中
         const existingNodeIndex = nodesToUpdate.findIndex(n => n.id === parseInt(id));
         
@@ -399,14 +412,7 @@ export function entitreeFlexLayout(nodes: Node[], edges: Edge[], nodeWidth: numb
       } as Node;
     }).filter((node: Node | null): node is Node => node !== null);
     
-    // 输出性能统计
-    //const endTime = performance.now();
-    //const totalTime = endTime - startTime;
-    //console.log(`布局计算总耗时: ${totalTime.toFixed(2)}ms`);
-    //console.log(`高度计算耗时: ${heightCalculationTime.toFixed(2)}ms (${(heightCalculationTime / totalTime * 100).toFixed(2)}%)`);
-    //console.log(`使用缓存高度的节点数: ${cachedHeightCount}/${nodes.length} (${(cachedHeightCount / nodes.length * 100).toFixed(2)}%)`);
-    
-    // 更新服务器
+    // 更新服务器 - 仅当要求且有节点需要更新时才执行
     if (shouldUpdateServer && nodesToUpdate.length > 0) {
       console.log(`更新服务器节点数: ${nodesToUpdate.length}`);
       updateNodesPositionAndHeight(nodesToUpdate).send()

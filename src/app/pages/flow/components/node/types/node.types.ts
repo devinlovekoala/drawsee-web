@@ -32,10 +32,9 @@ type AnswerSubType =
   | 'animation' 
   | 'ANSWER_POINT' 
   | 'ANSWER_DETAIL'
-  | 'CIRCUIT_BASIC'
-  | 'CIRCUIT_NODE_ANALYSIS'
-  | 'CIRCUIT_FUNCTION'
-  | 'CIRCUIT_OPTIMIZATION';
+  | 'circuit-canvas'
+  | 'circuit-point'
+  | 'circuit-detail';
 
 export interface AnswerNodeData extends BaseNodeData {
   subtype?: AnswerSubType;
@@ -63,19 +62,22 @@ export type NodeData<T extends string> =
   T extends 'root' ? RootNodeData :
   T extends 'query' ? QueryNodeData :
   T extends 'answer' ? AnswerNodeData :
-  T extends 'answer-point' | 'ANSWER_POINT' ? AnswerNodeData :
-  T extends 'answer-detail' | 'ANSWER_DETAIL' ? AnswerNodeData :
+  T extends 'answer-point' ? AnswerNodeData :
+  T extends 'answer-detail' ? AnswerNodeData :
   T extends 'knowledge-head' ? KnowledgeHeadNodeData :
   T extends 'knowledge-detail' ? KnowledgeDetailNodeData :
   T extends 'resource' ? ResourceNodeData :
+  T extends 'circuit-canvas' ? AnswerNodeData :
+  T extends 'circuit-point' ? AnswerNodeData :
+  T extends 'circuit-detail' ? AnswerNodeData :
   BaseNodeData;
 
 export type FlowNode<T extends NodeType> = Node<NodeData<T>>;
 export type RootNode = FlowNode<'root'>;
 export type QueryNode = FlowNode<'query'>;
 export type AnswerNode = FlowNode<'answer'>;
-export type AnswerPointNode = FlowNode<'answer-point' | 'ANSWER_POINT'>;
-export type AnswerDetailNode = FlowNode<'answer-detail' | 'ANSWER_DETAIL'>;
+export type AnswerPointNode = FlowNode<'answer-point'>;
+export type AnswerDetailNode = FlowNode<'answer-detail'>;
 export type KnowledgeHeadNode = FlowNode<'knowledge-head'>;
 export type KnowledgeDetailNode = FlowNode<'knowledge-detail'>;
 export type ResourceNode = FlowNode<'resource'>;

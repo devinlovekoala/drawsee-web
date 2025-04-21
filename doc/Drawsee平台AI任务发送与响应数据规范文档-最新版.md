@@ -1,4 +1,4 @@
-# Drawsee平台AI任务发送与响应数据规范文档
+# Drawsee平台AI任务发送与响应数据规范文档（最新版）
 
 ## 一、通用任务结构
 
@@ -90,12 +90,12 @@
   "type": "TEXT",
   "data": {
     "nodeId": 124,
-    "content": "[{\"title\":\"语法基础\",\"description\":\"Java的基本语法规则和代码结构\"},...}]"
+    "content": "角度1：语法基础\n从Java的基本语法规则和代码结构出发进行讲解\n\n角度2：变量和数据类型\n介绍Java中的变量声明、基本数据类型和引用类型"
   }
 }
 ```
 
-4. **角度节点**
+4. **角度节点 - 示例1**
 ```json
 {
   "type": "NODE",
@@ -104,7 +104,7 @@
     "type": "ANSWER_POINT",
     "data": {
       "title": "语法基础",
-      "text": "Java的基本语法规则和代码结构",
+      "text": "从Java的基本语法规则和代码结构出发进行讲解",
       "subtype": "ANSWER_POINT"
     },
     "position": {"x": 0, "y": 0},
@@ -113,7 +113,25 @@
 }
 ```
 
-5. **完成信号**
+5. **角度节点 - 示例2**
+```json
+{
+  "type": "NODE",
+  "data": {
+    "id": 126,
+    "type": "ANSWER_POINT",
+    "data": {
+      "title": "变量和数据类型",
+      "text": "介绍Java中的变量声明、基本数据类型和引用类型",
+      "subtype": "ANSWER_POINT"
+    },
+    "position": {"x": 0, "y": 0},
+    "parentId": 124
+  }
+}
+```
+
+6. **完成信号**
 ```json
 {
   "type": "DONE",
@@ -141,7 +159,7 @@
 {
   "type": "NODE",
   "data": {
-    "id": 126,
+    "id": 127,
     "type": "ANSWER_DETAIL",
     "data": {
       "title": "详细解析",
@@ -160,7 +178,7 @@
 {
   "type": "TEXT",
   "data": {
-    "nodeId": 126,
+    "nodeId": 127,
     "content": "Java的基本语法..."
   }
 }
@@ -198,7 +216,7 @@
 {
   "type": "NODE",
   "data": {
-    "id": 127,
+    "id": 128,
     "type": "KNOWLEDGE_HEAD",
     "data": {
       "title": "知识点",
@@ -217,7 +235,7 @@
 {
   "userId": 123456,
   "convId": 789012,
-  "parentId": 127,  // 知识点头节点ID
+  "parentId": 128,  // 知识点头节点ID
   "taskId": "task_uuid",
   "type": "KNOWLEDGE_DETAIL"
 }
@@ -229,7 +247,7 @@
 {
   "type": "NODE",
   "data": {
-    "id": 128,
+    "id": 129,
     "type": "KNOWLEDGE_DETAIL",
     "data": {
       "title": "知识详情",
@@ -242,7 +260,7 @@
       }
     },
     "position": {"x": 0, "y": 0},
-    "parentId": 127
+    "parentId": 128
   }
 }
 ```
@@ -252,7 +270,7 @@
 {
   "type": "NODE",
   "data": {
-    "id": 129,
+    "id": 130,
     "type": "RESOURCE",
     "data": {
       "title": "教学动画",
@@ -260,7 +278,7 @@
       "objectNames": ["animation1.mp4", "animation2.mp4"]
     },
     "position": {"x": 0, "y": 0},
-    "parentId": 128
+    "parentId": 129
   }
 }
 ```
@@ -270,7 +288,7 @@
 {
   "type": "NODE",
   "data": {
-    "id": 130,
+    "id": 131,
     "type": "RESOURCE",
     "data": {
       "title": "B站视频",
@@ -278,43 +296,7 @@
       "urls": ["https://www.bilibili.com/video/xxx"]
     },
     "position": {"x": 0, "y": 0},
-    "parentId": 128
-  }
-}
-```
-
-4. **Word文档节点** (如果存在)
-```json
-{
-  "type": "NODE",
-  "data": {
-    "id": 131,
-    "type": "RESOURCE",
-    "data": {
-      "title": "Word文档",
-      "subtype": "WORD",
-      "urls": ["https://example.com/doc.docx"]
-    },
-    "position": {"x": 0, "y": 0},
-    "parentId": 128
-  }
-}
-```
-
-5. **PDF文档节点** (如果存在)
-```json
-{
-  "type": "NODE",
-  "data": {
-    "id": 132,
-    "type": "RESOURCE",
-    "data": {
-      "title": "PDF文档",
-      "subtype": "PDF",
-      "urls": ["https://example.com/document.pdf"]
-    },
-    "position": {"x": 0, "y": 0},
-    "parentId": 128
+    "parentId": 129
   }
 }
 ```
@@ -352,28 +334,6 @@
     },
     "position": {"x": 0, "y": 0},
     "parentId": 124
-  }
-}
-```
-
-4. **进度更新**
-```json
-{
-  "type": "DATA",
-  "data": {
-    "progress": "正在生成动画分镜...",
-    "nodeId": 133
-  }
-}
-```
-
-5. **最终帧数据**
-```json
-{
-  "type": "DATA",
-  "data": {
-    "nodeId": 133,
-    "frame": "base64编码的图像数据"
   }
 }
 ```
@@ -448,17 +408,6 @@
 }
 ```
 
-2. **推导完成状态**
-```json
-{
-  "type": "DATA",
-  "data": {
-    "nodeId": 135,
-    "isDone": true
-  }
-}
-```
-
 ### 8. 解题总结 (SOLVER_SUMMARY)
 
 #### 发送结构
@@ -491,7 +440,7 @@
 }
 ```
 
-### 9. 目标规划 (PLANNER)
+### 9. 电路分析 (CIRCUIT_ANALYSIS)
 
 #### 发送结构
 ```json
@@ -500,95 +449,7 @@
   "convId": 789012,
   "parentId": 345678,
   "taskId": "task_uuid",
-  "type": "PLANNER",
-  "prompt": "如何准备高考数学考试？"
-}
-```
-
-#### 响应节点
-1. **查询节点** (同上)
-
-2. **目标分析节点**
-```json
-{
-  "type": "NODE",
-  "data": {
-    "id": 137,
-    "type": "ANSWER",
-    "data": {
-      "title": "目标分析",
-      "subtype": "PLANNER_FIRST",
-      "text": ""
-    },
-    "position": {"x": 0, "y": 0},
-    "parentId": 123
-  }
-}
-```
-
-3. **目标拆解节点**
-```json
-{
-  "type": "NODE",
-  "data": {
-    "id": 138,
-    "type": "ANSWER",
-    "data": {
-      "title": "目标拆解",
-      "subtype": "PLANNER_SPLIT",
-      "text": "制定每日复习计划"
-    },
-    "position": {"x": 0, "y": 0},
-    "parentId": 137
-  }
-}
-```
-
-### 10. HTML制作 (HTML_MAKER)
-
-#### 发送结构
-```json
-{
-  "userId": 123456,
-  "convId": 789012,
-  "parentId": 345678,
-  "taskId": "task_uuid",
-  "type": "HTML_MAKER",
-  "prompt": "制作一个简单的个人介绍网页"
-}
-```
-
-#### 响应节点
-1. **查询节点** (同上)
-
-2. **HTML制作节点**
-```json
-{
-  "type": "NODE",
-  "data": {
-    "id": 139,
-    "type": "ANSWER",
-    "data": {
-      "title": "HTML制作",
-      "subtype": "HTML_MAKER",
-      "text": ""
-    },
-    "position": {"x": 0, "y": 0},
-    "parentId": 123
-  }
-}
-```
-
-### 11. 电路分析 (CIRCUIT_ANALYZE)
-
-#### 发送结构
-```json
-{
-  "userId": 123456,
-  "convId": 789012,
-  "parentId": 345678,
-  "taskId": "task_uuid",
-  "type": "CIRCUIT_ANALYZE",
+  "type": "CIRCUIT_ANALYSIS",
   "model": "deepseekV3",  // 使用的AI模型
   "prompt": {
     "elements": [
@@ -598,20 +459,7 @@
         "position": {"x": 100, "y": 100},
         "rotation": 0,
         "properties": {"resistance": "1k"},
-        "ports": [
-          {
-            "id": "p1", 
-            "name": "端口1", 
-            "type": "input",
-            "position": {"side": "left", "x": 0, "y": 0, "align": "start"}
-          },
-          {
-            "id": "p2", 
-            "name": "端口2", 
-            "type": "output",
-            "position": {"side": "right", "x": 0, "y": 0, "align": "start"}
-          }
-        ]
+        "ports": [...]
       },
       {
         "id": "v1",
@@ -619,77 +467,27 @@
         "position": {"x": 50, "y": 100},
         "rotation": 90,
         "properties": {"voltage": "5V"},
-        "ports": [
-          {
-            "id": "p1", 
-            "name": "正极", 
-            "type": "output",
-            "position": {"side": "top", "x": 0, "y": 0, "align": "center"}
-          },
-          {
-            "id": "p2", 
-            "name": "负极", 
-            "type": "input",
-            "position": {"side": "bottom", "x": 0, "y": 0, "align": "center"}
-          }
-        ]
+        "ports": [...]
       }
     ],
-    "connections": [
-      {
-        "id": "conn1",
-        "source": {"elementId": "v1", "portId": "p1"},
-        "target": {"elementId": "r1", "portId": "p1"}
-      },
-      {
-        "id": "conn2",
-        "source": {"elementId": "r1", "portId": "p2"},
-        "target": {"elementId": "v1", "portId": "p2"}
-      }
-    ],
-    "metadata": {
-      "title": "简单电路示例",
-      "description": "一个包含电阻和电压源的电路",
-      "createdAt": "2024-04-01T10:00:00Z",
-      "updatedAt": "2024-04-01T10:00:00Z"
-    }
+    "connections": [...],
+    "metadata": {...}
   }
 }
 ```
 
 #### 响应节点
-1. **查询节点**
+1. **电路画布节点**
 ```json
 {
   "type": "NODE",
   "data": {
     "id": 140,
-    "type": "QUERY",
+    "type": "CIRCUIT_CANVAS",
     "data": {
-      "title": "电路分析请求",
+      "title": "电路设计",
       "text": "电路分析请求",
-      "circuitDesign": {
-        "elements": [
-          {
-            "id": "r1",
-            "type": "resistor",
-            "position": {"x": 100, "y": 100},
-            "rotation": 0,
-            "properties": {"resistance": "1k"},
-            "ports": [/* ... */]
-          },
-          {
-            "id": "v1",
-            "type": "voltage_source",
-            "position": {"x": 50, "y": 100},
-            "rotation": 90,
-            "properties": {"voltage": "5V"},
-            "ports": [/* ... */]
-          }
-        ],
-        "connections": [/* ... */],
-        "metadata": {/* ... */}
-      },
+      "circuitDesign": {...},
       "mode": "CIRCUIT_ANALYSIS"
     },
     "position": {"x": 0, "y": 0},
@@ -698,18 +496,17 @@
 }
 ```
 
-2. **电路基本分析节点**
+2. **电路分析点节点**
 ```json
 {
   "type": "NODE",
   "data": {
     "id": 141,
-    "type": "ANSWER",
+    "type": "CIRCUIT_POINT",
     "data": {
-      "title": "电路基本分析",
-      "subtype": "CIRCUIT_BASIC",
-      "progress": "正在分析电路基本情况...",
-      "basicAnalysis": "这个电路由一个5V电压源和一个1kΩ电阻组成。根据欧姆定律，电路中的电流为I=V/R=5V/1kΩ=5mA。"
+      "title": "电路类型",
+      "text": "这是一个基于运算放大器的反相放大电路，由输入电阻、反馈电阻和运放组成",
+      "subtype": "circuit-point"
     },
     "position": {"x": 0, "y": 0},
     "parentId": 140
@@ -717,28 +514,39 @@
 }
 ```
 
-3. **节点分析节点**
+3. **更多电路分析点节点示例**
 ```json
 {
   "type": "NODE",
   "data": {
     "id": 142,
-    "type": "ANSWER",
+    "type": "CIRCUIT_POINT",
     "data": {
-      "title": "节点[N1]分析",
-      "subtype": "CIRCUIT_NODE_ANALYSIS",
-      "progress": "正在分析节点[N1]...",
-      "nodeName": "N1",
-      "nodeDescription": "电压源正极与电阻连接点",
-      "nodeAnalysis": "节点N1连接电压源的正极和电阻的一端，维持在5V电位。"
+      "title": "工作原理",
+      "text": "该电路通过负反馈原理实现输入信号的放大，反相器输出与输入信号相位相反",
+      "subtype": "circuit-point"
     },
     "position": {"x": 0, "y": 0},
-    "parentId": 141
+    "parentId": 140
   }
 }
 ```
 
-4. **电路功能分析节点**
+### 10. 电路分析点详情 (CIRCUIT_DETAIL)
+
+#### 发送结构
+```json
+{
+  "userId": 123456,
+  "convId": 789012,
+  "parentId": 141,  // 电路分析点节点的ID
+  "taskId": "task_uuid",
+  "type": "CIRCUIT_DETAIL",
+  "model": "deepseekV3"  // 使用的AI模型
+}
+```
+
+#### 响应节点
 ```json
 {
   "type": "NODE",
@@ -746,43 +554,13 @@
     "id": 143,
     "type": "ANSWER",
     "data": {
-      "title": "电路功能分析",
-      "subtype": "CIRCUIT_FUNCTION",
-      "progress": "正在分析电路功能...",
-      "functionAnalysis": "这是一个简单的负载电路，电压源提供恒定电压，电阻作为负载消耗电能，将电能转换为热能。"
+      "title": "电路类型详情",
+      "text": "## 电路类型\n本电路是一个典型的反相运算放大器电路，它是模拟电子电路中最基础也最常用的电路之一。\n\n## 详细分析\n反相放大器由一个运算放大器（Op-Amp）和两个电阻（反馈电阻Rf和输入电阻Rin）组成。输入信号连接到运放的反相输入端，而同相输入端则接地。这种配置使得输出信号与输入信号相位相差180度（即反相）。\n\n## 技术参数\n放大倍数计算：$A_v = -\\frac{R_f}{R_{in}}$\n\n对于本电路，放大倍数为：$A_v = -\\frac{10k\\Omega}{1k\\Omega} = -10$\n\n这意味着输出信号的幅度是输入信号的10倍，但相位相反。\n\n## 要点总结\n1. 本电路是反相放大器，输出与输入相位相差180度\n2. 放大倍数由反馈电阻与输入电阻的比值决定\n3. 输入阻抗等于输入电阻Rin的值\n4. 理想情况下，运放的虚短特性使反相输入端电压接近于0V",
+      "subtype": "circuit-detail",
+      "angle": "电路类型"
     },
     "position": {"x": 0, "y": 0},
     "parentId": 141
-  }
-}
-```
-
-5. **电路优化建议节点**
-```json
-{
-  "type": "NODE",
-  "data": {
-    "id": 144,
-    "type": "ANSWER",
-    "data": {
-      "title": "电路优化建议",
-      "subtype": "CIRCUIT_OPTIMIZATION",
-      "progress": "正在生成优化建议...",
-      "optimizationResult": "可以考虑添加一个并联电容以滤除可能的电压波动，提高电路稳定性。"
-    },
-    "position": {"x": 0, "y": 0},
-    "parentId": 143
-  }
-}
-```
-
-6. **完成进度信息**
-```json
-{
-  "type": "DATA",
-  "data": {
-    "progress": "电路分析完成",
-    "nodeId": 144
   }
 }
 ```
@@ -801,14 +579,16 @@
 ## 四、任务配置注意事项
 
 1. **任务类型必须正确**：确保`type`字段使用`AiTaskType`类中定义的常量值。
-2. **父节点类型匹配**：某些任务类型（如`KNOWLEDGE_DETAIL`、`GENERAL_DETAIL`）要求特定类型的父节点。
-3. **提示内容格式**：大多数任务使用字符串作为`prompt`，但`CIRCUIT_ANALYZE`使用`CircuitDesign`对象。
+2. **父节点类型匹配**：某些任务类型（如`KNOWLEDGE_DETAIL`、`GENERAL_DETAIL`、`CIRCUIT_DETAIL`）要求特定类型的父节点。
+3. **提示内容格式**：大多数任务使用字符串作为`prompt`，但`CIRCUIT_ANALYSIS`使用`CircuitDesign`对象。
 4. **任务链接顺序**：
    - 解题类任务通常按照：`SOLVER_FIRST` → `SOLVER_CONTINUE` → `SOLVER_SUMMARY`的顺序使用。
    - 通用对话类任务通常按照：`GENERAL`(生成角度) → `GENERAL_DETAIL`(展开具体角度)的顺序使用。
+   - 电路分析任务通常按照：`CIRCUIT_ANALYSIS`(生成分析点) → `CIRCUIT_DETAIL`(展开具体分析点)的顺序使用。
 5. **模型选择**：可以通过`model`字段指定使用的AI模型，不指定时使用默认模型。
-6. **GENERAL_DETAIL不需要传递角度参数**：最新版本已优化，前端发送`GENERAL_DETAIL`任务时不需要在promptParams中包含`angle`参数，系统会自动从父节点中读取角度信息。
-7. **电路节点获取**：使用`/tool/circuit/nodes`接口获取电路节点标号信息，便于前端渲染节点标识。
+6. **详情类任务参数**：
+   - `GENERAL_DETAIL`不需要传递角度参数，系统会自动从父节点中读取角度信息。
+   - `CIRCUIT_DETAIL`不需要传递电路设计数据，系统会自动从上游节点中读取相关信息。
 
 ## 五、节点类型说明
 
@@ -822,38 +602,54 @@
 6. **KNOWLEDGE_HEAD**：知识点头节点，存储识别出的知识点
 7. **KNOWLEDGE_DETAIL**：知识点详情节点，存储知识点的详细内容
 8. **RESOURCE**：资源节点，存储各类资源（动画、视频、文档等）
+9. **CIRCUIT_CANVAS**：电路画布节点，存储电路设计数据
+10. **CIRCUIT_POINT**：电路分析点节点，存储电路分析的不同角度
 
-不同的节点类型可能有不同的子类型(subtype)，用于更细致地区分节点的用途和内容格式。
+## 六、回答角度数据格式更新说明
 
-## 六、节点数据获取模式
+### 1. 旧版格式（JSON格式）
 
-### 1. 通用对话详情模式 (GENERAL_DETAIL)
+在旧版本中，回答角度使用JSON数组格式输出：
 
-系统采用"从父节点获取数据"的设计模式，与知识点详情类似：
+```json
+[
+  {
+    "title": "语法基础",
+    "description": "从Java的基本语法规则和代码结构出发进行讲解"
+  },
+  {
+    "title": "变量和数据类型",
+    "description": "介绍Java中的变量声明、基本数据类型和引用类型"
+  }
+]
+```
 
-1. **角度信息获取**：
-   - 从父节点(`ANSWER_POINT`)的数据中提取`title`字段作为角度信息
-   - 不再需要前端传递角度参数
+### 2. 新版格式（文本格式）
 
-2. **原始问题获取**：
-   - 通过`findOriginalQuestion`方法向上回溯查找`QUERY`节点
-   - 从`QUERY`节点的数据中提取`text`字段作为原始问题
+在最新版本中，回答角度使用与知识点头节点相似的文本格式输出：
 
-3. **执行流程**：
-   - 验证父节点类型是否为`ANSWER_POINT`
-   - 从父节点读取角度信息创建`ANSWER_DETAIL`节点
-   - 回溯查找原始问题
-   - 调用`StreamAiService.answerDetailChat`方法生成详细回答
+```
+角度1：语法基础
+从Java的基本语法规则和代码结构出发进行讲解
 
-### 2. 知识点详情模式 (KNOWLEDGE_DETAIL)
+角度2：变量和数据类型
+介绍Java中的变量声明、基本数据类型和引用类型
+```
 
-类似地，知识点详情也采用从父节点获取知识点名称的模式：
+### 3. 格式解析流程
 
-1. **知识点名称获取**：
-   - 从父节点(`KNOWLEDGE_HEAD`)的数据中提取`text`字段作为知识点名称
+系统现在支持两种格式的解析：
+1. 首先尝试以JSON格式解析（兼容旧格式）
+2. 如果JSON解析失败，则使用文本格式解析
 
-2. **执行流程**：
-   - 验证父节点类型是否为`KNOWLEDGE_HEAD`
-   - 从父节点读取知识点名称
-   - 调用`StreamAiService.knowledgeDetailChat`方法生成知识点详情
-   - 查找相关资源并创建资源节点
+解析文本格式时：
+- 匹配"角度X：[标题]"格式的行作为标题
+- 标题后的行作为描述
+- 空行作为分隔符
+
+### 4. 优点说明
+
+- **统一数据格式**：与知识问答模式保持一致的数据格式
+- **降低复杂度**：文本格式更易于阅读和调试
+- **兼容性保障**：保留对旧版JSON格式的兼容支持
+- **提高可维护性**：统一处理流程，简化代码结构

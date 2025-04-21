@@ -145,9 +145,11 @@ const defaultPorts = {
 interface CircuitFlowProps {
   onCircuitDesignChange?: (design: CircuitDesign) => void;
   selectedModel?: string;
+  initialCircuitDesign?: CircuitDesign; // 添加初始电路设计数据
+  isReadOnly?: boolean; // 是否为只读模式，禁用编辑功能
 }
 
-export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'doubao' }: CircuitFlowProps) => {
+export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'doubao', initialCircuitDesign, isReadOnly = false }: CircuitFlowProps) => {
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -159,6 +161,52 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'doubao' }:
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const { handleBlankQuery, handleAiTaskCountPlus, userInfo } = useAppContext();
+  
+  // 加载初始电路设计数据
+  useEffect(() => {
+    if (initialCircuitDesign && initialCircuitDesign.elements.length > 0) {
+      console.log('加载初始电路设计数据', initialCircuitDesign);
+      
+      // 将电路设计元素转换为节点
+      const newNodes = initialCircuitDesign.elements.map(element => {
+        return {
+          id: element.id,
+          type: 'circuitNode',
+          position: element.position,
+          data: {
+            type: element.type,
+            label: element.label || `${element.type}`,
+            value: element.value || '',
+            element: element
+          }
+        };
+      });
+      
+      // 将电路设计连接转换为边
+      const newEdges = initialCircuitDesign.connections.map(connection => {
+        const edgeId = `edge-${connection.source.elementId}-${connection.source.portId}-${connection.target.elementId}-${connection.target.portId}`;
+        return {
+          id: edgeId,
+          source: connection.source.elementId,
+          sourceHandle: connection.source.portId,
+          target: connection.target.elementId,
+          targetHandle: connection.target.portId,
+          type: 'default',
+          animated: false,
+          style: { stroke: '#3B82F6', strokeWidth: 2 },
+          data: { label: '连线' }
+        };
+      });
+      
+      setNodes(newNodes);
+      setEdges(newEdges);
+      
+      // 稍微延迟后重新计算视图，确保所有节点都已渲染
+      setTimeout(() => {
+        reactFlowInstance.fitView({ padding: 0.2 });
+      }, 100);
+    }
+  }, [initialCircuitDesign, reactFlowInstance]);
   
   // 监听节点旋转事件，更新连线
   useEffect(() => {
@@ -745,14 +793,14 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'doubao' }:
       <ReactFlow
         nodes={nodes}
         edges={edges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        onConnect={onConnect}
+        onNodesChange={isReadOnly ? undefined : onNodesChange}
+        onEdgesChange={isReadOnly ? undefined : onEdgesChange}
+        onConnect={isReadOnly ? undefined : onConnect}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         connectionLineComponent={ConnectionPreview}
-        deleteKeyCode={['Backspace', 'Delete']}
-        multiSelectionKeyCode={['Control', 'Meta']}
+        deleteKeyCode={isReadOnly ? null : ['Backspace', 'Delete']}
+        multiSelectionKeyCode={isReadOnly ? null : ['Control', 'Meta']}
         snapToGrid={true}
         snapGrid={[15, 15]}
         defaultViewport={{ x: 0, y: 0, zoom: 1 }}
@@ -761,66 +809,75 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'doubao' }:
         // @ts-ignore
         connectionMode="loose"
         defaultMarkerColor="#3B82F6"
-        connectOnClick={true}
+        connectOnClick={!isReadOnly}
         connectionRadius={20}
-        isValidConnection={() => true}
-        onNodeClick={(_, node) => setSelectedNodeId(node.id)}
-        onEdgeClick={onEdgeClick}
+        isValidConnection={() => !isReadOnly}
+        onNodeClick={isReadOnly ? undefined : (_, node) => setSelectedNodeId(node.id)}
+        onEdgeClick={isReadOnly ? undefined : onEdgeClick}
         onPaneClick={onPaneClick}
-        elementsSelectable={true}
-        selectNodesOnDrag={false}
-        edgesFocusable={true}
-        edgesUpdatable={true}
+        elementsSelectable={!isReadOnly}
+        selectNodesOnDrag={!isReadOnly}
+        edgesFocusable={!isReadOnly}
+        edgesUpdatable={!isReadOnly}
+        nodesDraggable={!isReadOnly}
+        nodesConnectable={!isReadOnly}
+        zoomOnScroll={true}
+        panOnScroll={false}
+        zoomOnDoubleClick={!isReadOnly}
       >
         <Background />
         <Controls />
-        <Panel position="top-left" style={{ marginLeft: '10px', marginTop: '10px' }}>
-          <Space wrap direction="horizontal">
-            <Dropdown
-              menu={{
-                items: elementMenuItems.map(item => ({
-                  key: item.key,
-                  label: item.label,
-                  onClick: () => addNewNode(item.key as CircuitElementType)
-                })),
-              }}
-              placement="bottomLeft"
-            >
-              <Button type="primary" icon={<PlusOutlined />}>
-                添加元件 <DownOutlined />
+        {!isReadOnly && (
+          <Panel position="top-left" style={{ marginLeft: '10px', marginTop: '10px' }}>
+            <Space wrap direction="horizontal">
+              <Dropdown
+                menu={{
+                  items: elementMenuItems.map(item => ({
+                    key: item.key,
+                    label: item.label,
+                    onClick: () => addNewNode(item.key as CircuitElementType)
+                  })),
+                }}
+                placement="bottomLeft"
+              >
+                <Button type="primary" icon={<PlusOutlined />}>
+                  添加元件 <DownOutlined />
+                </Button>
+              </Dropdown>
+              <Button onClick={() => setEdges([])} danger>清除所有连接</Button>
+              <ModelSelector
+                selectedModel={currentModel}
+                onModelChange={setCurrentModel}
+              />
+              <Button 
+                icon={<PlayCircleOutlined />} 
+                onClick={handleAnalyzeCircuit}
+                loading={isAnalyzing}
+              >
+                发送分析任务
               </Button>
-            </Dropdown>
-            <Button onClick={() => setEdges([])} danger>清除所有连接</Button>
-            <ModelSelector
-              selectedModel={currentModel}
-              onModelChange={setCurrentModel}
-            />
-            <Button 
-              icon={<PlayCircleOutlined />} 
-              onClick={handleAnalyzeCircuit}
-              loading={isAnalyzing}
-            >
-              发送分析任务
-            </Button>
-          </Space>
-        </Panel>
+            </Space>
+          </Panel>
+        )}
       </ReactFlow>
       
       {/* 快捷键说明 */}
-      <div style={{ 
-        position: 'absolute', 
-        bottom: 10, 
-        right: 10, 
-        padding: '5px 10px',
-        background: 'rgba(255, 255, 255, 0.8)',
-        borderRadius: '4px',
-        fontSize: '12px',
-        color: '#666'
-      }}>
-        <div>Ctrl+R: 旋转元件</div>
-        <div>Delete/Ctrl+D: 删除元件</div>
-        <div>Delete/Backspace: 删除选中连线</div>
-      </div>
+      {!isReadOnly && (
+        <div style={{ 
+          position: 'absolute', 
+          bottom: 10, 
+          right: 10, 
+          padding: '5px 10px',
+          background: 'rgba(255, 255, 255, 0.8)',
+          borderRadius: '4px',
+          fontSize: '12px',
+          color: '#666'
+        }}>
+          <div>Ctrl+R: 旋转元件</div>
+          <div>Delete/Ctrl+D: 删除元件</div>
+          <div>Delete/Backspace: 删除选中连线</div>
+        </div>
+      )}
       
       {isAnalyzing && (
         <div style={{ 
@@ -842,11 +899,13 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'doubao' }:
   );
 };
 
-export const CircuitFlowWithProvider = ({ onCircuitDesignChange, selectedModel }: CircuitFlowProps) => (
+export const CircuitFlowWithProvider = ({ onCircuitDesignChange, selectedModel, initialCircuitDesign, isReadOnly }: CircuitFlowProps) => (
   <ReactFlowProvider>
     <CircuitFlow 
       onCircuitDesignChange={onCircuitDesignChange}
       selectedModel={selectedModel}
+      initialCircuitDesign={initialCircuitDesign}
+      isReadOnly={isReadOnly}
     />
   </ReactFlowProvider>
 );
