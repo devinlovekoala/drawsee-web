@@ -201,27 +201,36 @@ const defaultPorts: Record<string, Port[]> = {
     }
   ],
   [CircuitElementType.INDUCTOR]: [
-    { id: 'port1', name: '左端口', type: 'bidirectional',       position: { 
-        side: 'right', 
-        x: 20, 
+    { 
+      id: 'port1', 
+      name: '左端口', 
+      type: 'bidirectional',       
+      position: { 
+        side: 'left',  // 修改为左侧
+        x: 0, 
         y: 50,
         rotatedOffset: {
-          90: { bottom: '-25px' },
-          180: { top: '17px',left: '100%' },
-          270: { top: '35px' }
+          '90': { top: '0px' },
+          '180': { top: '50%', left: '100%' },
+          '270': { top: '100%' }
         }
       }  
     },
-    { id: 'port2', name: '右端口', type: 'bidirectional',       position: { 
+    { 
+      id: 'port2', 
+      name: '右端口', 
+      type: 'bidirectional',       
+      position: { 
         side: 'right', 
-        x: 122, 
+        x: 100,  // 修正为100%
         y: 50,
         rotatedOffset: {
-          '90': { top: '36px' },
-          '180': { top: '15px',left: '0%' },
-          '270': { top: '-5px' }
+          '90': { top: '100%' },
+          '180': { top: '50%', left: '0%' },
+          '270': { top: '0%' }
         }
-      } }
+      } 
+    }
   ],
   [CircuitElementType.VOLTAGE_SOURCE]: [
     { id: 'positive', name: '正极', type: 'output',       position: { 
@@ -297,27 +306,12 @@ const defaultPorts: Record<string, Port[]> = {
       type: 'input', 
       position: { 
         side: 'left', 
-        x: 0, 
+        x: 5,  // 调整基极的横坐标
         y: 50,
         rotatedOffset: {
-          '90': { top: '0px' },
-          '180': { top: '26px',left: '90%' },
-          '270': { top: '50px',left:'50' }
-        }
-      } 
-    },
-    { 
-      id: 'emitter', 
-      name: '发射极', 
-      type: 'output', 
-      position: { 
-        side: 'left', 
-        x: 80, 
-        y: 0,
-        rotatedOffset: {
-          '90': { top: '40px',left: '10%' },
-          '180': { top: '0px',left: '20%' },
-          '270': { top: '10px',left: '10%' }
+          '90': { top: '50%', left: '30%' },
+          '180': { top: '50%', left: '100%' },
+          '270': { top: '50%', left: '70%' }
         }
       } 
     },
@@ -327,12 +321,27 @@ const defaultPorts: Record<string, Port[]> = {
       type: 'input', 
       position: { 
         side: 'right', 
-        x: 100, 
-        y: 100,
+        x: 95,  // 调整集电极的横坐标
+        y: 10,
         rotatedOffset: {
-          '90': { top: '40px',left: '90%' },
-          '180': { top: '50px',left: '25%' },
-          '270': { top: '10px',left: '90%' }
+          '90': { top: '10%', left: '50%' },
+          '180': { top: '10%', left: '0%' },
+          '270': { top: '90%', left: '50%' }
+        }
+      } 
+    },
+    { 
+      id: 'emitter', 
+      name: '发射极', 
+      type: 'output', 
+      position: { 
+        side: 'right', 
+        x: 95,  // 调整发射极的横坐标
+        y: 90,
+        rotatedOffset: {
+          '90': { top: '90%', left: '50%' },
+          '180': { top: '90%', left: '0%' },
+          '270': { top: '10%', left: '50%' }
         }
       } 
     }
@@ -510,11 +519,11 @@ export const CircuitNode = memo(({ data, id }: NodeProps<CircuitNodeData>) => {
       case 0: // 0度旋转
         switch(side) {
           case 'left':
-            style.left = '0%';
+            style.left = `${x}%`;
             style.top = `${y}%`;
             break;
           case 'right':
-            style.left = '100%';
+            style.left = `${x}%`;
             style.top = `${y}%`;
             break;
           case 'top':
@@ -682,7 +691,7 @@ export const CircuitNode = memo(({ data, id }: NodeProps<CircuitNodeData>) => {
               (port.id === 'port1' ? '50%' : '50%') :
               (port.id === 'port1' ? '50%' : '50%'),
             top: normalizedRotation === 90 ?
-              (port.id === 'port1' ? '100%' : '0%') :
+              (port.id === 'port1' ? '100%' : '0%') : 
               (port.id === 'port1' ? '0%' : '100%'),
           };
         }
