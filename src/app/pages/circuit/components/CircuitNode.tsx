@@ -450,7 +450,6 @@ export const CircuitNode = memo(({ data, id }: NodeProps<CircuitNodeData>) => {
   
   // 获取元件配置
   const config = ComponentVisualConfig[type];
-  const SVGComponent = SVGComponents[type] || SVGComponents[CircuitElementType.RESISTOR]; // 提供默认值
   
   // 获取元件当前的旋转角度
   const rotation = data.element?.rotation || 0;

@@ -1,6 +1,6 @@
 import { BaseNode, ExtendedNodeProps } from './base/BaseNode';
 import { useFlowContext } from '@/app/contexts/FlowContext';
-import { AiTaskType, CreateAiTaskDTO } from '@/api/types/flow.types';
+import { CreateAiTaskDTO } from '@/api/types/flow.types';
 import { toast } from 'sonner';
 import { createAiTask } from '@/api/methods/flow.methods';
 import { useState, useCallback } from 'react';
@@ -91,7 +91,7 @@ function AnswerPointNode({ data, ...props }: ExtendedNodeProps<'answer-point' | 
       footerContent={
         <button
           onClick={handleGeneralDetailChat}
-          disabled={isGenerated || isLoading || isChatting}
+          disabled={!!(isGenerated || isLoading || isChatting)}
           className={`px-6 py-2.5 font-medium rounded transition-colors ${
             isGenerated 
               ? 'bg-yellow-500 text-white cursor-not-allowed'

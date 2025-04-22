@@ -10,7 +10,7 @@ import {SSE} from "sse.js";
 import { TOKEN_KEY } from "@/common/constant/storage-key.constant";
 import useFlowTools from "./useFlowTools";
 import { TEMP_QUERY_NODE_ID_PREFIX } from "../constants";
-import { processCompletedNode, processTextUpdate } from "../utils/sectionParser";
+import { processTextUpdate } from "../utils/sectionParser";
 
 /**
  * 流程图状态管理Hook

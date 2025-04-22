@@ -1,6 +1,4 @@
 'use client';
-
-import React from 'react';
 import { CircuitFlowWithProvider } from './CircuitFlow';
 import { CircuitDesign } from '@/api/types/circuit.types';
 

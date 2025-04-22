@@ -1,9 +1,8 @@
 import { SparklesIcon, Cog, BrainCircuit, Wand2, GraduationCap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { useState, useRef, useEffect } from 'react';
+import { useState } from 'react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/app/components/ui/collapsible';
-import { AiTaskType } from '@/api/types/flow.types';
 
 // 定义Agent类型，用于侧边栏展示
 const agents = [

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useState, useMemo, useRef, useEffect } from 'react';
+import React, { useCallback, useState, useRef, useEffect } from 'react';
 import ReactFlow, {
   addEdge,
   Background,
@@ -12,13 +12,12 @@ import ReactFlow, {
   EdgeChange,
   applyNodeChanges,
   applyEdgeChanges,
-  MarkerType,
   useReactFlow,
   ReactFlowProvider,
   Panel
 } from 'reactflow';
 import { Button, Dropdown, message, Space, Modal, Spin } from 'antd';
-import { DownOutlined, PlusOutlined, SaveOutlined, PlayCircleOutlined } from '@ant-design/icons';
+import { DownOutlined, PlusOutlined, PlayCircleOutlined } from '@ant-design/icons';
 import 'reactflow/dist/style.css';
 import { CircuitNode } from './CircuitNode';
 import ConnectionEdge, { ConnectionPreview } from './ConnectionEdge';
@@ -26,13 +25,11 @@ import {
   CircuitElement, 
   CircuitElementType, 
   CircuitDesign, 
-  Port,
-  ComponentVisualConfig
+  Port
 } from '@/api/types/circuit.types';
 import { createAiTask } from '@/api/methods/flow.methods';
 import { useAppContext } from '@/app/contexts/AppContext';
 import { CreateAiTaskDTO } from '@/api/types/flow.types';
-import { useNavigate } from 'react-router-dom';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { ModelSelector } from '@/app/pages/blank/components/ModelSelector';
 import { ModelType } from '@/app/pages/flow/components/input/FlowInputPanel';
@@ -159,8 +156,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'doubao', i
   
   const reactFlowInstance = useReactFlow();
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
-  const navigate = useNavigate();
-  const { handleBlankQuery, handleAiTaskCountPlus, userInfo } = useAppContext();
+  const { handleBlankQuery, handleAiTaskCountPlus } = useAppContext();
   
   // 加载初始电路设计数据
   useEffect(() => {
@@ -728,11 +724,6 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'doubao', i
     
     message.info('元件已删除');
   }, [selectedNodeId]);
-  
-  // 处理节点选择
-  const onNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
-    setSelectedNodeId(node.id);
-  }, []);
   
   // 处理边点击
   const onEdgeClick = useCallback((e: React.MouseEvent, edge: Edge) => {

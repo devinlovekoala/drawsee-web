@@ -1,6 +1,6 @@
 import { BaseNode, ExtendedNodeProps } from './base/BaseNode';
 import { useFlowContext } from '@/app/contexts/FlowContext';
-import { AiTaskType, CreateAiTaskDTO } from '@/api/types/flow.types';
+import { CreateAiTaskDTO } from '@/api/types/flow.types';
 import { toast } from 'sonner';
 import { createAiTask } from '@/api/methods/flow.methods';
 import { useState, useCallback, useMemo } from 'react';
@@ -14,7 +14,7 @@ import { CircuitPointData } from './types/circuitNode.types';
  * 用于存储电路分析的不同角度或重点，可点击"继续解析"按钮获取详细内容
  */
 function CircuitPointNode({ data, ...props }: ExtendedNodeProps<'circuit-point'>) {
-  const {chat, convId, isChatting, addChatTask} = useFlowContext();
+  const {chat, convId, isChatting} = useFlowContext();
   const {handleAiTaskCountPlus} = useAppContext();
   
   const nodeData = data as unknown as CircuitPointData;

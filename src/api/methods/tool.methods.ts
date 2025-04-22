@@ -1,5 +1,4 @@
 import alova from "@/api";
-import { CircuitAnalysisDTO, CircuitAnalysisResult, SpiceNetlistResponse } from "@/api/types/circuit.types";
 
 // image 对应 springboot 中的MultipartFile
 export const recognizeTextFromImage = (image: File) => {

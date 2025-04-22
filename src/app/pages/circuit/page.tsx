@@ -1,6 +1,4 @@
 'use client';
-
-import React from 'react';
 import { Layout, Typography, Divider } from 'antd';
 import CircuitCanvas from './components/CircuitCanvas';
 

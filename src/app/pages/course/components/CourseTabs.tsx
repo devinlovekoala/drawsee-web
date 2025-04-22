@@ -1,4 +1,3 @@
-import React, { useState } from 'react';
 import { Users, UserPlus, Globe } from 'lucide-react';
 
 // 定义标签类型

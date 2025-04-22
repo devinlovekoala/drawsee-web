@@ -8,6 +8,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { BookOpenIcon, CircuitBoardIcon, CodeXmlIcon, MessageCircleIcon, SparklesIcon, TargetIcon, TvMinimalPlayIcon } from 'lucide-react';
 import { toast } from 'sonner';
+import React from 'react';
 
 interface ModeSelectorProps {
   selectedType: AiTaskType;
@@ -19,45 +20,45 @@ const modes = [
     name: '常规问答模式',
     description: '最常规的 AI 生成模式，一问一答。',
     icon: MessageCircleIcon,
-    type: 'general' satisfies AiTaskType
+    type: 'GENERAL' as AiTaskType
   },
   {
     name: '知识问答模式',
     description: '基于知识库的 AI 生成模式，能识别用户提问中的相关知识点。',
     icon: BookOpenIcon,
-    type: 'knowledge' satisfies AiTaskType
+    type: 'KNOWLEDGE' as AiTaskType
   },
   {
     name: '推理解题模式',
     description: '基于解题引擎，能够基于用户提问生成解题过程。',
     icon: SparklesIcon,
-    type: 'solver-first' satisfies AiTaskType
+    type: 'SOLVER_FIRST' as AiTaskType
   },
   {
     name: '网页生成模式',
     description: '基于网页生成引擎，能够基于用户提问生成可预览的html网页。',
     icon: CodeXmlIcon,
-    type: 'html-maker' as string,
+    type: 'HTML_MAKER' as AiTaskType,
     disabled: true
   },
   {
     name: '目标解析模式',
     description: '基于目标解析引擎，能够对用户目标进行有效拆解。',
     icon: TargetIcon,
-    type: 'planner' as string,
+    type: 'GENERAL' as AiTaskType, // 临时使用通用类型
     disabled: true
   },
   {
     name: '动画生成模式',
     description: '基于昭析动画生成引擎，能够基于用户提问生成生动的动画视频解析。',
     icon: TvMinimalPlayIcon,
-    type: 'animation' satisfies AiTaskType,
+    type: 'ANIMATION' as AiTaskType,
   },
   {
     name: '电路分析模式',
     description: '基于电路分析引擎，能够基于用户输入的电路图，生成电路分析结果。',
     icon: CircuitBoardIcon,
-    type: 'circuit-analyze' satisfies AiTaskType,
+    type: 'CIRCUIT_ANALYSIS' as AiTaskType,
   },
 ];
 
@@ -65,7 +66,10 @@ export function ModeSelector({ selectedType, onTypeChange }: ModeSelectorProps) 
   const [isOpen, setIsOpen] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  
+  // 确保使用正确的类型比较
   const selectedMode = modes.find(mode => mode.type === selectedType) || modes[0];
+  
   const [position, setPosition] = useState({ top: 0, left: 0, width: 0 });
 
   // 当按钮点击时更新位置
@@ -126,7 +130,10 @@ export function ModeSelector({ selectedType, onTypeChange }: ModeSelectorProps) 
         aria-expanded={isOpen}
         aria-haspopup="true"
       >
-        <selectedMode.icon className="w-5 h-5 text-gray-600" />
+        {/* 使用JSX元素渲染图标组件 */}
+        <div className="flex items-center justify-center w-5 h-5 text-gray-600">
+          {React.createElement(selectedMode.icon)}
+        </div>
         <span className="text-sm font-medium text-gray-800">{selectedMode.name}</span>
         <ChevronDownIcon 
           className={`w-4 h-4 text-gray-500 transition-transform duration-200 ${isOpen ? 'transform rotate-180' : ''}`}
@@ -174,12 +181,8 @@ export function ModeSelector({ selectedType, onTypeChange }: ModeSelectorProps) 
                       toast.info(`${mode.name}功能即将上线，敬请期待！`);
                       return;
                     }
-                    // 确保使用有效的AiTaskType
-                    const validAiTaskType = ['general', 'knowledge', 'knowledge-detail', 'animation', 
-                      'solver-first', 'solver-continue', 'solver-summary', 'circuit-analyze'].includes(mode.type) 
-                      ? (mode.type as AiTaskType) 
-                      : 'general';
-                    onTypeChange(validAiTaskType);
+                    // 使用正确的AiTaskType类型
+                    onTypeChange(mode.type as AiTaskType);
                     setIsOpen(false);
                   }}
                 >

@@ -5,17 +5,13 @@ import { ModelType } from '../flow/components/input/FlowInputPanel';
 
 // 电路分析页面 - 提供电路设计可视化界面
 function Circuit() {
-  const [circuitDesign, setCircuitDesign] = useState<CircuitDesign | null>(null);
-  const [selectedModel, setSelectedModel] = useState<ModelType>('doubao'); // 默认使用豆包模型
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_circuitDesign, setCircuitDesign] = useState<CircuitDesign | null>(null);
+  const [selectedModel] = useState<ModelType>('doubao'); // 默认使用豆包模型
   
   // 更新电路设计数据
   const handleCircuitDesignChange = useCallback((design: CircuitDesign) => {
     setCircuitDesign(design);
-  }, []);
-  
-  // 处理模型变更
-  const handleModelChange = useCallback((model: ModelType) => {
-    setSelectedModel(model);
   }, []);
   
   return (

@@ -1,4 +1,4 @@
-import React, { useMemo, useEffect } from 'react';
+import { useMemo, useEffect } from 'react';
 import { BaseNode, ExtendedNodeProps } from './base/BaseNode';
 import { CircuitCanvasData } from './types/circuitNode.types';
 import { CircuitFlowWithProvider } from '@/app/pages/circuit/components/CircuitFlow';

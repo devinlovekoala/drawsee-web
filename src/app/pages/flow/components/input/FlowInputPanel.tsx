@@ -1,7 +1,6 @@
 import { useCallback, useState, useRef, useEffect, useMemo } from "react";
 import { toast } from "sonner";
 import { XMarkIcon } from '@heroicons/react/24/outline';
-import { BookOpenIcon, CodeXmlIcon, MessageCircleIcon, TargetIcon } from 'lucide-react';
 import { createAiTask } from "@/api/methods/flow.methods.ts";
 import type { AiTaskType, CreateAiTaskDTO } from '@/api/types/flow.types.ts';
 import { TempQueryNodeTask } from "../../hooks/useTempQueryNode";
@@ -26,7 +25,6 @@ interface FlowInputPanelProps {
 export type ModelType = 'deepseekV3' | 'doubao';
 
 export function FlowInputPanel({
-  selectedNode,
   prompt,
   setPrompt,
   canInput, 

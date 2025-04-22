@@ -1,5 +1,5 @@
 import { BaseNode, ExtendedNodeProps } from './base/BaseNode';
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 
 /**
  * 详细回答节点组件

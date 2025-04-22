@@ -2,7 +2,6 @@ import {useCallback, useState, useEffect} from "react";
 import {createAiTask} from "@/api/methods/flow.methods.ts";
 import {AiTaskType, CreateAiTaskDTO} from "@/api/types/flow.types.ts";
 import {toast} from "sonner";
-import { ArrowTurnDownLeftIcon } from '@heroicons/react/24/outline';
 import './styles/scrollbar.css';
 import { useAppContext } from "@/app/contexts/AppContext";
 import { XIcon, CheckIcon, WandIcon, ImageUpIcon } from "lucide-react";
@@ -59,8 +58,6 @@ function Blank() {
         'solver-first': 'SOLVER_FIRST',
         'solver-continue': 'SOLVER_CONTINUE',
         'solver-summary': 'SOLVER_SUMMARY',
-        'planner': 'PLANNER',
-        'html-maker': 'HTML_MAKER',
         'circuit-analyze': 'CIRCUIT_ANALYSIS'
       };
       
@@ -252,8 +249,6 @@ function Blank() {
   const isSolverMode = queryForm.type === "SOLVER_FIRST";
   // 判断是否为动画生成模式
   const isAnimationMode = queryForm.type === "ANIMATION";
-  // 判断是否为通用模式
-  const isGeneralMode = queryForm.type === "GENERAL";
 
   // 根据模式获取页面标题和描述
   const getPageInfo = () => {

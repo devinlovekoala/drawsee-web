@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useMemo, useEffect, useState } from 'react';
-import { EdgeProps, ConnectionLineComponentProps, getSmoothStepPath, getBezierPath } from 'reactflow';
+import { useMemo, useEffect, useState } from 'react';
+import { EdgeProps, ConnectionLineComponentProps, getSmoothStepPath } from 'reactflow';
 
 // 统一边缘线样式
 const edgeStyles = {

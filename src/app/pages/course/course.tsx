@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import ClassCodeInput from './components/ClassCodeInput';
 import CourseList from './components/CourseList';
 import CourseTabs from './components/CourseTabs';
