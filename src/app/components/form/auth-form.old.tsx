@@ -17,7 +17,8 @@ function AuthForm({className, onSuccess}: Props) {
 	const [form, setForm] = useState({
 		username: '',
 		password: '',
-		passwordConfirm: ''
+		passwordConfirm: '',
+		invitationCode: ''
 	});
 
 	const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -54,9 +55,16 @@ function AuthForm({className, onSuccess}: Props) {
 				return;
 			}
 
+			if (form.invitationCode === '') {
+				toast.error("邀请码不能为空");
+				setLoading(false);
+				return;
+			}
+
 			const userSignUpDTO = {
 				username: form.username,
-				password: form.password
+				password: form.password,
+				invitationCode: form.invitationCode
 			} as UserSignUpDTO;
 
 			signup(userSignUpDTO)
@@ -144,6 +152,33 @@ function AuthForm({className, onSuccess}: Props) {
 										required
 									/>
 								</div>
+								<div className="space-y-2">
+									<label
+										className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+										htmlFor="passwordConfirm"
+									>
+										邀请码
+									</label>
+									<input
+										className="flex h-10 w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-neutral-400 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+										type="password"
+										placeholder="请输入邀请码"
+										value={form.invitationCode}
+										onChange={(e) => setForm(prev => ({...prev, invitationCode: e.target.value}))}
+										required
+									/>
+									<p className="text-sm text-neutral-500">
+										没有邀请码？
+										<a 
+											href="https://bw4bdu09z49.feishu.cn/share/base/form/shrcnjbxh4YBf7xEWaAAZVKw3Kf" 
+											className="underline hover:text-neutral-900"
+											target="_blank" 
+											rel="noopener noreferrer"
+										>
+											获取邀请码
+										</a>
+									</p>
+								</div>
 							</>)}
 							<button
 								type="submit"
@@ -171,7 +206,7 @@ function AuthForm({className, onSuccess}: Props) {
 						className="inline-flex w-full justify-center text-sm text-neutral-500 hover:text-neutral-900 transition-colors"
 						onClick={() => {
 							setIsLogin(!isLogin);
-							setForm({username: '', password: '', passwordConfirm: ''});
+							setForm({username: '', password: '', passwordConfirm: '', invitationCode: ''});
 						}}
 					>
 						{isLogin ? "还没有账号？点击注册" : "已有账号？点击登录"}
