@@ -2,6 +2,25 @@ import { useCallback, useEffect, useRef } from 'react';
 import { Edge, Node, useReactFlow } from '@xyflow/react';
 import useFlowTools from './useFlowTools';
 
+// 节流函数
+function throttle<T extends (...args: any[]) => any>(
+  func: T,
+  limit: number
+): (...args: Parameters<T>) => void {
+  let inThrottle: boolean;
+  
+  return function(this: any, ...args: Parameters<T>): void {
+    if (!inThrottle) {
+      func.apply(this, args);
+      inThrottle = true;
+      
+      setTimeout(() => {
+        inThrottle = false;
+      }, limit);
+    }
+  };
+}
+
 /**
  * 监听视口变化，优化布局的Hook
  * 特别针对电路分析节点在缩放时的布局问题
@@ -16,6 +35,7 @@ export function useViewportChange(
   const { executeLayout } = useFlowTools();
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastZoomRef = useRef<number>(getViewport().zoom);
+  const lastUpdateTimeRef = useRef<number>(Date.now());
   
   // 自定义视口变化事件
   const dispatchViewportChangeEvent = useCallback((zoom: number) => {
@@ -27,29 +47,39 @@ export function useViewportChange(
     window.dispatchEvent(event);
   }, []);
   
-  // 监听ReactFlow的视口变化
-  useEffect(() => {
-    const handleViewportChange = () => {
+  // 创建节流后的视口变化处理函数
+  const throttledHandleViewportChange = useCallback(
+    throttle(() => {
       const { zoom } = getViewport();
+      const currentTime = Date.now();
       
       // 计算缩放变化幅度
       const zoomChangeDelta = Math.abs(zoom - lastZoomRef.current);
       
-      // 只有当缩放变化足够明显时才触发处理（避免微小变化引起不必要的重新布局）
-      if (zoomChangeDelta > 0.05) {
+      // 计算距离上次更新的时间间隔
+      const timeSinceLastUpdate = currentTime - lastUpdateTimeRef.current;
+      
+      // 只有当缩放变化足够明显且距离上次更新有足够时间时才触发处理
+      if (zoomChangeDelta > 0.05 && timeSinceLastUpdate > 100) {
         lastZoomRef.current = zoom;
+        lastUpdateTimeRef.current = currentTime;
         
-        // 延迟分发事件，减少频繁触发
+        // 清除之前的延时操作
         if (timeoutRef.current) {
           clearTimeout(timeoutRef.current);
         }
         
+        // 设置新的延时操作
         timeoutRef.current = setTimeout(() => {
           dispatchViewportChangeEvent(zoom);
-        }, 100);
+        }, 150); // 增加延迟时间，让变化更平滑
       }
-    };
-    
+    }, 100), // 100ms的节流时间
+    [getViewport, dispatchViewportChangeEvent]
+  );
+  
+  // 监听ReactFlow的视口变化
+  useEffect(() => {
     // 创建MutationObserver监视ReactFlow容器的data-zoom属性变化
     const observer = new MutationObserver((mutations) => {
       mutations.forEach((mutation) => {
@@ -57,7 +87,7 @@ export function useViewportChange(
           mutation.type === 'attributes' && 
           mutation.attributeName === 'data-zoom'
         ) {
-          handleViewportChange();
+          throttledHandleViewportChange();
         }
       });
     });
@@ -75,7 +105,7 @@ export function useViewportChange(
         clearTimeout(timeoutRef.current);
       }
     };
-  }, [getViewport, dispatchViewportChangeEvent]);
+  }, [throttledHandleViewportChange]);
   
   // 处理视口变化事件
   useEffect(() => {
