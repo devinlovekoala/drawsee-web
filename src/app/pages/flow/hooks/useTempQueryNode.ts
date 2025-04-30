@@ -15,7 +15,19 @@ export type TempQueryNodeTask = {
 };
 
 // 定义允许用户追问的节点类型
-const ALLOWED_PARENT_TYPES: NodeType[] = ['root', 'answer', 'knowledge-detail'];
+const ALLOWED_PARENT_TYPES: NodeType[] = [
+  'root', 
+  'answer', 
+  'knowledge-detail', 
+  'knowledge-head',
+  'answer-point', 
+  'ANSWER_POINT',
+  'answer-detail', 
+  'ANSWER_DETAIL',
+  'circuit-point',
+  'circuit-detail',
+  'circuit-canvas'
+];
 
 // 防抖函数
 function debounce<F extends (...args: Parameters<F>) => ReturnType<F>>(func: F, wait: number): (...args: Parameters<F>) => void {
