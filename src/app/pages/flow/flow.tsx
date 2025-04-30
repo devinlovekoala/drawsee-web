@@ -79,17 +79,23 @@ function Flow() {
 
   // 节点变化监听
   const onNodesChange: OnNodesChange = useCallback((changes) => {
-    //console.log('onNodesChange', changes);
-    
     setElements(({nodes, edges}) => {
       let newNodes = nodes;
       let newEdges = edges;
+      let needsRelayout = false;
+      let significantChanges = 0;
+      const totalNodes = nodes.length;
 
       // 处理节点选择变化
       let selectedNodeId: string | null = null;
       let unselectedNodeId: string | null = null;
       let fitViewNodeId: string | null = null;
       let selectionChanged = false;
+
+      // 节点高度变化的累计值
+      let totalHeightChange = 0;
+      let changedNodesCount = 0;
+
       changes.forEach((change) => {
         if (change.type === 'select') {
           selectionChanged = true;
@@ -98,17 +104,48 @@ function Flow() {
           } else {
             unselectedNodeId = change.id;
           }
+        } else if (change.type === 'dimensions') {
+          const node = newNodes.find(n => n.id === change.id);
+          if (node) {
+            const curHeight = node.data.height as number | undefined;
+            const newHeight = change.dimensions?.height;
+
+            if (curHeight !== undefined && newHeight !== undefined) {
+              const heightDiff = Math.abs(newHeight - curHeight);
+              totalHeightChange += heightDiff;
+              changedNodesCount++;
+
+              // 更新节点高度
+              node.data.height = newHeight;
+
+              // 检查是否是显著变化
+              if (heightDiff > 20) { // 显著变化阈值
+                significantChanges++;
+              }
+            }
+          }
         }
       });
+
+      // 计算是否需要重新布局的条件
+      const averageHeightChange = changedNodesCount > 0 ? totalHeightChange / changedNodesCount : 0;
+      const significantChangeRatio = significantChanges / totalNodes;
+
+      // 判断是否需要重新布局
+      needsRelayout = (
+        // 条件1: 显著变化的节点比例超过阈值
+        significantChangeRatio > 0.3 ||
+        // 条件2: 平均高度变化超过阈值
+        (changedNodesCount > 0 && averageHeightChange > 30) ||
+        // 条件3: 变化的节点数量超过总节点数的一定比例，且平均变化较大
+        (changedNodesCount > totalNodes * 0.4 && averageHeightChange > 15)
+      );
+
+      // 处理选择变化
       if (selectionChanged) {
-        // 触发自定义事件，通知选择变化
         window.dispatchEvent(new CustomEvent('node-selection-change'));
-      }
-      if (selectedNodeId) {
-        // 如果选中节点发生变化，则更新选中节点
-        if (selectedNodeId !== selectedNode?.id) {
+        if (selectedNodeId && selectedNodeId !== selectedNode?.id) {
           setSelectedNode(newNodes.find(node => node.id === selectedNodeId) || null);
-          // 如果存在临时提问节点则删除临时提问节点
           const tempQueryNode = newNodes.find(node => node.id.startsWith(TEMP_QUERY_NODE_ID_PREFIX));
           if (tempQueryNode) {
             newNodes = nodesAndEdgesNoneTempQueryNode.current?.nodes || newNodes;
@@ -116,68 +153,52 @@ function Flow() {
             fitViewNodeId = selectedNodeId;
           }
           setUserInput('');
+        } else if (unselectedNodeId) {
+          const rootNode = newNodes.find(node => node.id === rootNodeId);
+          setSelectedNode(selectedNode?.id === rootNodeId ? null : rootNode || null);
+          if (rootNode) {
+            newNodes = newNodes.map(node => ({
+              ...node,
+              selected: node.id === rootNodeId
+            }));
+          }
+          const tempQueryNode = newNodes.find(node => node.id.startsWith(TEMP_QUERY_NODE_ID_PREFIX));
+          if (tempQueryNode) {
+            newNodes = nodesAndEdgesNoneTempQueryNode.current?.nodes || newNodes;
+            newEdges = nodesAndEdgesNoneTempQueryNode.current?.edges || newEdges;
+            fitViewNodeId = unselectedNodeId;
+          }
+          setUserInput('');
         }
-      } else if (unselectedNodeId) {
-        // 如果取消选中节点，则选中根节点，除非当前选中节点就是根节点
-        const rootNode = newNodes.find(node => node.id === rootNodeId);
-        setSelectedNode(selectedNode?.id === rootNodeId ? null : rootNode || null);
-        if (rootNode) {
-          newNodes = newNodes.map(node => ({
-            ...node,
-            selected: node.id === rootNodeId
-          }));
-        }
-        // 如果存在临时提问节点则删除临时提问节点
-        const tempQueryNode = newNodes.find(node => node.id.startsWith(TEMP_QUERY_NODE_ID_PREFIX));
-        if (tempQueryNode) {
-          newNodes = nodesAndEdgesNoneTempQueryNode.current?.nodes || newNodes;
-          newEdges = nodesAndEdgesNoneTempQueryNode.current?.edges || newEdges;
-          fitViewNodeId = unselectedNodeId;
-        }
-        setUserInput('');
       }
 
+      // 应用节点变化
       newNodes = applyNodeChanges(changes, newNodes);
 
-      // 处理节点高度变化
-      let updateHeightNodeCount = 0;
-      changes.forEach((change) => {
-        if (change.type === 'dimensions') {
-          // 修改newNodes中id相同的节点
-          newNodes.forEach((node, index) => {
-            if (node.id === change.id) {
-              const curHeight = node.data.height as number | undefined;
-              const newHeight = change.dimensions?.height;
-              //console.log('curHeight', curHeight, 'newHeight', newHeight);
-              newNodes[index].data.height = newHeight;
-              if (!node.id.startsWith(TEMP_QUERY_NODE_ID_PREFIX) && (
-                ( curHeight === undefined && newHeight !== undefined ) ||
-                ( curHeight !== undefined && newHeight !== undefined && 
-                  Math.abs(newHeight - curHeight) > 10 )
-              )) {
-                updateHeightNodeCount++;
-              }
-            }
-          });
-        }
-      });
-      // updateHeightNodeCount 超过node总数的一半
-      //console.log('updateHeightNodeCount', updateHeightNodeCount, 'newNodes.length', newNodes.length);
-      if (updateHeightNodeCount > (newNodes.length / 2)) {
-        console.log('实际渲染时height变化了', updateHeightNodeCount, '次，进行布局');
-        // 进行布局
-        executeLayout(newNodes, edges, true);
+      // 如果需要重新布局，执行布局计算
+      if (needsRelayout) {
+        console.log('检测到显著布局变化，进行重新布局', {
+          totalNodes,
+          changedNodes: changedNodesCount,
+          averageHeightChange,
+          significantChanges,
+          significantChangeRatio
+        });
+        newNodes = executeLayout(newNodes, edges, true);
       }
+
+      // 执行视图调整
       if (fitViewNodeId) {
         console.log('执行fitView', fitViewNodeId);
         executeFitView([fitViewNodeId], 350);
       }
+
       return {
         nodes: newNodes,
         edges: newEdges,
       };
     });
-  },[executeFitView, executeLayout, nodesAndEdgesNoneTempQueryNode, rootNodeId, selectedNode?.id, setElements]);
+  }, [executeFitView, executeLayout, nodesAndEdgesNoneTempQueryNode, rootNodeId, selectedNode?.id, setElements]);
 
   // 边变化监听
   const onEdgesChange: OnEdgesChange = useCallback((changes) => {

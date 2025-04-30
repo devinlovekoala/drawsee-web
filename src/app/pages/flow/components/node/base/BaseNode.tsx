@@ -29,23 +29,30 @@ export interface ExtendedNodeProps<T extends NodeType> extends Omit<NodeProps, '
 // 全局节点渲染缓存
 const nodeContentCache: Record<string, React.ReactNode> = {};
 
-// 从文本中提取简化预览内容
-function extractPreview(text?: string, maxLength = 50): string {
+// 从文本中提取第一句话作为预览内容
+function extractPreview(text?: string): string {
   if (!text) return '';
   
-  // 移除所有LaTeX公式和代码块，替换为简单标识
+  // 移除所有LaTeX公式和代码块
   const cleanText = text
-    .replace(/\$\$([\s\S]*?)\$\$/g, '[公式]')
-    .replace(/\$(.*?)\$/g, '[公式]')
-    .replace(/```[\s\S]*?```/g, '[代码]')
-    .replace(/#{1,6}\s+/g, '') // 移除标题标记
-    .replace(/\*\*/g, '')      // 移除粗体标记
-    .replace(/\*/g, '')        // 移除斜体标记
-    .replace(/\n/g, ' ');      // 将换行替换为空格
+    .replace(/\$\$([\s\S]*?)\$\$/g, '')
+    .replace(/\$(.*?)\$/g, '')
+    .replace(/```[\s\S]*?```/g, '')
+    .replace(/#{1,6}\s+/g, '')      // 移除标题标记
+    .replace(/\*\*/g, '')           // 移除粗体标记
+    .replace(/\*/g, '')             // 移除斜体标记
+    .trim();
+
+  // 匹配第一句话（以。！？.!?结尾）
+  const match = cleanText.match(/^[^。！？.!?]+[。！？.!?]/);
+  if (match) {
+    const firstSentence = match[0].trim();
+    // 如果第一句话太长，截取前15个字
+    return firstSentence.length > 15 ? firstSentence.substring(0, 15) + '...' : firstSentence;
+  }
   
-  return cleanText.length > maxLength 
-    ? cleanText.substring(0, maxLength) + '...' 
-    : cleanText;
+  // 如果没有找到明显的句子结束符，返回前15个字
+  return cleanText.length > 15 ? cleanText.substring(0, 15) + '...' : cleanText;
 }
 
 /**
@@ -130,7 +137,7 @@ export const BaseNode = React.memo(function BaseNode<T extends NodeType>({
       hasTitle: nodeData.title !== undefined,
       hasText: nodeData.text !== undefined,
       formattedDate: format(new Date(nodeData.createdAt), 'yyyy-MM-dd HH:mm'),
-      textPreview: extractPreview(nodeData?.text || '', 100),
+      textPreview: extractPreview(nodeData?.text),  // 使用新的提取逻辑
       nodeHeight: nodeData.height || NODE_DEFAULT_HEIGHT
     };
   }, [nodeData.title, nodeData.text, nodeData.createdAt, nodeData.height]);
@@ -193,11 +200,10 @@ export const BaseNode = React.memo(function BaseNode<T extends NodeType>({
   
   // 使用缓存渲染或创建新的渲染结果
   const renderContent = useCallback(() => {
-    // 如果是简化视图模式，不使用缓存，直接显示骨架屏
+    // 如果是简化视图模式，不使用缓存，直接显示预览
     if (isSimplifiedView) {
       return (
         <div className="skeleton-view" style={{ height: '100%', width: '100%' }}>
-          <div className="skeleton-gradient-background"></div>
           {textPreview && (
             <div 
               className="node-preview-text"
