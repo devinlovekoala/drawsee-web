@@ -268,9 +268,6 @@ export function dagreLayout(nodes: Node[], edges: Edge[], shouldUpdateServer: bo
 }
 
 export function entitreeFlexLayout(nodes: Node[], edges: Edge[], nodeWidth: number, shouldUpdateServer: boolean = false, resetHeight: boolean = false): { nodes: Node[], edges: Edge[] } {
-  // 记录开始时间
-  //const startTime = performance.now();
-
   try {
     if (nodes.length === 0) {
       return { nodes, edges };
@@ -294,25 +291,39 @@ export function entitreeFlexLayout(nodes: Node[], edges: Edge[], nodeWidth: numb
     // 构建扁平树结构
     const flatTree = {} as Record<string, { width: number, height: number, children: string[], parents: string[] }>;
     
-    // 保存电路点节点的ID和高度，避免重复计算导致高度变化
-    const circuitPointNodes: Record<string, number> = {};
+    // 保存节点类型和高度的映射，确保相同类型的节点高度一致性
+    const nodeTypeHeightMap: Record<string, number> = {};
+    
+    // 保存特殊类型节点的ID和高度，避免重复计算导致高度变化
+    const specialNodeHeights: Record<string, number> = {};
     
     nodes.forEach(node => {
       const width = node.type !== 'root' ? nodeWidth : ROOT_NODE_SIZE;
       let height: number;
       
-      // 对特定类型节点保持高度稳定
-      if (node.type === 'circuit-point' || node.type === 'answer-point' || node.type === 'ANSWER_POINT') {
-        // 如果是电路点节点，尽量保持其高度稳定
-        if (node.data.height !== undefined && !resetHeight) {
+      // 特殊处理特定类型节点以保持其高度稳定
+      if (node.type === 'circuit-point' || node.type === 'answer-point' || node.type === 'ANSWER_POINT' || 
+          node.type === 'knowledge-head') {
+        // 如果是这些特殊类型节点，尽量保持其高度稳定
+        if (specialNodeHeights[node.id] !== undefined) {
+          // 如果已经在本次布局中计算过，使用缓存值
+          height = specialNodeHeights[node.id];
+        } else if (node.data.height !== undefined && !resetHeight) {
+          // 如果节点有高度且不需要重置，使用已有高度
           height = node.data.height as number;
-          circuitPointNodes[node.id] = height;
+          specialNodeHeights[node.id] = height;
+        } else if (nodeTypeHeightMap[node.type] !== undefined) {
+          // 如果相同类型已经计算过，使用相同类型的高度
+          height = nodeTypeHeightMap[node.type];
+          specialNodeHeights[node.id] = height;
         } else {
-          // 如果没有缓存高度，则计算高度
+          // 如果都没有，则计算高度并缓存
           height = calculateNodeHeight(node as Node<NodeData<NodeType>>, nodeWidth);
-          circuitPointNodes[node.id] = height;
-          node.data.height = height;
+          nodeTypeHeightMap[node.type] = height;
+          specialNodeHeights[node.id] = height;
         }
+        // 更新节点数据中的高度信息
+        node.data.height = height;
       }
       // 获得节点高度
       else if (node.id.startsWith(TEMP_QUERY_NODE_ID_PREFIX)) {
@@ -322,7 +333,7 @@ export function entitreeFlexLayout(nodes: Node[], edges: Edge[], nodeWidth: numb
       } else if (!resetHeight && node.data.height !== undefined) {
         height = node.data.height as number;
       } else {
-        // 如果没有缓存高度，则计算高度
+        // 如果没有缓存高度或需要重置高度，则计算高度
         height = calculateNodeHeight(node as Node<NodeData<NodeType>>, nodeWidth);
         
         // 将没有高度信息的节点添加到需要更新的列表中
@@ -346,35 +357,36 @@ export function entitreeFlexLayout(nodes: Node[], edges: Edge[], nodeWidth: numb
       };
     });
     
+    // 优化布局设置参数，使布局更加稳定
     const settings = {
-      clone: false, // 如果您的应用程序不允许编辑原始对象，则返回输入的副本
-      enableFlex: true, // 如果关闭，性能略好（不会读取node.width，node.height）
-      firstDegreeSpacing: 75, // 节点之间的间距（像素），属于同一源的节点，例如具有相同父节点的子节点
-      nextAfterAccessor: "spouses", // 用于在当前节点之后侧向移动的侧节点属性
-      nextAfterSpacing: 10, // 当前节点之后的"侧"节点的间距
-      nextBeforeAccessor: "siblings", // 用于在当前节点之前侧向移动的侧节点属性
-      nextBeforeSpacing: 10, // 当前节点之前的"侧"节点的间距
-      nodeHeight: 40, // 默认节点高度（像素）
-      nodeWidth: 40, // 默认节点宽度（像素）
-      orientation: "vertical", // "垂直"以查看顶部的父节点和底部的子节点，"水平"以查看左侧的父节点和
-      rootX: 0, // 如果不是0，设置根节点的位置
-      rootY: 0, // 如果不是0，设置根节点的位置
-      secondDegreeSpacing: 20, // 节点之间的间距（像素），不属于同一父节点的节点，例如"cousin"节点
-      sourcesAccessor: "parents", // 用作祖先ID数组的属性
-      sourceTargetSpacing: 120, // 在垂直方向上节点之间的间距（垂直方向），否则在水平方向
-      targetsAccessor: "children", // 用作子节点ID数组的属性
+      clone: false,
+      enableFlex: true,
+      // 调整节点间距，使布局更加紧凑但不拥挤
+      firstDegreeSpacing: 75, // 相同父节点的子节点间距
+      nextAfterSpacing: 10,
+      nextBeforeSpacing: 10,
+      nodeHeight: 40,
+      nodeWidth: 40,
+      orientation: "vertical",
+      rootX: 0,
+      rootY: 0,
+      secondDegreeSpacing: 20, // 不同父节点的节点间距
+      sourcesAccessor: "parents",
+      // 增加父子节点之间的垂直间距，避免节点重叠
+      sourceTargetSpacing: 120,
+      targetsAccessor: "children",
     } as Partial<Settings>;
     
     const {map: layoutedTreeMap} = layoutFromMap(rootId, flatTree, settings);
     
-    // 应用布局结果到节点
+    // 应用布局结果到节点，并保持特殊节点的高度不变
     const layoutedNodes = Object.entries(layoutedTreeMap).map(([id, node]) => {
       const originalNode = nodes.find(n => n.id === id);
       if (!originalNode) return null;
       
-      // 对于电路点节点，确保其高度保持不变
-      if (circuitPointNodes[id] !== undefined) {
-        originalNode.data.height = circuitPointNodes[id];
+      // 对于特殊类型节点，确保其高度保持不变
+      if (specialNodeHeights[id] !== undefined) {
+        originalNode.data.height = specialNodeHeights[id];
       }
       
       // 检查位置是否发生变化
@@ -406,6 +418,7 @@ export function entitreeFlexLayout(nodes: Node[], edges: Edge[], nodeWidth: numb
         }
       }
       
+      // 返回布局后的节点
       return {
         ...originalNode,
         position: { x: node.x, y: node.y }

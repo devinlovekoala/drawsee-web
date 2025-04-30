@@ -1,12 +1,22 @@
 import './ResourceNode.css';
 import BilibiliContent from './components/BilibiliContent';
 import AnimationContent from './components/AnimationContent';
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import BaseNode, { ExtendedNodeProps } from '../base/BaseNode';
 import { FaVideo } from 'react-icons/fa';
 import GeneratedAnimationContent from './components/GeneratedAnimationContent';
 
 function ResourceNode({data, ...props}: ExtendedNodeProps<'resource'>) {
+  // 为生成的动画节点添加数据变化日志
+  useEffect(() => {
+    if (data.subtype === 'generated-animation') {
+      console.log(`ResourceNode ${props.id} 数据更新:`, {
+        objectName: data.objectName,
+        progress: data.progress,
+        hasFrame: !!data.frame
+      });
+    }
+  }, [data, props.id]);
 
   const customContent = useMemo(() => {
     if (data.subtype === 'bilibili') {
@@ -41,7 +51,7 @@ function ResourceNode({data, ...props}: ExtendedNodeProps<'resource'>) {
         {data.subtype === 'generated-animation' && (
           <div className="badge badge-purple">
             <FaVideo className="badge-icon" />
-            生成动画
+            {data.objectName ? '生成动画' : '生成中...'}
           </div>
         )}
       </div>

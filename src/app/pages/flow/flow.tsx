@@ -31,6 +31,7 @@ import { useAppContext } from "@/app/contexts/AppContext";
 import ResourceNode from "./components/node/resource/ResourceNode";
 import FlowLeftToolBar from "./components/FlowLeftToolBar";
 import { TASK_KEY_PREFIX } from "@/common/constant/storage-key.constant";
+import { useViewportChange } from "./hooks/useViewportChange";
 
 const nodeTypes = {
   'root': RootNode,
@@ -187,6 +188,38 @@ function Flow() {
       };
     });
   }, [setElements]);
+
+  // 使用视口变化监听hook - 解决缩放时节点布局问题
+  useViewportChange(elements.nodes, elements.edges, isChatting, setElements);
+
+  // 监听节点缩放变化事件 - 补充处理BaseNode组件发出的缩放变化事件
+  useEffect(() => {
+    const handleNodeScaleChanged = (event: CustomEvent) => {
+      // 避免在聊天或加载过程中处理
+      if (isChatting || isLoading || elements.nodes.length === 0) return;
+      
+      // 获取缩放值
+      const { zoom } = event.detail;
+      console.log('检测到节点缩放变化，缩放值:', zoom);
+      
+      // 在小缩放值时进行更精细的布局优化
+      if (zoom < 0.3) {
+        // 使用低缩放专用的布局参数进行重布局
+        setElements(({nodes, edges}) => {
+          const layoutedNodes = executeLayout(nodes, edges, false, false);
+          return { nodes: layoutedNodes, edges };
+        });
+      }
+    };
+    
+    // 添加事件监听
+    window.addEventListener('node-scale-changed', handleNodeScaleChanged as EventListener);
+    
+    // 清理函数
+    return () => {
+      window.removeEventListener('node-scale-changed', handleNodeScaleChanged as EventListener);
+    };
+  }, [isChatting, isLoading, elements.nodes.length, executeLayout, setElements]);
 
   // 监听convId变化，立即重置状态
   useEffect(() => {

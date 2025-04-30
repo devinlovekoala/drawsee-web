@@ -171,6 +171,14 @@ export const BaseNode = React.memo(function BaseNode<T extends NodeType>({
       if (zoom !== currentZoom) {
         setCurrentZoom(zoom);
         setIsSimplifiedView(zoom < ZOOM_THRESHOLD);
+        
+        // 当缩放级别变化较大时，通知整个应用进行布局调整
+        if (Math.abs(zoom - currentZoom) > 0.1) {
+          // 在DOM上分发一个自定义事件，以便其他组件能够响应
+          window.dispatchEvent(new CustomEvent('node-scale-changed', {
+            detail: { zoom }
+          }));
+        }
       }
     };
     

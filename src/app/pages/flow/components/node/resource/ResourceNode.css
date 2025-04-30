@@ -335,6 +335,15 @@
   text-align: center;
 }
 
+.animation-error-detail {
+  text-align: center;
+  color: var(--color-red-text);
+  opacity: 0.8;
+  max-width: 90%;
+  margin: 0 auto;
+  word-break: break-word;
+}
+
 .animation-error-actions {
   display: flex;
   margin-top: 0.5rem;

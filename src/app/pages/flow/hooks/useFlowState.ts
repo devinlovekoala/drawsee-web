@@ -234,6 +234,17 @@ function useFlowState(convId: number) {
               return {nodes, edges};
             }
             
+            // 检查是否为动画渲染完成的更新
+            const isAnimationCompleted = 
+              targetNode.type === 'resource' && 
+              targetNode.data.subtype === 'generated-animation' && 
+              'objectName' in data && 
+              data.objectName;
+            
+            if (isAnimationCompleted) {
+              console.log(`动画渲染已完成，节点ID: ${nodeId}，objectName: ${data.objectName}`);
+            }
+            
             // 更新节点数据
             const updatedNodes = nodes.map(node =>
               node.id === nodeId ? 
@@ -244,7 +255,9 @@ function useFlowState(convId: number) {
                   // 去除nodeId
                   ...Object.fromEntries(
                     Object.entries(data).filter(([key]) => key !== 'nodeId')
-                  )
+                  ),
+                  // 如果是动画渲染完成，移除progress状态以强制组件显示视频
+                  ...(isAnimationCompleted ? { progress: undefined } : {})
                 }
               } : node
             );
@@ -253,6 +266,14 @@ function useFlowState(convId: number) {
             if (JSON.stringify(nodes) !== JSON.stringify(updatedNodes)) {
               // 执行布局时不重置高度，防止布局变形
               const layoutedNodes = executeLayout(updatedNodes, edges, false, false);
+              
+              // 如果是动画渲染完成，延迟后聚焦到该节点
+              if (isAnimationCompleted) {
+                setTimeout(() => {
+                  executeFitView([nodeId], 500);
+                }, 500);
+              }
+              
               return {
                 nodes: layoutedNodes,
                 edges,
