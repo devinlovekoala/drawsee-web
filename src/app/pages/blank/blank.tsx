@@ -61,7 +61,10 @@ function Blank() {
         'circuit-analyze': 'CIRCUIT_ANALYSIS'
       };
       
-      if (typeMap[queryForm.type as string]) {
+      // 检查是否需要进行类型转换（只有当类型是字符串且为小写格式时）
+      if (typeof queryForm.type === 'string' && 
+          queryForm.type !== queryForm.type.toUpperCase() && 
+          typeMap[queryForm.type as string]) {
         setQueryForm(prev => ({ ...prev, type: typeMap[queryForm.type as string] }));
       }
     }
@@ -70,6 +73,7 @@ function Blank() {
   // 当location变化时，更新queryForm的type字段
   useEffect(() => {
     if (location.state?.agentType) {
+      // 直接使用提供的类型，无需转换，因为AgentMenu组件已经提供了正确的大写格式
       setQueryForm(prev => ({
         ...prev,
         type: location.state.agentType as AiTaskType,
@@ -94,8 +98,15 @@ function Blank() {
 
       // 更新知识问答模式状态
       setIsKnowledgeMode(location.state.agentType === 'KNOWLEDGE');
+      
+      // 输出调试信息到控制台
+      console.log('功能切换:', {
+        from: queryForm.type,
+        to: location.state.agentType,
+        agent: location.state.agentName
+      });
     }
-  }, [location.state, navigate]);
+  }, [location.state]);
 
   const [showImageUploader, setShowImageUploader] = useState(false);
   const [solvingWays, setSolvingWays] = useState<string[]>([]);
@@ -249,6 +260,11 @@ function Blank() {
   const isSolverMode = queryForm.type === "SOLVER_FIRST";
   // 判断是否为动画生成模式
   const isAnimationMode = queryForm.type === "ANIMATION";
+  
+  // 开发调试：监控queryForm.type变化
+  useEffect(() => {
+    console.log('当前功能类型变更:', queryForm.type);
+  }, [queryForm.type]);
 
   // 根据模式获取页面标题和描述
   const getPageInfo = () => {

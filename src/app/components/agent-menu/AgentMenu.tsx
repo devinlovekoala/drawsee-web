@@ -11,7 +11,7 @@ const agents = [
     name: 'AI推理解题',
     description: '提供强大的数学、物理等多学科推理解题能力',
     icon: SparklesIcon,
-    type: 'solver-first',
+    type: 'SOLVER_FIRST',
     isActive: true,
   },
   {
@@ -19,7 +19,7 @@ const agents = [
     name: 'AI动画生成',
     description: '将复杂概念转换为生动直观的动画形式',
     icon: Wand2,
-    type: 'animation',
+    type: 'ANIMATION',
     isActive: true,
   },
   {
@@ -27,7 +27,7 @@ const agents = [
     name: 'AI电子电路分析',
     description: '电子电路分析与仿真，帮助理解电路原理',
     icon: BrainCircuit,
-    type: 'circuit-analyze',
+    type: 'CIRCUIT_ANALYSIS',
     isActive: true,
   }
 ];
@@ -44,60 +44,6 @@ const learningTools = [
   }
 ];
 
-// const agentModes = [
-//   {
-//     id: 'general',
-//     name: '通用对话',
-//     description: '基础AI对话，回答各类问题',
-//     icon: 'message-circle',
-//     type: 'general' as AiTaskType
-//   },
-//   {
-//     id: 'knowledge',
-//     name: '知识问答',
-//     description: '基于知识库的AI对话',
-//     icon: 'book-open',
-//     type: 'knowledge' as AiTaskType
-//   },
-//   {
-//     id: 'solver',
-//     name: '解题推理',
-//     description: '复杂问题求解、推理和证明',
-//     icon: 'sparkles',
-//     type: 'solver-first' as AiTaskType
-//   },
-//   {
-//     id: 'html-maker',
-//     name: '网页生成',
-//     description: '生成HTML网页，预览效果',
-//     icon: 'code',
-//     type: 'html-maker' as AiTaskType
-//   },
-//   {
-//     id: 'planner',
-//     name: '目标解析',
-//     description: '分解目标、任务规划与指导',
-//     icon: 'target',
-//     type: 'planner' as AiTaskType
-//   },
-//   {
-//     id: 'animation',
-//     name: '动画生成',
-//     description: '创建教学动画，生动演示',
-//     icon: 'tv',
-//     type: 'animation' as AiTaskType,
-//     isNew: true
-//   },
-//   {
-//     id: 'circuit',
-//     name: '电路分析',
-//     description: '设计分析电子电路',
-//     icon: 'circuit-board',
-//     type: 'circuit-analyze' as AiTaskType,
-//     isNew: true
-//   }
-// ];
-
 export function AgentMenu() {
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(true);
@@ -110,16 +56,16 @@ export function AgentMenu() {
     }
 
     // 根据不同的agent类型导航到相应页面，并携带参数
-    if (agent.type === 'circuit-analyze') {
+    if (agent.type === 'CIRCUIT_ANALYSIS') {
       // 电路分析模式直接导航到电路分析页面
       navigate('/circuit');
     } else {
       // 其他模式导航到blank页面
-      navigate('/blank', { 
-        state: { 
+      navigate('/blank', {
+        state: {
           agentType: agent.type,
-          agentName: agent.name 
-        } 
+          agentName: agent.name
+        }
       });
     }
   };

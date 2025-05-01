@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Logo from '../../assets/svg/昭析.svg';
+import { LOGIN_FLAG_KEY } from '@/common/constant/storage-key.constant.ts';
 
 const NavBar: React.FC = () => {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -18,7 +19,18 @@ const NavBar: React.FC = () => {
   }, []);
 
   const handleLogin = () => {
-    navigate('/blank', { state: { from: '/about' } });
+    // 检查用户是否已登出
+    const hasLoggedOut = localStorage.getItem('Auth:LoggedOut') === 'true';
+    const isLoggedIn = sessionStorage.getItem(LOGIN_FLAG_KEY) === 'true';
+    
+    // 如果已登出或未登录，则不跳转到应用页面，而是进入登录拦截模式
+    if (hasLoggedOut || !isLoggedIn) {
+      // 将状态设置为需要登录，App组件会检测并显示登录表单
+      navigate('/blank', { state: { requireLogin: true } });
+    } else {
+      // 已登录用户直接跳转
+      navigate('/blank', { state: { from: '/about' } });
+    }
   };
 
   return (

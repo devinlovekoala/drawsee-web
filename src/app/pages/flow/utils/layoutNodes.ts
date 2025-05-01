@@ -302,8 +302,8 @@ export function entitreeFlexLayout(nodes: Node[], edges: Edge[], nodeWidth: numb
       let height: number;
       
       // 特殊处理特定类型节点以保持其高度稳定
-      if (node.type === 'circuit-point' || node.type === 'answer-point' || node.type === 'ANSWER_POINT' || 
-          node.type === 'knowledge-head') {
+      if (node.type === 'circuit-point' || node.type === 'answer-point' || 
+          node.type === 'knowledge-head' || node.type === 'knowledge-detail') {
         // 如果是这些特殊类型节点，尽量保持其高度稳定
         if (specialNodeHeights[node.id] !== undefined) {
           // 如果已经在本次布局中计算过，使用缓存值

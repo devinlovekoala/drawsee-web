@@ -118,13 +118,36 @@ function App() {
       return;
     }
 
+    // 检查是否要求显示登录表单
+    const locationState = location.state as any;
+    if (locationState?.requireLogin) {
+      setIsLogin(false);
+      return;
+    }
+
     // 自动登录校验
     const loginFlag = sessionStorage.getItem(LOGIN_FLAG_KEY);
+    // 检查是否已经登出
+    const hasLoggedOut = localStorage.getItem('Auth:LoggedOut') === 'true';
+    
     if (!loginFlag) {
+      // 如果用户已经主动登出，则不执行自动登录，而是显示登录界面
+      if (hasLoggedOut) {
+        setIsLogin(false);
+        // 如果当前不在about页面，则重定向到about页面
+        if (location.pathname !== '/about') {
+          navigate('/about');
+        }
+        return;
+      }
+      
+      // 尝试自动登录
       checkLogin()
         .then((data) => {
           toast.info("欢迎回来");
           sessionStorage.setItem(LOGIN_FLAG_KEY, JSON.stringify(true));
+          // 清除登出标志
+          localStorage.removeItem('Auth:LoggedOut');
           setIsLogin(true);
           setUserInfo({
             username: data.username,
@@ -139,7 +162,7 @@ function App() {
           setIsLogin(false);
         });
     }
-  }, [getConvData, navigate]);
+  }, [getConvData, navigate, location.pathname, location.state]);
 
   // 登录成功后的操作
   const handleLoginSuccess = useCallback((data: LoginVO) => {
@@ -147,6 +170,8 @@ function App() {
     if (data.token) {
       localStorage.setItem(TOKEN_KEY, data.token);
     }
+    // 清除登出标志
+    localStorage.removeItem('Auth:LoggedOut');
     setUserInfo({
       username: data.username,
       aiTaskCount: data.aiTaskCount,
@@ -274,9 +299,15 @@ function App() {
 
   // 退出登录
   const handleLogout = useCallback(() => {
+    // 清除会话存储
     sessionStorage.clear();
-    localStorage.clear();
+    // 只清除身份验证相关的localStorage，保留其他设置
+    localStorage.removeItem(TOKEN_KEY);
+    // 设置一个显式的登出标志，以便区分首次访问和已登出状态
+    localStorage.setItem('Auth:LoggedOut', 'true');
+    // 更新状态
     setIsLogin(false);
+    // 导航到欢迎页
     navigate('/about');
   }, [navigate]);
 
