@@ -118,6 +118,16 @@ function App() {
       return;
     }
 
+    // 如果已经登录，就不需要处理其他逻辑了
+    const loginFlag = sessionStorage.getItem(LOGIN_FLAG_KEY);
+    if (loginFlag === 'true') {
+      // 已登录状态下，如果有requireLogin参数，清除它
+      if (location.state && (location.state as any).requireLogin) {
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+      return;
+    }
+
     // 检查是否要求显示登录表单
     const locationState = location.state as any;
     if (locationState?.requireLogin) {
@@ -125,62 +135,74 @@ function App() {
       return;
     }
 
-    // 自动登录校验
-    const loginFlag = sessionStorage.getItem(LOGIN_FLAG_KEY);
     // 检查是否已经登出
     const hasLoggedOut = localStorage.getItem('Auth:LoggedOut') === 'true';
     
-    if (!loginFlag) {
-      // 如果用户已经主动登出，则不执行自动登录，而是显示登录界面
-      if (hasLoggedOut) {
-        setIsLogin(false);
-        // 如果当前不在about页面，则重定向到about页面
-        if (location.pathname !== '/about') {
-          navigate('/about');
-        }
-        return;
+    // 如果用户已经主动登出，则不执行自动登录，而是显示登录界面
+    if (hasLoggedOut) {
+      setIsLogin(false);
+      // 如果当前不在about页面，则重定向到about页面
+      if (location.pathname !== '/about') {
+        navigate('/about');
       }
-      
-      // 尝试自动登录
-      checkLogin()
-        .then((data) => {
-          toast.info("欢迎回来");
-          sessionStorage.setItem(LOGIN_FLAG_KEY, JSON.stringify(true));
-          // 清除登出标志
-          localStorage.removeItem('Auth:LoggedOut');
-          setIsLogin(true);
-          setUserInfo({
-            username: data.username,
-            aiTaskCount: data.aiTaskCount,
-            aiTaskLimit: data.aiTaskLimit
-          });
-          getConvData();
-          navigate("/blank");
-        })
-        .catch(() => {
-          toast.error("未登录，请先登录");
-          setIsLogin(false);
-        });
+      return;
     }
+    
+    // 尝试自动登录
+    checkLogin()
+      .then((data) => {
+        toast.info("欢迎回来");
+        sessionStorage.setItem(LOGIN_FLAG_KEY, JSON.stringify(true));
+        // 清除登出标志
+        localStorage.removeItem('Auth:LoggedOut');
+        setIsLogin(true);
+        setUserInfo({
+          username: data.username,
+          aiTaskCount: data.aiTaskCount,
+          aiTaskLimit: data.aiTaskLimit
+        });
+        getConvData();
+        navigate("/blank");
+      })
+      .catch(() => {
+        toast.error("未登录，请先登录");
+        setIsLogin(false);
+      });
   }, [getConvData, navigate, location.pathname, location.state]);
 
   // 登录成功后的操作
   const handleLoginSuccess = useCallback((data: LoginVO) => {
+    // 防止重复处理，如果已经登录则不执行后续操作
+    if (isLogin) return;
+    
+    // 立即更新登录状态，避免重复显示登录表单
     setIsLogin(true);
+    
     if (data.token) {
       localStorage.setItem(TOKEN_KEY, data.token);
     }
     // 清除登出标志
     localStorage.removeItem('Auth:LoggedOut');
+    
+    // 更新用户信息
     setUserInfo({
       username: data.username,
       aiTaskCount: data.aiTaskCount,
       aiTaskLimit: data.aiTaskLimit
     });
+    
+    // 设置登录标志
     sessionStorage.setItem(LOGIN_FLAG_KEY, JSON.stringify(true));
-    navigate("/blank");
+    
+    // 清除URL中的state参数，避免在跳转后仍然保留requireLogin标志
+    window.history.replaceState({}, document.title, window.location.pathname);
+    
+    // 跳转到应用页面
+    navigate("/blank", { replace: true });
+    
+    // 获取会话数据
     getConvData();
-  }, [getConvData, navigate]);
+  }, [isLogin, getConvData, navigate]);
 
   // 删除对话框相关函数
   const openDeleteNodeDialog = useCallback((nodeId: string) => {

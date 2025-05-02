@@ -1,4 +1,4 @@
-import {useState} from "react";
+import {useState, useRef} from "react";
 import {toast} from "sonner";
 import {login, signup} from "@/api/methods/auth.methods.ts";
 import {LoginVO, UserSignUpDTO} from "@/api/types/auth.types.ts";
@@ -19,19 +19,32 @@ function AuthForm({className, onSuccess}: Props) {
 		password: '',
 		passwordConfirm: ''
 	});
+	
+	// 使用ref跟踪表单提交状态，防止重复提交
+	const isSubmitting = useRef(false);
 
 	const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
+		
+		// 如果已经在提交中，直接返回
+		if (isSubmitting.current || loading) {
+			return;
+		}
+		
+		// 标记开始提交
+		isSubmitting.current = true;
 		setLoading(true);
 
 		if (form.username === '') {
 			toast.error("用户名不能为空");
 			setLoading(false);
+			isSubmitting.current = false;
 			return;
 		}
 		if (form.password === '') {
 			toast.error("密码不能为空");
 			setLoading(false);
+			isSubmitting.current = false;
 			return;
 		}
 
@@ -39,18 +52,19 @@ function AuthForm({className, onSuccess}: Props) {
 			login(form.username, form.password)
 				.then((data) => {
 					toast.success("登录成功");
+					// 登录成功直接回调，不重置表单状态
 					onSuccess(data);
 				})
 				.catch((error: Error) => {
 					toast.error(`登录失败，${error.message}`);
-				})
-				.finally(() => {
+					isSubmitting.current = false;
 					setLoading(false);
 				});
 		} else {
 			if (form.password !== form.passwordConfirm) {
 				toast.error("两次输入的密码不一致");
 				setLoading(false);
+				isSubmitting.current = false;
 				return;
 			}
 
@@ -62,12 +76,12 @@ function AuthForm({className, onSuccess}: Props) {
 			signup(userSignUpDTO)
 				.then((data) => {
 					toast.success("注册成功");
+					// 注册成功直接回调，不重置表单状态
 					onSuccess(data);
 				})
 				.catch((error: Error) => {
 					toast.error(`注册失败，${error.message}`);
-				})
-				.finally(() => {
+					isSubmitting.current = false;
 					setLoading(false);
 				});
 		}
@@ -108,6 +122,7 @@ function AuthForm({className, onSuccess}: Props) {
 									placeholder="请输入用户名"
 									value={form.username}
 									onChange={(e) => setForm(prev => ({...prev, username: e.target.value}))}
+									disabled={loading}
 									required
 								/>
 							</div>
@@ -124,6 +139,7 @@ function AuthForm({className, onSuccess}: Props) {
 									placeholder="请输入密码"
 									value={form.password}
 									onChange={(e) => setForm(prev => ({...prev, password: e.target.value}))}
+									disabled={loading}
 									required
 								/>
 							</div>
@@ -141,6 +157,7 @@ function AuthForm({className, onSuccess}: Props) {
 										placeholder="请再次输入密码"
 										value={form.passwordConfirm}
 										onChange={(e) => setForm(prev => ({...prev, passwordConfirm: e.target.value}))}
+										disabled={loading}
 										required
 									/>
 								</div>
@@ -170,9 +187,12 @@ function AuthForm({className, onSuccess}: Props) {
 						type="button"
 						className="inline-flex w-full justify-center text-sm text-neutral-500 hover:text-neutral-900 transition-colors"
 						onClick={() => {
+							// 切换表单模式时，如果正在加载则不允许
+							if (loading) return;
 							setIsLogin(!isLogin);
 							setForm({username: '', password: '', passwordConfirm: ''});
 						}}
+						disabled={loading}
 					>
 						{isLogin ? "还没有账号？点击注册" : "已有账号？点击登录"}
 					</button>
