@@ -17,11 +17,7 @@ export type TempQueryNodeTask = {
 // 定义允许用户追问的节点类型
 const ALLOWED_PARENT_TYPES: NodeType[] = [
   'root', 
-  'answer', 
   'knowledge-detail', 
-  'knowledge-head',
-  'answer-point', 
-  'ANSWER_POINT',
   'answer-detail', 
   'ANSWER_DETAIL',
   'circuit-point',
@@ -74,8 +70,21 @@ function useTempQueryNode(
       if (rootNodeId === null) setCanNotInputReason('没有选中节点，无法追问');
       return rootNodeId !== null;
     }
+    
+    // 显式检查不允许追问的节点类型
+    const nodeType = selectedNode.type as NodeType;
+    if (
+      nodeType === 'answer' || 
+      nodeType === 'knowledge-head' || 
+      nodeType === 'answer-point' || 
+      nodeType === 'ANSWER_POINT'
+    ) {
+      setCanNotInputReason('当前节点不允许追问');
+      return false;
+    }
+    
     // 选中节点是允许用户追问的节点类型
-    if (!ALLOWED_PARENT_TYPES.includes(selectedNode.type as NodeType)) {
+    if (!ALLOWED_PARENT_TYPES.includes(nodeType)) {
       setCanNotInputReason('当前节点不允许追问');
       return false;
     }
