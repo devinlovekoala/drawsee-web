@@ -1,22 +1,23 @@
-import { createContext, useContext } from "react";
+import React, { createContext, useContext } from "react";
 import { ChatTask } from "../pages/flow/types/ChatTask.types";
 
-export type FlowLocationState = {
+export interface FlowLocationState {
   convId: number;
   taskId?: number;
   from?: string;
-};
+  classId?: string | null;
+}
 
-export type FlowContextType = {
+export interface FlowContextType {
   chat: (taskId: number) => void;
-  convId: number;
+  convId: number | null;
   isChatting: boolean;
   addChatTask: (task: ChatTask) => void;
 }
 
 export const FlowContext = createContext<FlowContextType>({
   chat: () => {},
-  convId: -1,
+  convId: null,
   isChatting: false,
   addChatTask: () => {},
 });

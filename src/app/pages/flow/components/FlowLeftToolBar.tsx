@@ -1,11 +1,15 @@
-import { ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Trash2, ArrowLeft } from 'lucide-react';
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLocation } from 'react-router-dom';
 import { useAppContext } from '@/app/contexts/AppContext';
 import { FlowLocationState } from '@/app/contexts/FlowContext';
 
-function FlowLeftToolBar() {
+interface FlowLeftToolBarProps {
+  onBack?: () => void; // 新增返回班级列表的回调函数
+}
+
+function FlowLeftToolBar({ onBack }: FlowLeftToolBarProps) {
   const [isCollapsed, setIsCollapsed] = useState(true);
   const { convId } = useLocation().state as FlowLocationState;
   const { openDeleteConversationDialog, toggleSideBar, openSideBar } = useAppContext();
@@ -31,6 +35,17 @@ function FlowLeftToolBar() {
             transition={{ duration: 0.3, ease: "easeInOut" }}
             className="flex items-center gap-[0.3rem] text-[12px] px-2"
           >
+            {/* 返回班级列表按钮 */}
+            {onBack && (
+              <button
+                className="flex items-center justify-center bg-indigo-100 hover:bg-indigo-200 active:bg-indigo-300 rounded-lg px-2 py-[6px] text-indigo-600 transition-colors duration-200"
+                onClick={onBack}
+              >
+                <ArrowLeft className="w-[16px] h-[16px]" />
+                <span className="ml-1.5 font-medium">返回班级</span>
+              </button>
+            )}
+
             <button
               className="flex items-center justify-center bg-neutral-200 hover:bg-neutral-200 active:bg-neutral-300 rounded-lg px-2 py-[6px] text-neutral-600 transition-colors duration-200"
               onClick={toggleSideBar}

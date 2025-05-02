@@ -24,12 +24,10 @@ function Blank() {
     model: ModelType;
   }
 
-  // 从location中获取agent类型
+  // 从location中获取agent类型和班级ID
   const agentType = location.state?.agentType as AiTaskType || 'GENERAL';
   const agentName = location.state?.agentName as string;
-
-  // 添加是否启用知识问答模式的状态
-  const [isKnowledgeMode, setIsKnowledgeMode] = useState<boolean>(agentType === 'KNOWLEDGE');
+  const classId = location.state?.classId as string || null;
 
   const [queryForm, setQueryForm] = useState<QueryForm>({
     type: agentType,
@@ -38,14 +36,6 @@ function Blank() {
     model: "doubao"
   });
   
-  // 当知识问答模式切换时，更新 queryForm 的 type
-  useEffect(() => {
-    setQueryForm(prev => ({
-      ...prev,
-      type: isKnowledgeMode ? 'KNOWLEDGE' : 'GENERAL'
-    }));
-  }, [isKnowledgeMode]);
-
   // 确保类型值的大写格式
   useEffect(() => {
     if (queryForm.type) {
@@ -95,9 +85,6 @@ function Blank() {
       if (location.state.agentType === 'CIRCUIT_ANALYSIS') {
         // 保持在当前页面，使用户可以选择输入问题或跳转
       }
-
-      // 更新知识问答模式状态
-      setIsKnowledgeMode(location.state.agentType === 'KNOWLEDGE');
       
       // 输出调试信息到控制台
       console.log('功能切换:', {
@@ -107,6 +94,15 @@ function Blank() {
       });
     }
   }, [location.state]);
+
+  // 当进入页面时，打印调试信息
+  useEffect(() => {
+    console.log('Blank页面加载，参数:', {
+      agentType,
+      agentName,
+      classId
+    });
+  }, [agentType, agentName, classId]);
 
   const [showImageUploader, setShowImageUploader] = useState(false);
   const [solvingWays, setSolvingWays] = useState<string[]>([]);
@@ -179,7 +175,8 @@ function Blank() {
         promptParams: promptParams,
         convId: null,
         parentId: null,
-        model: ["GENERAL", "KNOWLEDGE", "ANIMATION", "SOLVER_FIRST", "CIRCUIT_ANALYSIS"].includes(queryForm.type) ? queryForm.model : null
+        model: ["GENERAL", "KNOWLEDGE", "ANIMATION", "SOLVER_FIRST", "CIRCUIT_ANALYSIS"].includes(queryForm.type) ? queryForm.model : null,
+        classId: classId // 添加班级ID
       };
 
       console.log('发送AI任务', createAiTaskDTO);
@@ -206,7 +203,7 @@ function Blank() {
     } finally {
       setIsProcessing(false);
     }
-  }, [isProcessing, queryForm.prompt, queryForm.type, queryForm.promptParams, queryForm.model, selectedWay, customWay, handleAiTaskCountPlus, handleBlankQuery, navigate]);
+  }, [isProcessing, queryForm.prompt, queryForm.type, queryForm.promptParams, queryForm.model, selectedWay, customWay, handleAiTaskCountPlus, handleBlankQuery, navigate, classId]);
 
   // 处理模型变更
   const handleModelChange = (model: ModelType) => {
@@ -293,7 +290,7 @@ function Blank() {
 
   const pageInfo = getPageInfo();
 
-  // 电路分析模式的指导提示
+  // 渲染电路分析模式指南
   const renderCircuitAnalysisGuide = () => {
     if (queryForm.type !== "CIRCUIT_ANALYSIS") {
       return null;
@@ -599,19 +596,10 @@ function Blank() {
                       <div className="mb-4 whitespace-nowrap md:mb-0">
                         <div className="flex gap-3">
                           {/* 在通用、知识、解题、动画和电路分析模式下显示模型选择器 */}
-                          {['GENERAL', 'KNOWLEDGE', 'ANIMATION', 'SOLVER_FIRST', 'CIRCUIT_ANALYSIS'].includes(queryForm.type) && (
+                          {['GENERAL', 'ANIMATION', 'SOLVER_FIRST', 'CIRCUIT_ANALYSIS'].includes(queryForm.type) && (
                             <ModelSelector 
                               selectedModel={queryForm.model} 
                               onModelChange={handleModelChange} 
-                            />
-                          )}
-                          
-                          {/* 只在通用对话模式下显示知识问答切换开关 */}
-                          {['GENERAL', 'KNOWLEDGE'].includes(queryForm.type) && (
-                            <Switch
-                              label="知识问答模式"
-                              checked={isKnowledgeMode}
-                              onChange={setIsKnowledgeMode}
                             />
                           )}
                         </div>

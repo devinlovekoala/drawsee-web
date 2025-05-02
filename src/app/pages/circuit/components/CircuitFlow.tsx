@@ -144,9 +144,10 @@ interface CircuitFlowProps {
   selectedModel?: string;
   initialCircuitDesign?: CircuitDesign; // 添加初始电路设计数据
   isReadOnly?: boolean; // 是否为只读模式，禁用编辑功能
+  classId?: string | null; // 添加班级ID参数
 }
 
-export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'doubao', initialCircuitDesign, isReadOnly = false }: CircuitFlowProps) => {
+export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'doubao', initialCircuitDesign, isReadOnly = false, classId = null }: CircuitFlowProps) => {
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -157,6 +158,13 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'doubao', i
   const reactFlowInstance = useReactFlow();
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const { handleBlankQuery, handleAiTaskCountPlus } = useAppContext();
+  
+  // 显示班级ID信息（如果有）
+  useEffect(() => {
+    if (classId) {
+      console.log('当前班级ID:', classId);
+    }
+  }, [classId]);
   
   // 加载初始电路设计数据
   useEffect(() => {
@@ -582,7 +590,8 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'doubao', i
         promptParams: {},
         convId: null,
         parentId: null,
-        model: currentModel
+        model: currentModel,
+        classId: classId // 添加班级ID
       };
       
       console.log('发送电路分析AI任务', createAiTaskDTO);
@@ -595,6 +604,11 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'doubao', i
       
       // 成功提示
       message.success('电路分析已发送，正在处理...');
+      
+      // 将classId存储到sessionStorage，以便在flow页面获取
+      if (classId) {
+        sessionStorage.setItem(`circuit_class_id_${response.conversation.id}`, classId);
+      }
       
       // 跳转到Flow页面展示结果
       handleBlankQuery(response);
@@ -628,7 +642,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'doubao', i
       }
       setIsAnalyzing(false);
     }
-  }, [convertToCircuitDesign, currentModel, handleBlankQuery, handleAiTaskCountPlus]);
+  }, [convertToCircuitDesign, currentModel, handleBlankQuery, handleAiTaskCountPlus, classId]);
 
   // 旋转选中的节点
   const rotateSelectedNode = useCallback(() => {
@@ -890,13 +904,14 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'doubao', i
   );
 };
 
-export const CircuitFlowWithProvider = ({ onCircuitDesignChange, selectedModel, initialCircuitDesign, isReadOnly }: CircuitFlowProps) => (
+export const CircuitFlowWithProvider = ({ onCircuitDesignChange, selectedModel, initialCircuitDesign, isReadOnly, classId }: CircuitFlowProps) => (
   <ReactFlowProvider>
     <CircuitFlow 
       onCircuitDesignChange={onCircuitDesignChange}
       selectedModel={selectedModel}
       initialCircuitDesign={initialCircuitDesign}
       isReadOnly={isReadOnly}
+      classId={classId}
     />
   </ReactFlowProvider>
 );

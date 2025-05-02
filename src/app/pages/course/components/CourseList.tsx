@@ -1,18 +1,15 @@
 import { useState, useEffect } from 'react';
 import { CourseVO, PaginationParams } from '@/api/types/course.types';
-import { getUserCourses, getSystemCourses, getCreatedCourses } from '@/api/methods/course.methods';
+import { getSystemCourses } from '@/api/methods/course.methods';
 import { toast } from 'sonner';
 import CourseCard from './CourseCard';
 import { Loader2 } from 'lucide-react';
 
-type CourseCategory = 'joined' | 'created' | 'available';
-
 interface CourseListProps {
-  category: CourseCategory;
   refreshTrigger?: number;
 }
 
-export function CourseList({ category, refreshTrigger = 0 }: CourseListProps) {
+export function CourseList({ refreshTrigger = 0 }: CourseListProps) {
   const [courses, setCourses] = useState<CourseVO[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [pagination, setPagination] = useState<PaginationParams>({
@@ -25,26 +22,13 @@ export function CourseList({ category, refreshTrigger = 0 }: CourseListProps) {
   const fetchCourses = async () => {
     setIsLoading(true);
     try {
-      switch (category) {
-        case 'joined':
-          const joinedResult = await getUserCourses(pagination);
-          setCourses(joinedResult.items);
-          setTotalPages(joinedResult.totalPages);
-          break;
-        case 'created':
-          const createdResult = await getCreatedCourses(pagination);
-          setCourses(createdResult.items);
-          setTotalPages(createdResult.totalPages);
-          break;
-        case 'available':
-          const availableResult = await getSystemCourses(pagination);
-          setCourses(availableResult.items);
-          setTotalPages(availableResult.totalPages);
-          break;
-      }
+      // 获取所有可访问的班级课程
+      const result = await getSystemCourses(pagination);
+      setCourses(result.items);
+      setTotalPages(result.totalPages);
     } catch (error) {
-      toast.error('获取课程列表失败');
-      console.error('获取课程列表失败:', error);
+      toast.error('获取班级列表失败');
+      console.error('获取班级列表失败:', error);
     } finally {
       setIsLoading(false);
     }
@@ -57,37 +41,14 @@ export function CourseList({ category, refreshTrigger = 0 }: CourseListProps) {
     }
   };
 
-  // 当分页参数或类别变化时，重新获取课程
+  // 当分页参数变化时，重新获取课程
   useEffect(() => {
     fetchCourses();
-  }, [pagination.page, category, refreshTrigger]);
-
-  // 当类别变化时，重置分页
-  useEffect(() => {
-    setPagination({ page: 1, size: 12 });
-  }, [category]);
-
-  const getCategoryTitle = () => {
-    switch(category) {
-      case 'joined': return '我加入的课程';
-      case 'created': return '我创建的课程';
-      case 'available': return '可访问的课程';
-      default: return '课程列表';
-    }
-  };
-
-  const getEmptyMessage = () => {
-    switch(category) {
-      case 'joined': return '您还没有加入任何课程，可以通过班级码加入';
-      case 'created': return '您还没有创建任何课程';
-      case 'available': return '暂无可访问的课程';
-      default: return '暂无课程';
-    }
-  };
+  }, [pagination.page, refreshTrigger]);
 
   return (
     <div className="w-full">
-      <h2 className="text-xl font-semibold text-neutral-800 mb-6">{getCategoryTitle()}</h2>
+      <h2 className="text-xl font-semibold text-neutral-800 mb-6">可访问的班级</h2>
       
       {isLoading && pagination.page === 1 ? (
         <div className="flex flex-col items-center justify-center min-h-[200px]">
@@ -96,7 +57,7 @@ export function CourseList({ category, refreshTrigger = 0 }: CourseListProps) {
         </div>
       ) : courses.length === 0 ? (
         <div className="bg-neutral-100/70 border border-neutral-200 rounded-xl p-8 text-center">
-          <p className="text-neutral-600">{getEmptyMessage()}</p>
+          <p className="text-neutral-600">暂无可访问的班级</p>
         </div>
       ) : (
         <>

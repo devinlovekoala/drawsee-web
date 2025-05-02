@@ -153,4 +153,5 @@ export interface CreateAiTaskDTO {
   convId: number | null;
   parentId: number | null;
   model: string | null;
+  classId: string | null;
 }

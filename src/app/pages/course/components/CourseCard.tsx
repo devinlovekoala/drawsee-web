@@ -1,5 +1,5 @@
 import { CourseVO } from '@/api/types/course.types';
-import { Users, Book, Clock, ArrowUpRight } from 'lucide-react';
+import { Users, Book, Clock, ArrowUpRight, CircuitBoard } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 // 根据课程主题生成颜色
@@ -58,6 +58,12 @@ const getColorsBySubject = (subject: string) => {
       text: 'text-emerald-800',
       border: 'border-emerald-200',
       icon: 'text-emerald-500'
+    },
+    'CIRCUIT_ANALYSIS': {
+      bg: 'bg-cyan-50',
+      text: 'text-cyan-800',
+      border: 'border-cyan-200',
+      icon: 'text-cyan-500'
     }
   };
 
@@ -69,6 +75,29 @@ const getColorsBySubject = (subject: string) => {
   };
 };
 
+// 判断是否为电路分析课程的多种方式
+const isCircuitAnalysisCourse = (course: CourseVO): boolean => {
+  // 判断课程学科是否为电路分析（多种可能的表示方式）
+  const subjectCheck = [
+    'CIRCUIT_ANALYSIS', 
+    'circuit_analysis', 
+    'CircuitAnalysis', 
+    '电路分析', 
+    '电子电路分析'
+  ].includes(course.subject);
+  
+  // 判断课程名称是否包含电路分析相关词汇
+  const nameCheck = [
+    '电路分析', 
+    '电子电路', 
+    'circuit', 
+    'Circuit', 
+    'CIRCUIT'
+  ].some(keyword => course.name?.includes(keyword));
+  
+  return subjectCheck || nameCheck;
+};
+
 interface CourseCardProps {
   course: CourseVO;
 }
@@ -76,6 +105,9 @@ interface CourseCardProps {
 export function CourseCard({ course }: CourseCardProps) {
   const navigate = useNavigate();
   const colors = getColorsBySubject(course.subject);
+  
+  // 判断是否为电路分析课程
+  const isCircuitAnalysis = isCircuitAnalysisCourse(course);
   
   // 格式化日期
   const formatDate = (date: Date) => {
@@ -87,7 +119,23 @@ export function CourseCard({ course }: CourseCardProps) {
   };
 
   const handleCourseClick = () => {
-    navigate(`/course/${course.id}`);
+    if (isCircuitAnalysis) {
+      // 电路分析课程直接导航到电路分析页面
+      navigate('/circuit', {
+        state: {
+          classId: course.id // 传递班级ID
+        }
+      });
+    } else {
+      // 其他课程导航到通用对话页面
+      navigate('/blank', { 
+        state: { 
+          agentType: 'GENERAL',
+          agentName: '昭析智能助手',
+          classId: course.id // 传递班级ID
+        } 
+      });
+    }
   };
 
   return (
@@ -101,7 +149,11 @@ export function CourseCard({ course }: CourseCardProps) {
       
       <div className="flex items-start space-x-2 mb-2">
         <div className={`p-2 rounded-lg ${colors.bg} border ${colors.border}`}>
-          <Book className={`w-5 h-5 ${colors.icon}`} />
+          {isCircuitAnalysis ? (
+            <CircuitBoard className={`w-5 h-5 ${colors.icon}`} />
+          ) : (
+            <Book className={`w-5 h-5 ${colors.icon}`} />
+          )}
         </div>
         <div className="flex-1">
           <h3 className={`text-lg font-semibold ${colors.text} mb-1 truncate`}>{course.name}</h3>
@@ -126,7 +178,7 @@ export function CourseCard({ course }: CourseCardProps) {
           <span>创建于 {formatDate(course.createdAt)}</span>
         </div>
         <div className={`text-xs ${colors.text} px-2 py-1 rounded-full ${colors.bg} border ${colors.border}`}>
-          {course.subject}
+          {isCircuitAnalysis ? '电路分析' : course.subject}
         </div>
       </div>
     </div>

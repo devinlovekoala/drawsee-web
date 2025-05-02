@@ -7,11 +7,15 @@ import { useState, useCallback } from 'react';
 import { useAppContext } from '@/app/contexts/AppContext';
 import { ModelType } from '../input/FlowInputPanel';
 import { ModelSelector } from '../../../blank/components/ModelSelector';
+import { useLocation } from 'react-router-dom';
 
 function KnowledgeHeadNode({ showSourceHandle, showTargetHandle, data, ...props }: ExtendedNodeProps<'knowledge-head'>) {
   
   const {chat, convId, isChatting, addChatTask} = useFlowContext();
   const {handleAiTaskCountPlus} = useAppContext();
+  
+  const location = useLocation();
+  const classId = location.state?.classId as string || null;
 
   const [isGenerated, setIsGenerated] = useState(data.isGenerated || false);
   const [selectedModel, setSelectedModel] = useState<ModelType>('doubao'); // 默认使用豆包模型
@@ -37,7 +41,8 @@ function KnowledgeHeadNode({ showSourceHandle, showTargetHandle, data, ...props 
       promptParams: null,
       convId: convId,
       parentId: parseInt(props.id),
-      model: selectedModel
+      model: selectedModel,
+      classId: classId
     };
     console.log('发送知识详情AI任务', createAiTaskDTO);
     createAiTask(createAiTaskDTO).then((response) => {

@@ -10,7 +10,7 @@ import CircuitDetailNode from "@/app/pages/flow/components/node/CircuitDetailNod
 import AnswerPointNode from "@/app/pages/flow/components/node/AnswerPointNode";
 import AnswerDetailNode from "@/app/pages/flow/components/node/AnswerDetailNode";
 import {useCallback, useState, useEffect} from "react";
-import {useLocation} from "react-router-dom";
+import {useLocation, useNavigate} from "react-router-dom";
 import {useWatcher} from "alova/client";
 import {getNodesByConvId} from "@/api/methods/flow.methods.ts";
 import type { NodeVO as ApiNodeVO } from '@/api/types/flow.types';
@@ -51,6 +51,7 @@ const nodeTypes = {
 } as const;
 
 function Flow() {
+  const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState<boolean>(true);
   // 当前选中的节点
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
@@ -58,10 +59,29 @@ function Flow() {
   const [userInput, setUserInput] = useState<string>('');
   // 展示小地图
   const [showMiniMap, setShowMiniMap] = useState<boolean>(true);
-  // 获取location中的convId和taskId
-  const {convId, taskId: taskIdFromLocation} = useLocation().state as FlowLocationState;
+  
+  // 获取location中的convId、taskId和classId
+  const location = useLocation();
+  const locationState = location.state as FlowLocationState;
+  const convId = locationState?.convId;
+  const taskIdFromLocation = locationState?.taskId;
+  const classId = locationState?.classId || 
+    (convId ? sessionStorage.getItem(`circuit_class_id_${convId}`) : null); // 从sessionStorage获取班级ID
+  
   // 使用FlowState Hook
   const {elements, setElements, isChatting, rootNodeId, chat, addChatTask} = useFlowState(convId);
+  
+  // 处理返回班级列表
+  const handleBackToCourses = useCallback(() => {
+    // 如果有班级ID，返回到课程页面
+    if (classId) {
+      navigate('/course');
+    } else {
+      // 否则返回到主页
+      navigate('/');
+    }
+  }, [navigate, classId]);
+  
   // 使用临时查询节点Hook
   const {
     canInput,
@@ -488,7 +508,9 @@ function Flow() {
         </Panel>
         {/* 顶部左侧工具栏 */}
         <Panel position={"top-left"}>
-          <FlowLeftToolBar />
+          <FlowLeftToolBar 
+            onBack={classId ? handleBackToCourses : undefined}
+          />
         </Panel>
       </ReactFlow>
     </FlowContext.Provider>

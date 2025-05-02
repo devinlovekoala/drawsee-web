@@ -9,6 +9,7 @@ import { ModelSelector } from '../../../blank/components/ModelSelector';
 import { ModelType } from '../../../flow/components/input/FlowInputPanel';
 import AnswerPointNode from './AnswerPointNode';
 import AnswerDetailNode from './AnswerDetailNode';
+import { useLocation } from 'react-router-dom';
 
 function AnswerNode({ data, ...props }: ExtendedNodeProps<'answer'>) {
   // 根据subtype渲染不同的节点组件
@@ -25,6 +26,9 @@ function AnswerNode({ data, ...props }: ExtendedNodeProps<'answer'>) {
   const { subtype, isDone } = data;
   const [isGenerated, setIsGenerated] = useState(data.isGenerated || false);
   const [selectedModel, setSelectedModel] = useState<ModelType>('doubao'); // 默认使用豆包模型
+
+  const location = useLocation();
+  const classId = location.state?.classId as string || null;
 
   const handleSolverChat = useCallback((taskType: AiTaskType) => {
     if (isChatting) {
@@ -51,10 +55,11 @@ function AnswerNode({ data, ...props }: ExtendedNodeProps<'answer'>) {
             return "请继续解析此内容";
         }
       })(),  // 立即调用函数
-      promptParams: {},
+      promptParams: null,
       convId: convId,
       parentId: parseInt(props.id),
-      model: selectedModel // 使用选定的模型，适用于所有任务类型
+      model: selectedModel,
+      classId: classId // 添加班级ID
     };
     console.log('发送节点AI任务', createAiTaskDTO);
     createAiTask(createAiTaskDTO).then((response) => {
@@ -75,7 +80,7 @@ function AnswerNode({ data, ...props }: ExtendedNodeProps<'answer'>) {
       setIsGenerated(false);
       toast.error(error.message || "创建任务失败，请重试");
     });
-  }, [isChatting, isGenerated, convId, props.id, addChatTask, chat, handleAiTaskCountPlus, selectedModel]);
+  }, [isChatting, isGenerated, convId, props.id, addChatTask, chat, handleAiTaskCountPlus, selectedModel, classId]);
 
   // 处理模型变更
   const handleModelChange = useCallback((model: ModelType) => {

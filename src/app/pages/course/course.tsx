@@ -1,20 +1,15 @@
 import { useState } from 'react';
 import ClassCodeInput from './components/ClassCodeInput';
 import CourseList from './components/CourseList';
-import CourseTabs from './components/CourseTabs';
 import { GraduationCap, Plus } from 'lucide-react';
 
-type TabType = 'joined' | 'created' | 'available';
-
 function Course() {
-  const [activeTab, setActiveTab] = useState<TabType>('joined');
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [showCreateModal, setShowCreateModal] = useState(false);
 
   // 处理加入课程成功
   const handleJoinSuccess = () => {
     setRefreshTrigger(prev => prev + 1);
-    setActiveTab('joined');
   };
   
   return (
@@ -66,8 +61,8 @@ function Course() {
                   <GraduationCap className="h-7 w-7 text-indigo-600" />
                 </div>
                 <div>
-                  <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-neutral-900 to-neutral-600">课程中心</h1>
-                  <p className="text-sm md:text-base tracking-tight text-neutral-600">加入班级，查看课程，管理学习进度</p>
+                  <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-neutral-900 to-neutral-600">班级中心</h1>
+                  <p className="text-sm md:text-base tracking-tight text-neutral-600">查看可访问的班级，与AI智能体进行学习</p>
                 </div>
               </div>
               <button
@@ -75,15 +70,14 @@ function Course() {
                 className="hidden md:flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition-colors shadow-sm"
               >
                 <Plus className="h-4 w-4" />
-                <span>创建课程</span>
+                <span>创建班级</span>
               </button>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* 左侧：课程列表 */}
               <div className="lg:col-span-2 order-2 lg:order-1">
-                <CourseTabs activeTab={activeTab} onTabChange={setActiveTab} />
-                <CourseList category={activeTab} refreshTrigger={refreshTrigger} />
+                <CourseList refreshTrigger={refreshTrigger} />
               </div>
 
               {/* 右侧：加入班级 */}
@@ -95,7 +89,7 @@ function Course() {
                   className="md:hidden w-full flex items-center justify-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-3 rounded-lg transition-colors shadow-sm mt-4"
                 >
                   <Plus className="h-4 w-4" />
-                  <span>创建课程</span>
+                  <span>创建班级</span>
                 </button>
                 
                 {/* 右侧信息卡片 */}
@@ -109,15 +103,15 @@ function Course() {
                     </li>
                     <li className="flex items-start">
                       <span className="bg-indigo-100 text-indigo-800 rounded-full w-5 h-5 flex items-center justify-center text-xs mr-2 mt-0.5">2</span>
-                      <span>查看课程内容和知识点</span>
+                      <span>与AI智能体进行实时对话学习</span>
                     </li>
                     <li className="flex items-start">
                       <span className="bg-indigo-100 text-indigo-800 rounded-full w-5 h-5 flex items-center justify-center text-xs mr-2 mt-0.5">3</span>
-                      <span>追踪您的学习进度和成绩</span>
+                      <span>使用专业的学科功能（如电路分析）</span>
                     </li>
                     <li className="flex items-start">
                       <span className="bg-indigo-100 text-indigo-800 rounded-full w-5 h-5 flex items-center justify-center text-xs mr-2 mt-0.5">4</span>
-                      <span>参与课程讨论和作业提交</span>
+                      <span>追踪您的学习进度和成绩</span>
                     </li>
                   </ul>
                 </div>
@@ -131,7 +125,7 @@ function Course() {
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-xl w-[500px] max-w-full mx-4">
-            <h2 className="text-xl font-semibold mb-4">创建课程</h2>
+            <h2 className="text-xl font-semibold mb-4">创建班级</h2>
             <p className="text-neutral-600 mb-6">当前功能尚在开发中，敬请期待！</p>
             <button 
               onClick={() => setShowCreateModal(false)}

@@ -8,6 +8,7 @@ import { useAppContext } from '@/app/contexts/AppContext';
 import { ModelType } from '../input/FlowInputPanel';
 import { ModelSelector } from '@/app/pages/blank/components/ModelSelector';
 import { CircuitPointData } from './types/circuitNode.types';
+import { useLocation } from 'react-router-dom';
 
 /**
  * 电路分析点节点组件
@@ -16,6 +17,9 @@ import { CircuitPointData } from './types/circuitNode.types';
 function CircuitPointNode({ data, ...props }: ExtendedNodeProps<'circuit-point'>) {
   const {chat, convId, isChatting} = useFlowContext();
   const {handleAiTaskCountPlus} = useAppContext();
+  
+  const location = useLocation();
+  const classId = location.state?.classId as string || null;
   
   const nodeData = data as unknown as CircuitPointData;
   const [isGenerated, setIsGenerated] = useState(nodeData.isGenerated || false);
@@ -86,7 +90,8 @@ function CircuitPointNode({ data, ...props }: ExtendedNodeProps<'circuit-point'>
       promptParams: null, // 修改为null以符合API类型规范
       convId: convId,
       parentId: parseInt(props.id),
-      model: selectedModel
+      model: selectedModel,
+      classId: classId // 添加班级ID
     };
     
     console.log('发送电路详情AI任务', createAiTaskDTO);

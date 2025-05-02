@@ -11,6 +11,7 @@ import { Node as FlowNode } from "@xyflow/react";
 import { DeepSeek, Doubao } from "./ModelIcons";
 import { DropdownOption, SelectDropdown } from "./SelectDropdown";
 import { Switch } from "@/app/components/ui/switch";
+import { useLocation } from 'react-router-dom';
 
 interface FlowInputPanelProps {
   prompt: string;
@@ -51,7 +52,6 @@ export function FlowInputPanel({
 
   const [isExpanded, setIsExpanded] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
-  const [isKnowledgeMode, setIsKnowledgeMode] = useState(false);
   const [selectedModel, setSelectedModel] = useState<ModelType>('doubao');
   const containerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -60,6 +60,9 @@ export function FlowInputPanel({
   const {chat, convId} = useFlowContext();
   
   const {handleNewChat, quoteText, setQuoteText, handleAiTaskCountPlus} = useAppContext();
+  
+  const location = useLocation();
+  const classId = location.state?.classId as string || null;
   
   const [isProcessing, setIsProcessing] = useState(false);
   
@@ -126,8 +129,8 @@ export function FlowInputPanel({
       finalPrompt = `对于之前内容中的：\n\n>${quoteText.replace(/\n/g, ' ')}\n\n我的问题是：${prompt}`;
     }
     
-    // 根据知识问答模式开关决定任务类型
-    const taskType: AiTaskType = isKnowledgeMode ? 'KNOWLEDGE' : 'GENERAL';
+    // 使用统一的GENERAL任务类型，由后端决定是否为知识问答
+    const taskType: AiTaskType = 'GENERAL';
     
     // 最终选择的模型
     let finalModel = selectedModel; // 所有模式都使用选择的模型
@@ -138,7 +141,8 @@ export function FlowInputPanel({
       promptParams: {},
       convId: convId,
       parentId: parseInt(parentIdOfTempQueryNode),
-      model: finalModel // 使用选择的模型
+      model: finalModel, // 使用选择的模型
+      classId: classId // 传递班级ID
     } as CreateAiTaskDTO;
     
     createAiTask(createAiTaskDTO).then((response) => {
@@ -170,7 +174,8 @@ export function FlowInputPanel({
     }).finally(() => {
       setIsProcessing(false);
     });
-  }, [canInput, prompt, parentIdOfTempQueryNode, isKnowledgeMode, selectedModel, convId, canNotInputReason, quoteText, setQuoteText, setPrompt, handleNewChat, chat, isProcessing, handleAiTaskCountPlus]);
+  }, [isProcessing, prompt, quoteText, selectedModel, convId, parentIdOfTempQueryNode, 
+      setPrompt, setQuoteText, setIsExpanded, setIsAnimating, handleAiTaskCountPlus, chat, handleNewChat, classId]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -203,12 +208,7 @@ export function FlowInputPanel({
     >
       {/* 选择器按钮区域 */}
       <div className={`selectors-container flex flex-row justify-center gap-2`}>
-        {/* 知识问答模式开关 */}
-        <Switch
-          label="知识问答模式"
-          checked={isKnowledgeMode}
-          onChange={setIsKnowledgeMode}
-        />
+        {/* 移除知识问答模式开关 */}
         
         {/* 模型选择器 */}
         <SelectDropdown

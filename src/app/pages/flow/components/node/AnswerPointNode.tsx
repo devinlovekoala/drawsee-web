@@ -7,6 +7,7 @@ import { useState, useCallback } from 'react';
 import { useAppContext } from '@/app/contexts/AppContext';
 import { ModelType } from '../input/FlowInputPanel';
 import { ModelSelector } from '../../../blank/components/ModelSelector';
+import { useLocation } from 'react-router-dom';
 
 /**
  * 回答角度节点组件
@@ -15,6 +16,9 @@ import { ModelSelector } from '../../../blank/components/ModelSelector';
 function AnswerPointNode({ data, ...props }: ExtendedNodeProps<'answer-point' | 'ANSWER_POINT'>) {
   const {chat, convId, isChatting, addChatTask} = useFlowContext();
   const {handleAiTaskCountPlus} = useAppContext();
+  
+  const location = useLocation();
+  const classId = location.state?.classId as string || null;
   
   const [isGenerated, setIsGenerated] = useState(data.isGenerated || false);
   const [selectedModel, setSelectedModel] = useState<ModelType>('doubao'); // 默认使用豆包模型
@@ -46,7 +50,8 @@ function AnswerPointNode({ data, ...props }: ExtendedNodeProps<'answer-point' | 
       promptParams: null, // 修改为null以修复类型错误
       convId: convId,
       parentId: parseInt(props.id),
-      model: selectedModel
+      model: selectedModel,
+      classId: classId // 添加班级ID
     };
     
     console.log('发送通用详情AI任务', createAiTaskDTO);
