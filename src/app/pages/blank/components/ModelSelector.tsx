@@ -14,16 +14,16 @@ interface ModelSelectorProps {
 // 模型选项
 const modelOptions = [
   {
-    name: '豆包',
-    description: '豆包-1.5-pro-32k大语言模型',
-    icon: Doubao.Color,
-    type: 'doubao' satisfies ModelType
-  },
-  {
     name: 'DeepSeekV3',
     description: 'DeepSeekV3大语言模型',
     icon: DeepSeek.Color,
     type: 'deepseekV3' satisfies ModelType
+  },
+  {
+    name: '豆包',
+    description: '豆包-1.5-pro-32k大语言模型',
+    icon: Doubao.Color,
+    type: 'doubao' satisfies ModelType
   }
 ];
 

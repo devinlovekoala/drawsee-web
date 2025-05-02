@@ -23,7 +23,7 @@ function AnswerPointNode({ data, ...props }: ExtendedNodeProps<'answer-point' | 
   const classId = location.state?.classId as string || null;
   
   const [isGenerated, setIsGenerated] = useState(data.isGenerated || false);
-  const [selectedModel, setSelectedModel] = useState<ModelType>('doubao'); // 默认使用豆包模型
+  const [selectedModel, setSelectedModel] = useState<ModelType>('deepseekV3'); // 默认使用DeepSeek模型
   const [isLoading, setIsLoading] = useState(false); // 添加加载状态
   const [isEditing, setIsEditing] = useState(false); // 添加编辑状态
   const [editedText, setEditedText] = useState(data.text || ''); // 编辑内容
