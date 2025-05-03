@@ -4,13 +4,15 @@ import {AiTaskType, CreateAiTaskDTO} from "@/api/types/flow.types.ts";
 import {toast} from "sonner";
 import './styles/scrollbar.css';
 import { useAppContext } from "@/app/contexts/AppContext";
-import { XIcon, CheckIcon, WandIcon, ImageUpIcon } from "lucide-react";
+import { XIcon, CheckIcon, WandIcon, ImageUpIcon, FunctionSquareIcon } from "lucide-react";
 import ImageUploader from "@/app/components/ImageUploader";
 import { getSolverWays } from '@/api/methods/tool.methods';
 import { ModelSelector } from "./components/ModelSelector";
 import { ModelType } from "../flow/components/input/FlowInputPanel";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Switch } from "@/app/components/ui/switch";
+import MathKeyboard from "@/app/components/ui/math-keyboard";
+import LaTeXRenderer from "@/app/components/ui/latex-renderer";
 
 function Blank() {
   const {handleBlankQuery, handleAiTaskCountPlus} = useAppContext();
@@ -110,6 +112,8 @@ function Blank() {
   const [customWay, setCustomWay] = useState<string>('');
   const [isLoadingWays, setIsLoadingWays] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [showMathKeyboard, setShowMathKeyboard] = useState(false);
+  const [cursorPosition, setCursorPosition] = useState<number | null>(null);
 
   const handleQuery = useCallback(() => {
     if (isProcessing) return;
@@ -215,11 +219,55 @@ function Blank() {
     setShowImageUploader(prev => !prev);
   };
 
-  // 处理图片识别文本
+  // 函数：切换数学公式软键盘显示状态
+  const toggleMathKeyboard = () => {
+    setShowMathKeyboard(!showMathKeyboard);
+    // 记住当前光标位置
+    if (!showMathKeyboard && document.activeElement instanceof HTMLTextAreaElement) {
+      setCursorPosition(document.activeElement.selectionStart);
+    }
+  };
+
+  // 函数：处理数学符号插入
+  const handleMathSymbolInsert = (symbol: string) => {
+    if (cursorPosition !== null) {
+      const newText = 
+        queryForm.prompt.substring(0, cursorPosition) + 
+        symbol + 
+        queryForm.prompt.substring(cursorPosition);
+      
+      setQueryForm({...queryForm, prompt: newText});
+      
+      // 更新光标位置到插入符号之后
+      const newPosition = cursorPosition + symbol.length;
+      setCursorPosition(newPosition);
+      
+      // 在下一个渲染周期后聚焦并设置光标位置
+      setTimeout(() => {
+        const textarea = document.querySelector('textarea') as HTMLTextAreaElement;
+        if (textarea) {
+          textarea.focus();
+          textarea.setSelectionRange(newPosition, newPosition);
+        }
+      }, 0);
+    }
+  };
+
+  // 捕获textarea的光标位置变化
+  const handleTextareaSelect = (e: React.MouseEvent<HTMLTextAreaElement> | React.KeyboardEvent<HTMLTextAreaElement>) => {
+    setCursorPosition(e.currentTarget.selectionStart);
+  };
+
+  // 修改现有的handleImageTextRecognized函数来支持预览LaTeX
   const handleImageTextRecognized = (text: string) => {
-    setQueryForm(prev => ({ ...prev, prompt: prev.prompt + "\n" + text }));
-    setShowImageUploader(false);
-    toast.success("图片文本已追加至prompt");
+    // 将识别的文本添加到当前prompt中
+    const newPrompt = queryForm.prompt + "\n\n" + text;
+    setQueryForm({ ...queryForm, prompt: newPrompt });
+    
+    // 如果检测到可能是数学公式，提示用户可以使用公式键盘
+    if (text.includes('\\') || text.includes('^') || text.includes('_') || text.includes('sqrt')) {
+      toast.info("检测到数学公式，您可以使用公式键盘进行编辑");
+    }
   };
 
   // 根据输入文本获取解题方法
@@ -414,6 +462,8 @@ function Blank() {
                       <textarea
                         value={queryForm.prompt}
                         onChange={(e) => setQueryForm({...queryForm, prompt: e.target.value})}
+                        onClick={handleTextareaSelect}
+                        onKeyUp={handleTextareaSelect}
                         placeholder={
                           queryForm.type === "GENERAL" ? "问 AI 任何问题..." : 
                           queryForm.type === "KNOWLEDGE" ? "请输入知识性问题..." :
@@ -431,14 +481,28 @@ function Blank() {
                       <div className="absolute flex gap-2 bottom-2 right-2">
                         {/* 图片上传按钮 - 仅在解题模式下显示 */}
                         {queryForm.type === "SOLVER_FIRST" && (
-                          <button 
-                            onClick={toggleImageUploader}
-                            className="cursor-pointer bg-neutral-400/20 text-[rgba(101,101,101,1)] rounded-md 
-                            px-3 py-2 flex items-center gap-1 hover:scale-[0.95] hover:opacity-90 hover:ring-1 
-                            hover:ring-indigo-500/50 transition-all duration-200 font-medium"
-                          >
-                            <ImageUpIcon size={20} />
-                          </button>
+                          <>
+                            <button 
+                              onClick={toggleImageUploader}
+                              className="cursor-pointer bg-neutral-400/20 text-[rgba(101,101,101,1)] rounded-md 
+                              px-3 py-2 flex items-center gap-1 hover:scale-[0.95] hover:opacity-90 hover:ring-1 
+                              hover:ring-indigo-500/50 transition-all duration-200 font-medium"
+                              title="上传图片识别文字"
+                            >
+                              <ImageUpIcon size={20} />
+                            </button>
+                            
+                            {/* 数学公式键盘按钮 - 仅在解题模式下显示 */}
+                            <button 
+                              onClick={toggleMathKeyboard}
+                              className="cursor-pointer bg-neutral-400/20 text-[rgba(101,101,101,1)] rounded-md 
+                              px-3 py-2 flex items-center gap-1 hover:scale-[0.95] hover:opacity-90 hover:ring-1 
+                              hover:ring-indigo-500/50 transition-all duration-200 font-medium"
+                              title="数学公式键盘"
+                            >
+                              <FunctionSquareIcon size={20} />
+                            </button>
+                          </>
                         )}
                         
                         {/* 提问按钮 */}
@@ -502,7 +566,30 @@ function Blank() {
                       </div>
                     </div>
                   )}
+
+                  {/* 数学公式预览 - 仅在解题模式下显示 */}
+                  {queryForm.type === "SOLVER_FIRST" && queryForm.prompt && (
+                    <div className="mt-3">
+                      <div className="px-4 py-3 rounded-xl border border-blue-100 bg-blue-50/30">
+                        <h3 className="mb-2 text-sm font-medium text-blue-700">公式预览</h3>
+                        <div className="bg-white rounded-lg p-3 border border-blue-100">
+                          <LaTeXRenderer 
+                            latex={queryForm.prompt} 
+                            className="text-gray-800"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   
+                  {/* 数学公式键盘 - 仅在解题模式下显示且键盘开启时 */}
+                  {showMathKeyboard && (
+                    <MathKeyboard
+                      onInsert={handleMathSymbolInsert}
+                      onClose={() => setShowMathKeyboard(false)}
+                    />
+                  )}
+
                   {/* 解题方法选择器 - 仅在解题模式时显示 */}
                   {isSolverMode && (
                     <div className="mt-3 animate-fade-up animate-duration-300 rounded-xl border border-neutral-200/70 backdrop-blur-sm bg-white/30 p-4">
