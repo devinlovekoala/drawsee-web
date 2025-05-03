@@ -12,7 +12,7 @@ function Circuit() {
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [_circuitDesign, setCircuitDesign] = useState<CircuitDesign | null>(null);
-  const [selectedModel] = useState<ModelType>('doubao'); // 默认使用豆包模型
+  const [selectedModel] = useState<ModelType>('deepseekV3'); // 默认使用DeepSeekV3模型
   
   // 更新电路设计数据
   const handleCircuitDesignChange = useCallback((design: CircuitDesign) => {

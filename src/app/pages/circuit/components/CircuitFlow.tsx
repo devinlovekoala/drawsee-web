@@ -147,7 +147,7 @@ interface CircuitFlowProps {
   classId?: string | null; // 添加班级ID参数
 }
 
-export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'doubao', initialCircuitDesign, isReadOnly = false, classId = null }: CircuitFlowProps) => {
+export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3', initialCircuitDesign, isReadOnly = false, classId = null }: CircuitFlowProps) => {
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);

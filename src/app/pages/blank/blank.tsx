@@ -35,7 +35,7 @@ function Blank() {
     type: agentType,
     prompt: "",
     promptParams: {},
-    model: "doubao"
+    model: "deepseekV3"
   });
   
   // 确保类型值的大写格式

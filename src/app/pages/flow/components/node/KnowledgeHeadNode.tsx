@@ -18,7 +18,7 @@ function KnowledgeHeadNode({ showSourceHandle, showTargetHandle, data, ...props 
   const classId = location.state?.classId as string || null;
 
   const [isGenerated, setIsGenerated] = useState(data.isGenerated || false);
-  const [selectedModel, setSelectedModel] = useState<ModelType>('doubao'); // 默认使用豆包模型
+  const [selectedModel, setSelectedModel] = useState<ModelType>('deepseekV3'); // 默认使用DeepSeekV3模型
 
   // 处理模型变更
   const handleModelChange = useCallback((model: ModelType) => {

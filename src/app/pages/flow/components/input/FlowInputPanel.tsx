@@ -52,7 +52,7 @@ export function FlowInputPanel({
 
   const [isExpanded, setIsExpanded] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
-  const [selectedModel, setSelectedModel] = useState<ModelType>('doubao');
+  const [selectedModel, setSelectedModel] = useState<ModelType>('deepseekV3');
   const containerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const inputContainerRef = useRef<HTMLDivElement>(null);

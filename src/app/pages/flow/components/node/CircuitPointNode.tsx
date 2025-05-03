@@ -23,7 +23,7 @@ function CircuitPointNode({ data, ...props }: ExtendedNodeProps<'circuit-point'>
   
   const nodeData = data as unknown as CircuitPointData;
   const [isGenerated, setIsGenerated] = useState(nodeData.isGenerated || false);
-  const [selectedModel, setSelectedModel] = useState<ModelType>('doubao'); // 默认使用豆包模型
+  const [selectedModel, setSelectedModel] = useState<ModelType>('deepseekV3'); // 默认使用DeepSeekV3模型
   const [isLoading, setIsLoading] = useState(false); // 添加加载状态
 
   // 处理模型变更
