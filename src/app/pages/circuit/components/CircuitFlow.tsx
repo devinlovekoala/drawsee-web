@@ -21,18 +21,22 @@ import { DownOutlined, PlusOutlined, PlayCircleOutlined } from '@ant-design/icon
 import 'reactflow/dist/style.css';
 import { CircuitNode } from './CircuitNode';
 import ConnectionEdge, { ConnectionPreview } from './ConnectionEdge';
+import ComponentConfig from './ComponentConfig';
 import { 
-  CircuitElement, 
   CircuitElementType, 
   CircuitDesign, 
-  Port
+  Port,
+  CircuitElement
 } from '@/api/types/circuit.types';
 import { createAiTask } from '@/api/methods/flow.methods';
+import { CircuitNodeData, ModelType } from '../types';
 import { useAppContext } from '@/app/contexts/AppContext';
 import { CreateAiTaskDTO } from '@/api/types/flow.types';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { ModelSelector } from '@/app/pages/blank/components/ModelSelector';
-import { ModelType } from '@/app/pages/flow/components/input/FlowInputPanel';
+import { ModelType as FlowModelType } from '@/app/pages/flow/components/input/FlowInputPanel';
+import ElementLibrary from './ElementLibrary';
+import CircuitToolbar from './CircuitToolbar';
 
 // 唯一节点ID生成
 let nodeIdCounter = 1;
@@ -145,15 +149,28 @@ interface CircuitFlowProps {
   initialCircuitDesign?: CircuitDesign; // 添加初始电路设计数据
   isReadOnly?: boolean; // 是否为只读模式，禁用编辑功能
   classId?: string | null; // 添加班级ID参数
+  onModelChange?: (model: FlowModelType) => void; // 修改为使用 FlowModelType
 }
 
-export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3', initialCircuitDesign, isReadOnly = false, classId = null }: CircuitFlowProps) => {
+export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3', initialCircuitDesign, isReadOnly = false, classId = null, onModelChange }: CircuitFlowProps) => {
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
-  const [currentModel, setCurrentModel] = useState<ModelType>(selectedModel as ModelType);
+  const [currentModel, setCurrentModel] = useState<FlowModelType>(selectedModel as FlowModelType);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
+  const [showElementLibrary, setShowElementLibrary] = useState<boolean>(true);
+  const [canUndo, setCanUndo] = useState<boolean>(false);
+  const [canRedo, setCanRedo] = useState<boolean>(false);
+  const [fullScreenMode, setFullScreenMode] = useState<boolean>(false);
+  const [historyState, setHistoryState] = useState<{
+    past: any[],
+    present: any,
+    future: any[]
+  }>({ past: [], present: null, future: [] });
+  // 添加配置面板状态
+  const [configVisible, setConfigVisible] = useState<boolean>(false);
+  const [selectedElement, setSelectedElement] = useState<CircuitNodeData | null>(null);
   
   const reactFlowInstance = useReactFlow();
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
@@ -181,7 +198,8 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
             type: element.type,
             label: element.label || `${element.type}`,
             value: element.value || '',
-            element: element
+            element: element,
+            onNodeDoubleClick: handleNodeDoubleClick,
           }
         };
       });
@@ -198,7 +216,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
           type: 'default',
           animated: false,
           style: { stroke: '#3B82F6', strokeWidth: 2 },
-          data: { label: '连线' }
+          data: {}
         };
       });
       
@@ -315,7 +333,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
         type: 'default',
         animated: false,
         style: { stroke: '#3B82F6', strokeWidth: 2 },
-        data: { label: '连线' }
+        data: {}
       };
       
       setEdges((eds) => addEdge(newEdge, eds));
@@ -389,7 +407,8 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
           type,
           label: elementLabel,
           value: elementValue,
-          element
+          element: element,
+          onNodeDoubleClick: handleNodeDoubleClick,
         },
       };
 
@@ -793,96 +812,189 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
     }
   }, [selectedEdgeId]);
 
+  // 添加一个函数来处理元件双击事件
+  const handleNodeDoubleClick = useCallback((nodeId: string) => {
+    const node = nodes.find(n => n.id === nodeId);
+    if (node) {
+      setSelectedElement({
+        id: node.id,
+        label: node.data.label,
+        value: node.data.value,
+        element: node.data.element,
+        ports: node.data.ports
+      });
+      setConfigVisible(true);
+    }
+  }, [nodes]);
+  
+  // 添加一个函数来处理元件配置更新
+  const handleElementUpdate = useCallback((id: string, updates: Partial<CircuitNodeData>) => {
+    setNodes(currentNodes => 
+      currentNodes.map(node => {
+        if (node.id === id) {
+          const updatedData = {
+            ...node.data,
+            ...updates,
+            label: updates.label || node.data.label,
+            value: updates.value || node.data.value
+          };
+          
+          // 如果有 element 属性，也要更新它
+          if (node.data.element) {
+            updatedData.element = {
+              ...node.data.element,
+              label: updates.label || node.data.element.label,
+              value: updates.value || node.data.element.value
+            };
+          }
+          
+          return {
+            ...node,
+            data: updatedData
+          };
+        }
+        return node;
+      })
+    );
+    
+    message.success('元件已更新', 1);
+  }, []);
+
   return (
-    <div ref={reactFlowWrapper} style={{ width: '100%', height: '100%' }}>
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        onNodesChange={isReadOnly ? undefined : onNodesChange}
-        onEdgesChange={isReadOnly ? undefined : onEdgesChange}
-        onConnect={isReadOnly ? undefined : onConnect}
-        nodeTypes={nodeTypes}
-        edgeTypes={edgeTypes}
-        connectionLineComponent={ConnectionPreview}
-        deleteKeyCode={isReadOnly ? null : ['Backspace', 'Delete']}
-        multiSelectionKeyCode={isReadOnly ? null : ['Control', 'Meta']}
-        snapToGrid={true}
-        snapGrid={[15, 15]}
-        defaultViewport={{ x: 0, y: 0, zoom: 1 }}
-        fitView
-        attributionPosition="bottom-left"
-        // @ts-ignore
-        connectionMode="loose"
-        defaultMarkerColor="#3B82F6"
-        connectOnClick={!isReadOnly}
-        connectionRadius={20}
-        isValidConnection={() => !isReadOnly}
-        onNodeClick={isReadOnly ? undefined : (_, node) => setSelectedNodeId(node.id)}
-        onEdgeClick={isReadOnly ? undefined : onEdgeClick}
-        onPaneClick={onPaneClick}
-        elementsSelectable={!isReadOnly}
-        selectNodesOnDrag={!isReadOnly}
-        edgesFocusable={!isReadOnly}
-        edgesUpdatable={!isReadOnly}
-        nodesDraggable={!isReadOnly}
-        nodesConnectable={!isReadOnly}
-        zoomOnScroll={true}
-        panOnScroll={false}
-        zoomOnDoubleClick={!isReadOnly}
-      >
-        <Background />
-        <Controls />
-        {!isReadOnly && (
-          <Panel position="top-left" style={{ marginLeft: '10px', marginTop: '10px' }}>
-            <Space wrap direction="horizontal">
-              <Dropdown
-                menu={{
-                  items: elementMenuItems.map(item => ({
-                    key: item.key,
-                    label: item.label,
-                    onClick: () => addNewNode(item.key as CircuitElementType)
-                  })),
-                }}
-                placement="bottomLeft"
-              >
-                <Button type="primary" icon={<PlusOutlined />}>
-                  添加元件 <DownOutlined />
-                </Button>
-              </Dropdown>
-              <Button onClick={() => setEdges([])} danger>清除所有连接</Button>
-              <ModelSelector
-                selectedModel={currentModel}
-                onModelChange={setCurrentModel}
-              />
-              <Button 
-                icon={<PlayCircleOutlined />} 
-                onClick={handleAnalyzeCircuit}
-                loading={isAnalyzing}
-              >
-                发送分析任务
-              </Button>
-            </Space>
-          </Panel>
-        )}
-      </ReactFlow>
-      
-      {/* 快捷键说明 */}
-      {!isReadOnly && (
-        <div style={{ 
-          position: 'absolute', 
-          bottom: 10, 
-          right: 10, 
-          padding: '5px 10px',
-          background: 'rgba(255, 255, 255, 0.8)',
-          borderRadius: '4px',
-          fontSize: '12px',
-          color: '#666'
-        }}>
-          <div>Ctrl+R: 旋转元件</div>
-          <div>Delete/Ctrl+D: 删除元件</div>
-          <div>Delete/Backspace: 删除选中连线</div>
+    <div ref={reactFlowWrapper} className="flex flex-row w-full h-full bg-white">
+      {/* 左侧元件库面板 */}
+      {!isReadOnly && showElementLibrary && (
+        <div className="w-64 h-full overflow-auto border-r border-gray-200">
+          <ElementLibrary onSelectElement={addNewNode} />
         </div>
       )}
+      
+      {/* 主画布区域 */}
+      <div className="flex-1 flex flex-col h-full">
+        {/* 工具栏 */}
+        {!isReadOnly && (
+          <CircuitToolbar 
+            onSave={() => console.log('保存电路设计')}
+            onUndo={() => {
+              // Undo逻辑
+              if (historyState.past.length > 0) {
+                // TODO: 实现Undo功能
+              }
+            }}
+            onRedo={() => {
+              // Redo逻辑
+              if (historyState.future.length > 0) {
+                // TODO: 实现Redo功能
+              }
+            }}
+            onCopy={() => {
+              // 复制选中节点
+              if (selectedNodeId) {
+                // TODO: 实现复制功能
+              }
+            }}
+            onDelete={deleteSelectedNode}
+            onRotate={rotateSelectedNode}
+            onZoomIn={() => reactFlowInstance.zoomIn()}
+            onZoomOut={() => reactFlowInstance.zoomOut()}
+            onFitView={() => reactFlowInstance.fitView()}
+            onFullScreen={() => setFullScreenMode(!fullScreenMode)}
+            onExport={() => {
+              // TODO: 实现导出功能
+            }}
+            onClearAll={() => {
+              // 清除所有节点和边
+              setNodes([]);
+              setEdges([]);
+            }}
+            onAnalyze={handleAnalyzeCircuit}
+            isAnalyzing={isAnalyzing}
+            selectedModel={currentModel}
+            onModelChange={(model) => {
+              setCurrentModel(model);
+              if (onModelChange) {
+                onModelChange(model);
+              }
+            }}
+            canUndo={canUndo}
+            canRedo={canRedo}
+            hasSelectedNode={!!selectedNodeId}
+            hasContent={nodes.length > 0}
+          />
+        )}
+      
+        {/* 流程图区域 */}
+        <div className="flex-1">
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={isReadOnly ? undefined : onNodesChange}
+            onEdgesChange={isReadOnly ? undefined : onEdgesChange}
+            onConnect={isReadOnly ? undefined : onConnect}
+            nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
+            connectionLineComponent={ConnectionPreview}
+            deleteKeyCode={isReadOnly ? null : ['Backspace', 'Delete']}
+            multiSelectionKeyCode={isReadOnly ? null : ['Control', 'Meta']}
+            snapToGrid={true}
+            snapGrid={[15, 15]}
+            defaultViewport={{ x: 0, y: 0, zoom: 1 }}
+            fitView
+            attributionPosition="bottom-left"
+            // @ts-ignore
+            connectionMode="loose"
+            defaultMarkerColor="#3B82F6"
+            connectOnClick={!isReadOnly}
+            connectionRadius={20}
+            isValidConnection={() => !isReadOnly}
+            onNodeClick={isReadOnly ? undefined : (_, node) => setSelectedNodeId(node.id)}
+            onNodeDoubleClick={isReadOnly ? undefined : (_, node) => handleNodeDoubleClick(node.id)}
+            onEdgeClick={isReadOnly ? undefined : onEdgeClick}
+            onPaneClick={onPaneClick}
+            elementsSelectable={!isReadOnly}
+            selectNodesOnDrag={!isReadOnly}
+            edgesFocusable={!isReadOnly}
+            edgesUpdatable={!isReadOnly}
+            nodesDraggable={!isReadOnly}
+            nodesConnectable={!isReadOnly}
+            zoomOnScroll={true}
+            panOnScroll={false}
+            zoomOnDoubleClick={!isReadOnly}
+            className="circuit-flow-canvas"
+          >
+            <Background />
+            <Controls />
+          </ReactFlow>
+        </div>
+        
+        {/* 状态信息栏 */}
+        <div className="bg-gray-50 border-t border-gray-200 p-2 text-xs text-gray-600 flex justify-between">
+          <div>元件: {nodes.length} | 连接: {edges.length}</div>
+          
+          {selectedNodeId && (
+            <div className="text-blue-600">
+              已选择: {nodes.find(node => node.id === selectedNodeId)?.data.label || selectedNodeId}
+            </div>
+          )}
+          
+          <div>
+            <button 
+              className="text-gray-500 hover:text-gray-800 transition-colors"
+              onClick={() => setShowElementLibrary(!showElementLibrary)}
+            >
+              {showElementLibrary ? '隐藏元件库' : '显示元件库'}
+            </button>
+          </div>
+        </div>
+      </div>
+      
+      {/* 元件配置面板 */}
+      <ComponentConfig 
+        element={selectedElement}
+        visible={configVisible}
+        onClose={() => setConfigVisible(false)}
+        onUpdate={handleElementUpdate}
+      />
       
       {isAnalyzing && (
         <div style={{ 
@@ -894,17 +1006,17 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
           display: 'flex', 
           justifyContent: 'center', 
           alignItems: 'center',
-          backgroundColor: 'rgba(255, 255, 255, 0.7)',
+          backgroundColor: 'rgba(255, 255, 255, 0.8)',
           zIndex: 1000
         }}>
-          <Spin size="large" spinning={true} tip="正在发送电路分析任务..." />
+          <Spin size="large" spinning={true} tip="正在分析电路，请稍候..." />
         </div>
       )}
     </div>
   );
 };
 
-export const CircuitFlowWithProvider = ({ onCircuitDesignChange, selectedModel, initialCircuitDesign, isReadOnly, classId }: CircuitFlowProps) => (
+export const CircuitFlowWithProvider = ({ onCircuitDesignChange, selectedModel, initialCircuitDesign, isReadOnly, classId, onModelChange }: CircuitFlowProps) => (
   <ReactFlowProvider>
     <CircuitFlow 
       onCircuitDesignChange={onCircuitDesignChange}
@@ -912,6 +1024,7 @@ export const CircuitFlowWithProvider = ({ onCircuitDesignChange, selectedModel, 
       initialCircuitDesign={initialCircuitDesign}
       isReadOnly={isReadOnly}
       classId={classId}
+      onModelChange={onModelChange}
     />
   </ReactFlowProvider>
 );

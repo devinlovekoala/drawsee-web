@@ -12,23 +12,36 @@ function Circuit() {
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [_circuitDesign, setCircuitDesign] = useState<CircuitDesign | null>(null);
-  const [selectedModel] = useState<ModelType>('deepseekV3'); // 默认使用DeepSeekV3模型
+  const [selectedModel, setSelectedModel] = useState<ModelType>('deepseekV3'); // 默认使用DeepSeekV3模型
   
   // 更新电路设计数据
   const handleCircuitDesignChange = useCallback((design: CircuitDesign) => {
     setCircuitDesign(design);
   }, []);
   
+  // 处理模型切换
+  const handleModelChange = useCallback((model: ModelType) => {
+    setSelectedModel(model);
+  }, []);
+  
   return (
-    <div className="w-full h-full bg-white flex flex-col">
+    <div className="w-full h-full bg-gray-50 flex flex-col">
       {/* 页面标题区域 */}
-      <div className="bg-white border-b border-neutral-100 py-4 px-6">
-        <div>
-          <h1 className="text-xl font-semibold text-neutral-800">AI电子电路分析</h1>
-          <p className="text-sm text-neutral-500">
-            {classId ? '班级电路分析学习 - ' : ''}
-            设计电路并获取AI智能分析
-          </p>
+      <div className="bg-white border-b border-gray-200 py-4 px-6 shadow-sm">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-semibold text-gray-800">AI电子电路分析</h1>
+            <p className="text-sm text-gray-500">
+              {classId ? '班级电路分析学习 - ' : ''}
+              设计电路并获取AI智能分析
+            </p>
+          </div>
+          
+          <div className="text-sm text-gray-500">
+            <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-md font-medium">
+              专业版
+            </span>
+          </div>
         </div>
       </div>
       
@@ -38,6 +51,7 @@ function Circuit() {
           onCircuitDesignChange={handleCircuitDesignChange}
           selectedModel={selectedModel}
           classId={classId}
+          onModelChange={handleModelChange}
         />
       </div>
     </div>

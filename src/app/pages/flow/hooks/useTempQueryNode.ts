@@ -73,6 +73,37 @@ function useTempQueryNode(
     
     // 显式检查不允许追问的节点类型
     const nodeType = selectedNode.type as NodeType;
+    const nodeSubtype = selectedNode.data?.subtype as string | undefined;
+    const allowFollowup = selectedNode.data?.allowFollowup as boolean | undefined;
+    
+    // 添加调试输出
+    console.log('当前选中节点信息:', {
+      id: selectedNode.id,
+      type: nodeType,
+      subtype: nodeSubtype,
+      allowFollowup,
+      data: selectedNode.data
+    });
+    
+    // 检查节点类型是否在允许列表中
+    const isTypeAllowed = ALLOWED_PARENT_TYPES.includes(nodeType);
+    // 检查节点子类型是否在允许列表中(针对subtype为circuit-detail的情况)
+    const isSubtypeAllowed = nodeSubtype && ALLOWED_PARENT_TYPES.includes(nodeSubtype as NodeType);
+    
+    console.log('节点追问权限检查:', {
+      typeAllowed: isTypeAllowed,
+      subtypeAllowed: isSubtypeAllowed,
+      explicitlyAllowed: allowFollowup === true,
+      ALLOWED_PARENT_TYPES
+    });
+    
+    // 如果节点明确允许追问，则直接返回true
+    if (allowFollowup === true) {
+      setCanNotInputReason(null);
+      return true;
+    }
+    
+    // 明确拒绝的节点类型
     if (
       nodeType === 'answer' || 
       nodeType === 'knowledge-head' || 
@@ -83,19 +114,47 @@ function useTempQueryNode(
       return false;
     }
     
-    // 选中节点是允许用户追问的节点类型
-    if (!ALLOWED_PARENT_TYPES.includes(nodeType)) {
-      setCanNotInputReason('当前节点不允许追问');
-      return false;
+    // 特殊处理circuit-detail类型
+    if (nodeType === 'circuit-detail' || nodeSubtype === 'circuit-detail') {
+      setCanNotInputReason(null);
+      return true;
     }
-    setCanNotInputReason(null);
-    return true;
+    
+    // 选中节点是允许用户追问的节点类型
+    if (isTypeAllowed || isSubtypeAllowed) {
+      setCanNotInputReason(null);
+      return true;
+    }
+    
+    setCanNotInputReason('当前节点不允许追问');
+    return false;
   }, [selectedNode, rootNodeId, isChatting]);
   // 获取临时查询节点的父节点ID
   const parentIdOfTempQueryNode = useMemo(() => {
-    if (selectedNode && ALLOWED_PARENT_TYPES.includes(selectedNode.type as NodeType)) {
+    if (!selectedNode) return rootNodeId;
+    
+    const nodeType = selectedNode.type as NodeType;
+    const nodeSubtype = selectedNode.data?.subtype as string | undefined;
+    const allowFollowup = selectedNode.data?.allowFollowup as boolean | undefined;
+    
+    // 如果节点明确允许追问，则直接使用其ID
+    if (allowFollowup === true) {
       return selectedNode.id;
     }
+    
+    // 检查类型或子类型是否在允许列表中
+    const isTypeAllowed = ALLOWED_PARENT_TYPES.includes(nodeType);
+    const isSubtypeAllowed = nodeSubtype && ALLOWED_PARENT_TYPES.includes(nodeSubtype as NodeType);
+    
+    // 特殊处理circuit-detail类型
+    if (nodeType === 'circuit-detail' || nodeSubtype === 'circuit-detail') {
+      return selectedNode.id;
+    }
+    
+    if (isTypeAllowed || isSubtypeAllowed) {
+      return selectedNode.id;
+    }
+    
     return rootNodeId;
   }, [selectedNode, rootNodeId]);
   
