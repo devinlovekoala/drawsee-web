@@ -43,16 +43,24 @@ function extractPreview(text?: string): string {
     .replace(/\*/g, '')             // 移除斜体标记
     .trim();
 
-  // 匹配第一句话（以。！？.!?结尾）
-  const match = cleanText.match(/^[^。！？.!?]+[。！？.!?]/);
-  if (match) {
-    const firstSentence = match[0].trim();
-    // 如果第一句话太长，截取前15个字
-    return firstSentence.length > 15 ? firstSentence.substring(0, 15) + '...' : firstSentence;
+  // 获取更有意义的预览内容
+  // 1. 首先尝试获取第一个完整句子（以。！？.!?结尾）
+  const sentenceMatch = cleanText.match(/^[^。！？.!?]+[。！？.!?]/);
+  if (sentenceMatch) {
+    const firstSentence = sentenceMatch[0].trim();
+    // 如果第一句话太长，截取前25个字
+    return firstSentence.length > 25 ? firstSentence.substring(0, 25) + '...' : firstSentence;
   }
   
-  // 如果没有找到明显的句子结束符，返回前15个字
-  return cleanText.length > 15 ? cleanText.substring(0, 15) + '...' : cleanText;
+  // 2. 如果没有找到明显的句子，尝试截取前两个短语（以逗号、分号等分隔）
+  const phraseMatch = cleanText.match(/^[^，；,;]+[，；,;][^，；,;]+/);
+  if (phraseMatch) {
+    const phrases = phraseMatch[0].trim();
+    return phrases.length > 25 ? phrases.substring(0, 25) + '...' : phrases;
+  }
+  
+  // 3. 如果上述都未找到，直接返回前25个字
+  return cleanText.length > 25 ? cleanText.substring(0, 25) + '...' : cleanText;
 }
 
 /**
@@ -200,14 +208,21 @@ export const BaseNode = React.memo(function BaseNode<T extends NodeType>({
   
   // 使用缓存渲染或创建新的渲染结果
   const renderContent = useCallback(() => {
-    // 如果是简化视图模式，不使用缓存，直接显示预览
+    // 如果是简化视图模式，不使用缓存，直接显示标题而非预览文本
     if (isSimplifiedView) {
       return (
-        <div className="skeleton-view" style={{ height: '100%', width: '100%' }}>
-          {textPreview && (
+        <div className="skeleton-view" style={{ height: '100%', width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+          {hasTitle ? (
             <div 
-              className="node-preview-text"
-              style={{ fontSize: `${previewFontSize}rem` }}
+              className="node-preview-title text-center px-2"
+              style={{ fontSize: `${previewFontSize * 0.8}rem`, fontWeight: 'bold', color: '#333' }}
+            >
+              {nodeData.title}
+            </div>
+          ) : textPreview && (
+            <div 
+              className="node-preview-text text-center px-2"
+              style={{ fontSize: `${previewFontSize * 0.7}rem` }}
             >
               {textPreview}
             </div>

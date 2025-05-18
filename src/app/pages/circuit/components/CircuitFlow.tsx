@@ -584,7 +584,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
       
       // 按照文档规范构造电路分析任务数据
       const createAiTaskDTO: CreateAiTaskDTO = {
-        type: 'CIRCUIT_ANALYSIS', // 实际API使用CIRCUIT_ANALYSIS
+        type: 'CIRCUIT_ANALYSIS',
         // 按照文档规范，prompt需要是具有特定格式的对象
         prompt: JSON.stringify(processedCircuitDesign),
         promptParams: {},
