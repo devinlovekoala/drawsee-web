@@ -29,6 +29,7 @@ import {
   CircuitElement
 } from '@/api/types/circuit.types';
 import { createAiTask } from '@/api/methods/flow.methods';
+import { saveCircuitDesign } from '@/api/methods/circuit.methods';
 import { CircuitNodeData, ModelType } from '../types';
 import { useAppContext } from '@/app/contexts/AppContext';
 import { CreateAiTaskDTO } from '@/api/types/flow.types';
@@ -164,10 +165,14 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
   const [canRedo, setCanRedo] = useState<boolean>(false);
   const [fullScreenMode, setFullScreenMode] = useState<boolean>(false);
   const [historyState, setHistoryState] = useState<{
-    past: any[],
-    present: any,
-    future: any[]
-  }>({ past: [], present: null, future: [] });
+    past: Array<{nodes: Node[], edges: Edge[]}>,
+    present: {nodes: Node[], edges: Edge[]},
+    future: Array<{nodes: Node[], edges: Edge[]}>
+  }>({
+    past: [],
+    present: {nodes: [], edges: []},
+    future: []
+  });
   // 添加配置面板状态
   const [configVisible, setConfigVisible] = useState<boolean>(false);
   const [selectedElement, setSelectedElement] = useState<CircuitNodeData | null>(null);
@@ -175,6 +180,34 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
   const reactFlowInstance = useReactFlow();
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const { handleBlankQuery, handleAiTaskCountPlus } = useAppContext();
+  
+  // 监控节点和边变化，更新历史状态和撤销/重做按钮
+  useEffect(() => {
+    if (nodes.length > 0 || edges.length > 0) {
+      // 有内容时更新历史状态
+      const currentState = { nodes, edges };
+      
+      // 保存当前状态到历史记录中
+      setHistoryState(prev => ({
+        past: [...prev.past, prev.present],
+        present: currentState,
+        future: []
+      }));
+      
+      // 更新撤销/重做按钮状态
+      setCanUndo(true);
+      setCanRedo(false);
+    } else {
+      // 没有内容时重置历史状态
+      setHistoryState({
+        past: [],
+        present: {nodes: [], edges: []},
+        future: []
+      });
+      setCanUndo(false);
+      setCanRedo(false);
+    }
+  }, [nodes, edges]);
   
   // 监视节点变化
   useEffect(() => {
@@ -730,8 +763,10 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
       nds.map((node) => {
         if (node.id === selectedNodeId) {
           // 获取当前旋转角度
-          const currentRotation = node.data.element?.rotation || 0;
-          // 计算新的旋转角度 (0 -> 90 -> 180 -> 270 -> 0)
+          const match = node.style?.transform?.match(/rotate\((\d+)deg\)/);
+          const currentRotation = match ? parseInt(match[1], 10) : 0;
+          
+          // 每次旋转90度
           const newRotation = (currentRotation + 90) % 360;
           
           // 更新节点数据
@@ -843,8 +878,18 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
   
   // 添加画布点击处理以取消选择
   const onPaneClick = useCallback(() => {
+    console.log('取消选择节点');
     setSelectedNodeId(null);
     setSelectedEdgeId(null);
+  }, []);
+
+  // 处理节点点击
+  const handleNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
+    console.log('节点被点击:', node.id);
+    setSelectedNodeId(node.id);
+    // 取消选中边
+    setSelectedEdgeId(null);
+    event.stopPropagation();
   }, []);
   
   // 注册快捷键
@@ -911,6 +956,136 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
     }
   }, [configVisible, selectedElement]);
 
+  // 处理撤销
+  const handleUndo = useCallback(() => {
+    if (historyState.past.length === 0) return;
+    
+    const previous = historyState.past[historyState.past.length - 1];
+    const newPast = historyState.past.slice(0, historyState.past.length - 1);
+    
+    setHistoryState({
+      past: newPast,
+      present: previous,
+      future: [historyState.present, ...historyState.future]
+    });
+    
+    // 恢复节点和边的状态
+    setNodes(previous.nodes);
+    setEdges(previous.edges);
+    
+    // 清除选中状态
+    setSelectedNodeId(null);
+    
+    // 更新按钮状态
+    setCanUndo(newPast.length > 0);
+    setCanRedo(true);
+  }, [historyState, setNodes, setEdges]);
+  
+  // 处理重做
+  const handleRedo = useCallback(() => {
+    if (historyState.future.length === 0) return;
+    
+    const next = historyState.future[0];
+    const newFuture = historyState.future.slice(1);
+    
+    setHistoryState({
+      past: [...historyState.past, historyState.present],
+      present: next,
+      future: newFuture
+    });
+    
+    // 恢复节点和边的状态
+    setNodes(next.nodes);
+    setEdges(next.edges);
+    
+    // 清除选中状态
+    setSelectedNodeId(null);
+    
+    // 更新按钮状态
+    setCanUndo(true);
+    setCanRedo(newFuture.length > 0);
+  }, [historyState, setNodes, setEdges]);
+  
+  // 节点旋转功能
+  const handleRotate = useCallback(() => {
+    if (!selectedNodeId) return;
+    
+    setNodes((nds) =>
+      nds.map((node) => {
+        if (node.id === selectedNodeId) {
+          // 获取当前旋转角度
+          const match = node.style?.transform?.match(/rotate\((\d+)deg\)/);
+          const currentRotation = match ? parseInt(match[1], 10) : 0;
+          
+          // 每次旋转90度
+          const newRotation = (currentRotation + 90) % 360;
+          
+          return {
+            ...node,
+            style: {
+              ...node.style,
+              transform: `rotate(${newRotation}deg)`
+            }
+          };
+        }
+        return node;
+      })
+    );
+  }, [selectedNodeId, setNodes]);
+
+  // 保存电路设计
+  const handleSaveCircuit = useCallback(async () => {
+    try {
+      const circuitDesign = convertToCircuitDesign();
+      
+      // 检查电路是否为空
+      if (circuitDesign.elements.length === 0) {
+        message.error('电路中没有元件，请先添加元件');
+        return;
+      }
+      
+      message.loading('保存电路中...', 0.5);
+      const result = await saveCircuitDesign(
+        circuitDesign,
+        circuitDesign.metadata.title || '电路设计',
+        circuitDesign.metadata.description || '使用DrawSee创建的电路'
+      );
+      
+      if (result.success) {
+        message.success('电路设计保存成功！');
+      } else {
+        message.error('电路设计保存失败');
+      }
+    } catch (error) {
+      console.error('保存电路设计失败:', error);
+      message.error('保存失败：' + (error instanceof Error ? error.message : '未知错误'));
+    }
+  }, [convertToCircuitDesign]);
+  
+  // 清空电路
+  const handleClearCircuit = useCallback(() => {
+    Modal.confirm({
+      title: '确认清空电路？',
+      content: '此操作将删除所有元件和连接，且不可恢复',
+      okText: '确认清空',
+      okType: 'danger',
+      cancelText: '取消',
+      onOk: () => {
+        setNodes([]);
+        setEdges([]);
+        message.success('电路已清空');
+      }
+    });
+  }, []);
+
+  // 处理节点选择状态变化，更新工具栏按钮状态
+  useEffect(() => {
+    // 当节点被选中时，确保相关按钮可用
+    if (selectedNodeId) {
+      console.log('节点已选中:', selectedNodeId);
+    }
+  }, [selectedNodeId]);
+
   return (
     <div ref={reactFlowWrapper} className="flex flex-row w-full h-full bg-white">
       {/* 左侧元件库面板 */}
@@ -925,40 +1100,24 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
         {/* 工具栏 */}
         {!isReadOnly && (
           <CircuitToolbar 
-            onSave={() => console.log('保存电路设计')}
-            onUndo={() => {
-              // Undo逻辑
-              if (historyState.past.length > 0) {
-                // TODO: 实现Undo功能
-              }
-            }}
-            onRedo={() => {
-              // Redo逻辑
-              if (historyState.future.length > 0) {
-                // TODO: 实现Redo功能
-              }
-            }}
+            onSave={handleSaveCircuit}
+            onUndo={handleUndo}
+            onRedo={handleRedo}
             onCopy={() => {
               // 复制选中节点
               if (selectedNodeId) {
                 // TODO: 实现复制功能
+                message.info('复制功能开发中');
               }
             }}
             onDelete={deleteSelectedNode}
-            onRotate={rotateSelectedNode}
+            onRotate={handleRotate}
             onZoomIn={() => reactFlowInstance.zoomIn()}
             onZoomOut={() => reactFlowInstance.zoomOut()}
             onFitView={() => reactFlowInstance.fitView()}
             onFullScreen={() => setFullScreenMode(!fullScreenMode)}
-            onExport={() => {
-              // TODO: 实现导出功能
-            }}
-            onClearAll={() => {
-              // 清除所有节点和边
-              setNodes([]);
-              setEdges([]);
-            }}
-            onAnalyze={handleAnalyzeCircuit}
+            onAnalysis={handleAnalyzeCircuit}
+            onClear={handleClearCircuit}
             isAnalyzing={isAnalyzing}
             selectedModel={currentModel}
             onModelChange={(model) => {
@@ -998,7 +1157,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
             connectOnClick={!isReadOnly}
             connectionRadius={20}
             isValidConnection={() => !isReadOnly}
-            onNodeClick={isReadOnly ? undefined : (_, node) => setSelectedNodeId(node.id)}
+            onNodeClick={isReadOnly ? undefined : handleNodeClick}
             onNodeDoubleClick={isReadOnly ? undefined : (event, node) => {
               console.log('ReactFlow onNodeDoubleClick 事件触发，node.id:', node.id);
               // 阻止事件传播，避免与ReactFlow内置行为冲突
