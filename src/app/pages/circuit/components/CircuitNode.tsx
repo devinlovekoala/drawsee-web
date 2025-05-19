@@ -30,13 +30,14 @@ interface Port {
 
 // 节点数据接口
 interface CircuitNodeData {
+  id?: string;     // 添加id字段
   type: CircuitElementType;
   label: string;
   value: string;
   element?: CircuitElement; // 添加完整的元件数据
   onNodeClick?: (id: string) => void;
-  onNodeDoubleClick?: (id: string) => void;
-  onRotate?: (id: string, rotation: number) => void;
+  description?: string;    // 添加description字段
+  ports?: Port[];          // 添加ports字段
 }
 
 // 为每种元件类型定义默认端口
@@ -343,16 +344,6 @@ export const CircuitNode = memo(({ data, id, selected }: NodeProps<CircuitNodeDa
     height: config.height + 20
   };
   
-  // 处理双击事件 - 显示属性面板
-  const handleDoubleClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    e.stopPropagation();
-    
-    // 触发外部的双击回调
-    if (data.onNodeDoubleClick) {
-      data.onNodeDoubleClick(id);
-    }
-  }, [id, data]);
-
   // 获取端口的位置样式
   const getPortStyle = (port: Port): React.CSSProperties => {
     const baseStyle: React.CSSProperties = {
@@ -613,7 +604,14 @@ export const CircuitNode = memo(({ data, id, selected }: NodeProps<CircuitNodeDa
       }}
       data-rotation={rotation}
       data-element-type={data.element?.type}
-      onDoubleClick={handleDoubleClick}
+      data-node-id={id}
+      onClick={(e) => {
+        // 只负责处理单击事件，双击由ReactFlow处理
+        e.stopPropagation();
+        if (data.onNodeClick) {
+          data.onNodeClick(id);
+        }
+      }}
     >
       {/* 元件SVG */}
       <div 
@@ -721,22 +719,29 @@ export const CircuitNode = memo(({ data, id, selected }: NodeProps<CircuitNodeDa
         );
       })}
       
-      {/* 只在选中状态显示标签信息 */}
-      {selected && (
-        <div 
-          className="absolute -bottom-5 left-1/2 transform -translate-x-1/2 px-1 py-0.5 bg-white text-xs rounded shadow-sm border"
-          style={{
-            borderColor: theme.border,
-            color: theme.text,
-            fontSize: '9px',
-            pointerEvents: 'none', // 不阻止点击事件
-            zIndex: 5,
-          }}
-        >
-          {label}
-          {value && ` (${value})`}
-        </div>
-      )}
+      {/* 元件标签 - 始终显示但根据选中状态调整样式 */}
+      <div 
+        className={`absolute transform -translate-x-1/2 px-1.5 py-0.5 rounded transition-all duration-200 bg-white border shadow-sm ${selected ? '-top-7' : '-top-6'}`}
+        style={{
+          left: '50%',
+          borderColor: selected ? theme.primary : theme.border,
+          color: selected ? theme.primary : theme.text,
+          fontSize: selected ? '11px' : '10px',
+          opacity: selected ? 1 : 0.85,
+          pointerEvents: 'none', // 不阻止点击事件
+          zIndex: 5,
+          scale: selected ? '1.05' : '1',
+          fontWeight: selected ? 500 : 400,
+          letterSpacing: '0.01em',
+          maxWidth: '120px',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis'
+        }}
+      >
+        {label}
+        {value && <span style={{marginLeft: '3px', opacity: 0.8}}>({value})</span>}
+      </div>
     </div>
   );
 });

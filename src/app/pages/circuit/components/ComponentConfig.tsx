@@ -139,8 +139,21 @@ const ComponentConfig: React.FC<ComponentConfigProps> = ({
   const [labelInput, setLabelInput] = useState('');
   const [valueInput, setValueInput] = useState('');
 
+  // 记录接收到的数据
+  useEffect(() => {
+    console.log('ComponentConfig 组件状态 - visible:', visible, 'element:', element);
+    if (visible && element) {
+      console.log('ComponentConfig 接收到元素数据:', element);
+      console.log('模态框配置 - visible:', visible);
+    }
+    if (visible && !element) {
+      console.warn('警告：模态框可见但未接收到元素数据');
+    }
+  }, [visible, element]);
+
   useEffect(() => {
     if (element) {
+      console.log('设置输入字段 - label:', element.label, 'value:', element.value);
       setLabelInput(element.label || '');
       setValueInput(element.value || '');
     }
@@ -149,23 +162,42 @@ const ComponentConfig: React.FC<ComponentConfigProps> = ({
   const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!element) return;
+    if (!element) {
+      console.error('无法提交更新：element 为空');
+      return;
+    }
+    
+    if (!element.id) {
+      console.error('无法提交更新：element.id 为空');
+      return;
+    }
     
     const updates: Partial<CircuitNodeData> = {
       label: labelInput,
       value: valueInput,
     };
     
+    console.log('提交更新:', updates);
+    console.log('更新元素ID:', element.id);
     onUpdate(element.id, updates);
-  }, [element, labelInput, valueInput, onUpdate]);
+    onClose();
+  }, [element, labelInput, valueInput, onUpdate, onClose]);
 
-  if (!visible || !element) return null;
+  if (!visible) {
+    console.log('ComponentConfig 不可见，返回 null');
+    return null;
+  }
+  
+  if (!element) {
+    console.warn('ComponentConfig 元素为空，返回 null');
+    return null;
+  }
 
   const elementTypeName = element.element?.type ? getElementTypeName(element.element.type) : '元件';
   const elementUnit = element.element?.type ? getElementUnit(element.element.type) : '';
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50" onClick={onClose}>
+    <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-[9999]" onClick={onClose}>
       <div 
         className="bg-white rounded-lg shadow-xl w-96 overflow-hidden" 
         onClick={(e) => e.stopPropagation()}

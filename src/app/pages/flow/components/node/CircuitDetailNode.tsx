@@ -58,7 +58,6 @@ function CircuitDetailNode({ data, ...props }: ExtendedNodeProps<'circuit-detail
       }, 100);
     }
     // 只在组件挂载时执行一次
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   
   // 添加角度信息到标题
