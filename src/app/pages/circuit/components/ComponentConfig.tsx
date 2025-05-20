@@ -1,17 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Modal, Tabs, Form, Input, Select, Slider, Button, Space, Tooltip } from 'antd';
-import { 
-  SettingOutlined, 
-  EditOutlined, 
-  RotateRightOutlined, 
-  InfoCircleOutlined 
-} from '@ant-design/icons';
-import { CircuitElement, CircuitElementType } from '@/api/types/circuit.types';
+import { CircuitElementType } from '@/api/types/circuit.types';
 import { CircuitNodeData } from '@/app/pages/circuit/types';
 import { getElementUnit, getElementTypeName } from '../utils/element-utils';
-import { message } from 'antd';
-
-const { TabPane } = Tabs;
 
 // 单位选项
 interface UnitOptions {
@@ -28,93 +18,6 @@ interface UnitOptions {
   current_default: string;
   frequency_default: string;
 }
-
-const UNITS: UnitOptions = {
-  resistance: ['Ω', 'kΩ', 'MΩ'],
-  capacitance: ['pF', 'nF', 'μF', 'mF', 'F'],
-  inductance: ['nH', 'μH', 'mH', 'H'],
-  voltage: ['mV', 'V', 'kV'],
-  current: ['μA', 'mA', 'A'],
-  frequency: ['Hz', 'kHz', 'MHz', 'GHz'],
-  resistance_default: 'kΩ',
-  capacitance_default: 'μF',
-  inductance_default: 'mH',
-  voltage_default: 'V',
-  current_default: 'mA',
-  frequency_default: 'kHz',
-};
-
-// 获取元件单位类别
-const getElementUnitType = (elementType: CircuitElementType): string => {
-  switch (elementType) {
-    case CircuitElementType.RESISTOR:
-      return 'resistance';
-    case CircuitElementType.CAPACITOR:
-      return 'capacitance';
-    case CircuitElementType.INDUCTOR:
-      return 'inductance';
-    case CircuitElementType.VOLTAGE_SOURCE:
-      return 'voltage';
-    case CircuitElementType.CURRENT_SOURCE:
-      return 'current';
-    default:
-      return '';
-  }
-};
-
-// 解析值和单位
-const parseValueAndUnit = (value: string, unitType: string): { value: number, unit: string } => {
-  // 默认值和单位
-  let defaultUnit = '';
-  
-  // 根据单位类型获取默认单位
-  switch(unitType) {
-    case 'resistance':
-      defaultUnit = UNITS.resistance_default;
-      break;
-    case 'capacitance':
-      defaultUnit = UNITS.capacitance_default;
-      break;
-    case 'inductance':
-      defaultUnit = UNITS.inductance_default;
-      break;
-    case 'voltage':
-      defaultUnit = UNITS.voltage_default;
-      break;
-    case 'current':
-      defaultUnit = UNITS.current_default;
-      break;
-    case 'frequency':
-      defaultUnit = UNITS.frequency_default;
-      break;
-    default:
-      defaultUnit = '';
-  }
-  
-  let numValue = 1;
-  let unit = defaultUnit;
-  
-  // 正则表达式匹配数值和单位
-  const regex = /^([0-9.]+)\s*([a-zA-ZΩμ]*)$/;
-  const match = value.match(regex);
-  
-  if (match) {
-    numValue = parseFloat(match[1]);
-    unit = match[2] || defaultUnit;
-  }
-  
-  return { value: numValue, unit };
-};
-
-// 格式化值和单位
-const formatValueAndUnit = (value: number, unit: string): string => {
-  if (value === 0) return '0';
-  if (value < 0.001) return value.toExponential(2) + unit;
-  if (value < 1) return value.toFixed(3) + unit;
-  if (value < 10) return value.toFixed(2) + unit;
-  if (value < 100) return value.toFixed(1) + unit;
-  return Math.round(value) + unit;
-};
 
 interface ComponentConfigProps {
   element: CircuitNodeData | null;
@@ -138,22 +41,28 @@ const ComponentConfig: React.FC<ComponentConfigProps> = ({
 }) => {
   const [labelInput, setLabelInput] = useState('');
   const [valueInput, setValueInput] = useState('');
+  // 添加一个状态来跟踪组件是否已经初始化
+  const [initialized, setInitialized] = useState(false);
 
-  // 记录接收到的数据
+  // 记录接收到的数据 - 只在开发模式下记录日志
   useEffect(() => {
-    console.log('ComponentConfig 组件状态 - visible:', visible, 'element:', element);
-    if (visible && element) {
-      console.log('ComponentConfig 接收到元素数据:', element);
-      console.log('模态框配置 - visible:', visible);
+    if (process.env.NODE_ENV === 'development') {
+      if (visible && element && !initialized) {
+        console.log('ComponentConfig 接收到元素数据:', element);
+        setInitialized(true);
+      }
     }
-    if (visible && !element) {
-      console.warn('警告：模态框可见但未接收到元素数据');
+  }, [visible, element, initialized]);
+
+  // 当模态框关闭时重置初始化状态
+  useEffect(() => {
+    if (!visible) {
+      setInitialized(false);
     }
-  }, [visible, element]);
+  }, [visible]);
 
   useEffect(() => {
     if (element) {
-      console.log('设置输入字段 - label:', element.label, 'value:', element.value);
       setLabelInput(element.label || '');
       setValueInput(element.value || '');
     }
@@ -177,19 +86,15 @@ const ComponentConfig: React.FC<ComponentConfigProps> = ({
       value: valueInput,
     };
     
-    console.log('提交更新:', updates);
-    console.log('更新元素ID:', element.id);
     onUpdate(element.id, updates);
     onClose();
   }, [element, labelInput, valueInput, onUpdate, onClose]);
 
   if (!visible) {
-    console.log('ComponentConfig 不可见，返回 null');
     return null;
   }
   
   if (!element) {
-    console.warn('ComponentConfig 元素为空，返回 null');
     return null;
   }
 

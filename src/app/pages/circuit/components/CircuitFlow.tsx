@@ -17,7 +17,7 @@ import ReactFlow, {
   Panel
 } from 'reactflow';
 import { Button, Dropdown, message, Space, Modal, Spin } from 'antd';
-import { DownOutlined, PlusOutlined, PlayCircleOutlined } from '@ant-design/icons';
+import { DownOutlined, PlusOutlined, PlayCircleOutlined, SaveOutlined } from '@ant-design/icons';
 import 'reactflow/dist/style.css';
 import { CircuitNode } from './CircuitNode';
 import ConnectionEdge, { ConnectionPreview } from './ConnectionEdge';
@@ -183,39 +183,52 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
   
   // 监控节点和边变化，更新历史状态和撤销/重做按钮
   useEffect(() => {
-    if (nodes.length > 0 || edges.length > 0) {
-      // 有内容时更新历史状态
-      const currentState = { nodes, edges };
+    // 防止初始化或状态更新时频繁触发历史记录更新
+    // 只有当用户实际进行了操作，才更新历史状态
+    if (historyState.present.nodes.length === 0 && historyState.present.edges.length === 0) {
+      // 首次加载，直接设置当前状态而不添加到历史记录中
+      setHistoryState(prev => ({
+        ...prev,
+        present: { nodes, edges },
+      }));
+      
+      // 更新撤销/重做按钮状态
+      setCanUndo(false);
+      setCanRedo(false);
+      return;
+    }
+    
+    // 比较当前的节点和边与历史记录中present的节点和边是否相同
+    const nodesChanged = nodes.length !== historyState.present.nodes.length ||
+      nodes.some((node, index) => {
+        const presentNode = historyState.present.nodes[index];
+        return !presentNode || node.id !== presentNode.id || 
+          node.position.x !== presentNode.position.x || 
+          node.position.y !== presentNode.position.y;
+      });
+      
+    const edgesChanged = edges.length !== historyState.present.edges.length ||
+      edges.some((edge, index) => {
+        const presentEdge = historyState.present.edges[index];
+        return !presentEdge || edge.id !== presentEdge.id;
+      });
+    
+    // 只有当节点或边发生实质性变化时，才更新历史状态
+    if (nodesChanged || edgesChanged) {
+      console.log('节点或边发生了实质性变化，更新历史状态');
       
       // 保存当前状态到历史记录中
       setHistoryState(prev => ({
         past: [...prev.past, prev.present],
-        present: currentState,
+        present: { nodes, edges },
         future: []
       }));
       
       // 更新撤销/重做按钮状态
       setCanUndo(true);
       setCanRedo(false);
-    } else {
-      // 没有内容时重置历史状态
-      setHistoryState({
-        past: [],
-        present: {nodes: [], edges: []},
-        future: []
-      });
-      setCanUndo(false);
-      setCanRedo(false);
     }
   }, [nodes, edges]);
-  
-  // 监视节点变化
-  useEffect(() => {
-    console.log(`节点数组已更新，当前有 ${nodes.length} 个节点:`);
-    nodes.forEach((node, index) => {
-      console.log(`节点 ${index + 1}:`, node.id, '类型:', node.type);
-    });
-  }, [nodes]);
   
   // 显示班级ID信息（如果有）
   useEffect(() => {
@@ -224,10 +237,14 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
     }
   }, [classId]);
   
-  // 加载初始电路设计数据
+  // 加载初始电路设计数据 - 使用 useRef 避免重复加载
+  const initialLoadRef = useRef(false);
+  
   useEffect(() => {
-    if (initialCircuitDesign && initialCircuitDesign.elements.length > 0) {
+    // 避免重复加载初始数据
+    if (initialCircuitDesign && initialCircuitDesign.elements.length > 0 && !initialLoadRef.current) {
       console.log('加载初始电路设计数据', initialCircuitDesign);
+      initialLoadRef.current = true;
       
       // 将电路设计元素转换为节点
       const newNodes = initialCircuitDesign.elements.map(element => {
@@ -656,7 +673,9 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
   // 分析电路
   const handleAnalyzeCircuit = useCallback(async () => {
     try {
+      // 开始分析，设置状态为正在分析
       setIsAnalyzing(true);
+      
       const circuitDesign = convertToCircuitDesign();
       
       // 检查电路是否为空
@@ -692,6 +711,13 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
         return;
       }
       
+      // 显示加载提示
+      message.loading({
+        content: '正在准备分析电路...',
+        key: 'circuit-analysis',
+        duration: 0 // 不自动关闭
+      });
+      
       // 按照文档规范构造电路分析任务数据
       const createAiTaskDTO: CreateAiTaskDTO = {
         type: 'CIRCUIT_ANALYSIS',
@@ -712,20 +738,37 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
       // 计数+1
       handleAiTaskCountPlus();
       
-      // 成功提示
-      message.success('电路分析已发送，正在处理...');
-      
       // 将classId存储到sessionStorage，以便在flow页面获取
       if (classId) {
         sessionStorage.setItem(`circuit_class_id_${response.conversation.id}`, classId);
       }
       
-      // 跳转到Flow页面展示结果
+      // 更新loading消息内容
+      message.loading({
+        content: '分析启动成功，即将跳转到分析页面...',
+        key: 'circuit-analysis',
+        duration: 1 // 显示1秒
+      });
+      
+      // 立即触发跳转
       handleBlankQuery(response);
       
+      // 跳转后关闭分析中状态
       setIsAnalyzing(false);
+      
+      // 在跳转完成后稍微延迟再显示成功消息，避免界面闪烁
+      setTimeout(() => {
+        // 关闭之前的loading消息
+        message.destroy('circuit-analysis');
+        // 显示成功消息
+        message.success('已成功跳转到电路分析页面');
+      }, 800);
+      
     } catch (error) {
       console.error('电路分析失败:', error);
+      // 关闭分析中的loading消息
+      message.destroy('circuit-analysis');
+      
       if (error instanceof Error) {
         // 对于参数错误，给出更具体的提示
         if (error.message.includes('参数错误')) {
@@ -754,11 +797,14 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
     }
   }, [convertToCircuitDesign, currentModel, handleBlankQuery, handleAiTaskCountPlus, classId]);
 
-  // 旋转选中的节点
-  const rotateSelectedNode = useCallback(() => {
-    if (!selectedNodeId) return;
-
-    // 先更新节点的旋转状态
+  // 节点旋转功能
+  const handleRotate = useCallback(() => {
+    console.log('执行旋转操作，selectedNodeId:', selectedNodeId);
+    if (!selectedNodeId) {
+      console.log('没有选中节点，无法执行旋转');
+      return;
+    }
+    
     setNodes((nds) =>
       nds.map((node) => {
         if (node.id === selectedNodeId) {
@@ -769,86 +815,64 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
           // 每次旋转90度
           const newRotation = (currentRotation + 90) % 360;
           
-          // 更新节点数据
+          console.log(`节点 ${node.id} 旋转角度从 ${currentRotation} 变为 ${newRotation}`);
+          
           return {
             ...node,
+            style: {
+              ...node.style,
+              transform: `rotate(${newRotation}deg)`
+            },
             data: {
               ...node.data,
-              element: {
+              element: node.data.element ? {
                 ...node.data.element,
                 rotation: newRotation,
-              },
-            },
+              } : node.data.element
+            }
           };
         }
         return node;
       })
     );
     
-    // 等待DOM更新并处理连线重绘
-    setTimeout(() => {
-      // 强制触发ReactFlow内部更新
-      reactFlowInstance.setNodes(reactFlowInstance.getNodes());
-      
-      // 找到与选中节点相关的所有边
-      const relatedEdges = edges.filter(
-        edge => edge.source === selectedNodeId || edge.target === selectedNodeId
-      );
-      
-      if (relatedEdges.length > 0) {
-        // 首先删除所有相关的边，稍后会重新创建它们
-        setEdges(currentEdges => 
-          currentEdges.filter(edge => 
-            edge.source !== selectedNodeId && edge.target !== selectedNodeId
-          )
-        );
-        
-        // 稍微延迟后重新创建这些边，以便ReactFlow能重新计算连接点位置
-        setTimeout(() => {
-          setEdges(currentEdges => [
-            ...currentEdges,
-            ...relatedEdges.map(edge => ({
-              ...edge,
-              id: `${edge.id}-${Date.now()}`, // 创建新的ID以确保ReactFlow重新渲染
-              // 强制标记为需要重新计算
-              data: {
-                ...edge.data,
-                forceRefresh: true,
-                updateTimestamp: Date.now(),
-              }
-            }))
-          ]);
-          
-          // 再次强制ReactFlow重新计算所有位置
-          setTimeout(() => {
-            reactFlowInstance.fitView({ duration: 0, padding: 0.1 });
-          }, 50);
-        }, 50);
-      } else {
-        // 即使没有相关边，也强制刷新视图以确保端口位置正确
-        reactFlowInstance.fitView({ duration: 0, padding: 0.1 });
-      }
-    }, 100);
-  }, [selectedNodeId, setNodes, edges, setEdges, reactFlowInstance]);
+    // 触发自定义事件，通知连线需要更新
+    const event = new CustomEvent('circuit-node-rotated', {
+      detail: { nodeId: selectedNodeId, rotation: 90 }
+    });
+    document.dispatchEvent(event);
+    
+    message.success('元件已旋转', 0.5);
+  }, [selectedNodeId, setNodes]);
   
   // 删除选中的节点
   const deleteSelectedNode = useCallback(() => {
-    if (!selectedNodeId) return;
+    console.log('执行删除操作，selectedNodeId:', selectedNodeId);
+    if (!selectedNodeId) {
+      console.log('没有选中节点，无法执行删除');
+      return;
+    }
     
     // 删除连接到该节点的所有边
-    setEdges((edges) => 
-      edges.filter(
+    setEdges((edges) => {
+      const filteredEdges = edges.filter(
         (edge) => edge.source !== selectedNodeId && edge.target !== selectedNodeId
-      )
-    );
+      );
+      console.log(`删除了 ${edges.length - filteredEdges.length} 条与节点 ${selectedNodeId} 相关的连线`);
+      return filteredEdges;
+    });
     
     // 删除节点
-    setNodes((nodes) => nodes.filter((node) => node.id !== selectedNodeId));
+    setNodes((nodes) => {
+      const filteredNodes = nodes.filter((node) => node.id !== selectedNodeId);
+      console.log(`删除了节点 ${selectedNodeId}`);
+      return filteredNodes;
+    });
     
     // 清除选中状态
     setSelectedNodeId(null);
     
-    message.info('元件已删除');
+    message.success('元件已删除');
   }, [selectedNodeId]);
   
   // 处理边点击
@@ -885,18 +909,20 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
 
   // 处理节点点击
   const handleNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
-    console.log('节点被点击:', node.id);
+    console.log('节点被点击:', node.id, '节点数据:', node);
+    // 立即设置选中节点ID
     setSelectedNodeId(node.id);
     // 取消选中边
     setSelectedEdgeId(null);
+    // 阻止事件冒泡
     event.stopPropagation();
   }, []);
   
   // 注册快捷键
   useHotkeys('ctrl+r', (event) => {
     event.preventDefault();
-    rotateSelectedNode();
-  }, [rotateSelectedNode]);
+    handleRotate();
+  }, [handleRotate]);
   
   useHotkeys('ctrl+d, delete', (event) => {
     event.preventDefault();
@@ -915,26 +941,34 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
     }
   }, [selectedEdgeId]);
 
-  // 添加一个函数来处理元件配置更新
-  const handleElementUpdate = useCallback((id: string, updates: Partial<CircuitNodeData>) => {
-    setNodes(currentNodes => 
-      currentNodes.map(node => {
-        if (node.id === id) {
+  // 处理元件配置更新
+  const handleElementUpdate = useCallback((nodeId: string, updates: Partial<CircuitNodeData>) => {
+    console.log('开始更新元件:', nodeId, updates);
+    
+    setNodes(nds => 
+      nds.map(node => {
+        if (node.id === nodeId) {
+          // 创建更新后的数据对象
           const updatedData = {
             ...node.data,
-            ...updates,
-            label: updates.label || node.data.label,
-            value: updates.value || node.data.value
+            ...updates
           };
           
-          // 如果有 element 属性，也要更新它
-          if (node.data.element) {
+          // 确保element属性正确更新
+          if (updatedData.element) {
             updatedData.element = {
-              ...node.data.element,
-              label: updates.label || node.data.element.label,
-              value: updates.value || node.data.element.value
+              ...updatedData.element,
+              label: updates.label || updatedData.element.label,
+              value: updates.value || updatedData.element.value,
+              properties: {
+                ...updatedData.element.properties,
+                label: updates.label || updatedData.element.properties?.label,
+                value: updates.value || updatedData.element.properties?.value
+              }
             };
           }
+          
+          console.log('更新的节点数据:', updatedData);
           
           return {
             ...node,
@@ -945,17 +979,14 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
       })
     );
     
-    message.success('元件已更新', 1);
+    // 关闭配置面板
+    setConfigVisible(false);
+    // 清空选中的元件
+    setSelectedElement(null);
+    
+    console.log('元件更新完成');
   }, []);
-
-  // 监控配置面板显示状态的变化
-  useEffect(() => {
-    console.log('配置面板显示状态变更:', configVisible ? '显示' : '隐藏');
-    if (configVisible) {
-      console.log('当前选中的元素:', selectedElement);
-    }
-  }, [configVisible, selectedElement]);
-
+  
   // 处理撤销
   const handleUndo = useCallback(() => {
     if (historyState.past.length === 0) return;
@@ -1006,33 +1037,6 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
     setCanRedo(newFuture.length > 0);
   }, [historyState, setNodes, setEdges]);
   
-  // 节点旋转功能
-  const handleRotate = useCallback(() => {
-    if (!selectedNodeId) return;
-    
-    setNodes((nds) =>
-      nds.map((node) => {
-        if (node.id === selectedNodeId) {
-          // 获取当前旋转角度
-          const match = node.style?.transform?.match(/rotate\((\d+)deg\)/);
-          const currentRotation = match ? parseInt(match[1], 10) : 0;
-          
-          // 每次旋转90度
-          const newRotation = (currentRotation + 90) % 360;
-          
-          return {
-            ...node,
-            style: {
-              ...node.style,
-              transform: `rotate(${newRotation}deg)`
-            }
-          };
-        }
-        return node;
-      })
-    );
-  }, [selectedNodeId, setNodes]);
-
   // 保存电路设计
   const handleSaveCircuit = useCallback(async () => {
     try {
@@ -1077,14 +1081,95 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
       }
     });
   }, []);
-
+  
   // 处理节点选择状态变化，更新工具栏按钮状态
   useEffect(() => {
     // 当节点被选中时，确保相关按钮可用
     if (selectedNodeId) {
-      console.log('节点已选中:', selectedNodeId);
+      console.log('节点已选中:', selectedNodeId, '可以操作相关按钮');
+      
+      // 更新节点的选中样式
+      setNodes((nds) =>
+        nds.map((node) => ({
+          ...node,
+          selected: node.id === selectedNodeId,
+          style: {
+            ...node.style,
+            // 为选中的节点添加高亮边框
+            boxShadow: node.id === selectedNodeId ? '0 0 0 2px #1890ff' : undefined,
+            zIndex: node.id === selectedNodeId ? 1000 : undefined,
+          },
+        }))
+      );
+    } else {
+      console.log('没有选中节点，相关按钮将被禁用');
+      // 当没有节点被选中时，清除所有节点的选中样式
+      setNodes((nds) =>
+        nds.map((node) => ({
+          ...node,
+          selected: false,
+          style: {
+            ...node.style,
+            boxShadow: undefined,
+            zIndex: undefined,
+          },
+        }))
+      );
     }
   }, [selectedNodeId]);
+
+  // 监听节点双击事件，打开配置面板
+  useEffect(() => {
+    const handleNodeDoubleClicked = (event: CustomEvent) => {
+      const { nodeId } = event.detail;
+      console.log('CircuitFlow.handleNodeDoubleClicked 监听到事件 nodeId:', nodeId);
+      
+      // 查找节点数据
+      const node = nodes.find(n => n.id === nodeId);
+      if (node) {
+        console.log('找到节点数据, 打开配置面板');
+        
+        // 构建完整的节点数据对象
+        const nodeData = {
+          id: node.id,
+          type: node.data.type,
+          label: node.data.label || '',
+          value: node.data.value || '',
+          element: node.data.element,
+          description: node.data.description || '',
+          ports: node.data.ports || []
+        };
+        
+        // 设置选中的元件并打开配置面板
+        setSelectedElement(nodeData);
+        setConfigVisible(true);
+      } else {
+        console.warn('未找到节点数据:', nodeId);
+      }
+    };
+    
+    document.addEventListener('circuit-node-double-clicked', handleNodeDoubleClicked as EventListener);
+    
+    // 清理函数
+    return () => {
+      document.removeEventListener('circuit-node-double-clicked', handleNodeDoubleClicked as EventListener);
+    };
+  }, [nodes]);
+
+  // 使用React.useMemo来优化ComponentConfig的渲染
+  const componentConfigElement = React.useMemo(() => {
+    return (
+      <ComponentConfig 
+        element={selectedElement}
+        visible={configVisible}
+        onClose={() => {
+          setConfigVisible(false);
+          setSelectedElement(null);
+        }}
+        onUpdate={handleElementUpdate}
+      />
+    );
+  }, [selectedElement, configVisible, handleElementUpdate]);
 
   return (
     <div ref={reactFlowWrapper} className="flex flex-row w-full h-full bg-white">
@@ -1099,38 +1184,40 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
       <div className="flex-1 flex flex-col h-full">
         {/* 工具栏 */}
         {!isReadOnly && (
-          <CircuitToolbar 
-            onSave={handleSaveCircuit}
-            onUndo={handleUndo}
-            onRedo={handleRedo}
-            onCopy={() => {
-              // 复制选中节点
-              if (selectedNodeId) {
-                // TODO: 实现复制功能
-                message.info('复制功能开发中');
-              }
-            }}
-            onDelete={deleteSelectedNode}
-            onRotate={handleRotate}
-            onZoomIn={() => reactFlowInstance.zoomIn()}
-            onZoomOut={() => reactFlowInstance.zoomOut()}
-            onFitView={() => reactFlowInstance.fitView()}
-            onFullScreen={() => setFullScreenMode(!fullScreenMode)}
-            onAnalysis={handleAnalyzeCircuit}
-            onClear={handleClearCircuit}
-            isAnalyzing={isAnalyzing}
-            selectedModel={currentModel}
-            onModelChange={(model) => {
-              setCurrentModel(model);
-              if (onModelChange) {
-                onModelChange(model);
-              }
-            }}
-            canUndo={canUndo}
-            canRedo={canRedo}
-            hasSelectedNode={!!selectedNodeId}
-            hasContent={nodes.length > 0}
-          />
+          <div className="flex justify-between items-center">
+            <CircuitToolbar 
+              onSave={handleSaveCircuit}
+              onUndo={handleUndo}
+              onRedo={handleRedo}
+              onCopy={() => {
+                // 复制选中节点
+                if (selectedNodeId) {
+                  // TODO: 实现复制功能
+                  message.info('复制功能开发中');
+                }
+              }}
+              onDelete={deleteSelectedNode}
+              onRotate={handleRotate}
+              onZoomIn={() => reactFlowInstance.zoomIn()}
+              onZoomOut={() => reactFlowInstance.zoomOut()}
+              onFitView={() => reactFlowInstance.fitView()}
+              onFullScreen={() => setFullScreenMode(!fullScreenMode)}
+              onAnalysis={handleAnalyzeCircuit}
+              onClear={handleClearCircuit}
+              isAnalyzing={isAnalyzing}
+              selectedModel={currentModel}
+              onModelChange={(model) => {
+                setCurrentModel(model);
+                if (onModelChange) {
+                  onModelChange(model);
+                }
+              }}
+              canUndo={canUndo}
+              canRedo={canRedo}
+              hasSelectedNode={!!selectedNodeId}
+              hasContent={nodes.length > 0}
+            />
+          </div>
         )}
       
         {/* 流程图区域 */}
@@ -1159,27 +1246,15 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
             isValidConnection={() => !isReadOnly}
             onNodeClick={isReadOnly ? undefined : handleNodeClick}
             onNodeDoubleClick={isReadOnly ? undefined : (event, node) => {
-              console.log('ReactFlow onNodeDoubleClick 事件触发，node.id:', node.id);
               // 阻止事件传播，避免与ReactFlow内置行为冲突
               event.preventDefault();
               event.stopPropagation();
               
-              // 直接在这里处理节点双击，不通过回调
-              console.log('直接处理双击事件，节点数据:', node);
-              
-              const nodeData = {
-                id: node.id,
-                label: node.data.label || '',
-                value: node.data.value || '',
-                element: node.data.element,
-                description: '',
-                ports: node.data.ports || [],
-              };
-              
-              console.log('直接设置 selectedElement:', nodeData);
-              setSelectedElement(nodeData);
-              console.log('直接设置 configVisible = true');
-              setConfigVisible(true);
+              // 触发自定义事件
+              const doubleClickEvent = new CustomEvent('circuit-node-double-clicked', {
+                detail: { nodeId: node.id }
+              });
+              document.dispatchEvent(doubleClickEvent);
             }}
             onEdgeClick={isReadOnly ? undefined : onEdgeClick}
             onPaneClick={onPaneClick}
@@ -1221,13 +1296,8 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
         </div>
       </div>
       
-      {/* 元件配置面板 */}
-      <ComponentConfig 
-        element={selectedElement}
-        visible={configVisible}
-        onClose={() => setConfigVisible(false)}
-        onUpdate={handleElementUpdate}
-      />
+      {/* 使用优化后的组件配置面板 */}
+      {componentConfigElement}
       
       {isAnalyzing && (
         <div style={{ 

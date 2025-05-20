@@ -1,5 +1,5 @@
 import { FC } from 'react';
-import { Button, Tooltip, Divider, Select, Popconfirm } from 'antd';
+import { Button, Tooltip } from 'antd';
 import { 
   SaveOutlined, 
   UndoOutlined, 
@@ -59,14 +59,40 @@ export const CircuitToolbar: FC<CircuitToolbarProps> = ({
     { value: 'doubao', label: '豆包大模型' }
   ];
 
+  // 只在开发环境下输出日志
+  if (process.env.NODE_ENV === 'development') {
+    // 限制日志频率，使用requestAnimationFrame来降低日志输出频率
+    const debug = () => {
+      if (Math.random() < 0.01) { // 只有1%的概率输出日志
+        console.log('CircuitToolbar 渲染 - hasSelectedNode:', hasSelectedNode, 'canUndo:', canUndo, 'canRedo:', canRedo, 'hasContent:', hasContent);
+      }
+    };
+    
+    // 使用requestAnimationFrame来避免在同一帧内重复输出日志
+    requestAnimationFrame(debug);
+  }
+
+  // 根据按钮是否禁用返回对应的CSS类
+  const getButtonClass = (isDisabled: boolean) => {
+    return isDisabled 
+      ? 'cursor-not-allowed opacity-50' 
+      : 'hover:bg-gray-100 cursor-pointer';
+  };
+  
+  // 检查操作功能是否可用
+  const isOperationEnabled = (operation: (() => void) | undefined, condition: boolean): boolean => {
+    return !!operation && condition;
+  };
+
   return (
     <div className="flex items-center gap-2 bg-white p-2 border border-gray-200 rounded-md shadow-sm">
       <Tooltip title="保存电路">
         <Button
           type="text"
           onClick={onSave}
-          disabled={!hasContent}
+          disabled={!hasContent || !onSave}
           icon={<SaveOutlined />}
+          className={getButtonClass(!hasContent || !onSave)}
         />
       </Tooltip>
 
@@ -74,8 +100,9 @@ export const CircuitToolbar: FC<CircuitToolbarProps> = ({
         <Button
           type="text"
           onClick={onUndo}
-          disabled={!onUndo}
+          disabled={!canUndo || !onUndo}
           icon={<UndoOutlined />}
+          className={getButtonClass(!canUndo || !onUndo)}
         />
       </Tooltip>
 
@@ -83,19 +110,21 @@ export const CircuitToolbar: FC<CircuitToolbarProps> = ({
         <Button
           type="text"
           onClick={onRedo}
-          disabled={!onRedo}
+          disabled={!canRedo || !onRedo}
           icon={<RedoOutlined />}
+          className={getButtonClass(!canRedo || !onRedo)}
         />
       </Tooltip>
 
-      <Divider type="vertical" className="h-6 mx-2" />
+      <div className="h-6 mx-2 border-l border-gray-200"></div>
 
       <Tooltip title="复制">
         <Button
           type="text"
           onClick={onCopy}
-          disabled={!hasSelectedNode}
+          disabled={!hasSelectedNode || !onCopy}
           icon={<CopyOutlined />}
+          className={getButtonClass(!hasSelectedNode || !onCopy)}
         />
       </Tooltip>
 
@@ -103,8 +132,9 @@ export const CircuitToolbar: FC<CircuitToolbarProps> = ({
         <Button
           type="text"
           onClick={onDelete}
-          disabled={!hasSelectedNode}
+          disabled={!hasSelectedNode || !onDelete}
           icon={<DeleteOutlined />}
+          className={getButtonClass(!hasSelectedNode || !onDelete)}
         />
       </Tooltip>
 
@@ -112,18 +142,21 @@ export const CircuitToolbar: FC<CircuitToolbarProps> = ({
         <Button
           type="text"
           onClick={onRotate}
-          disabled={!hasSelectedNode}
+          disabled={!hasSelectedNode || !onRotate}
           icon={<RotateRightOutlined />}
+          className={getButtonClass(!hasSelectedNode || !onRotate)}
         />
       </Tooltip>
 
-      <Divider type="vertical" className="h-6 mx-2" />
+      <div className="h-6 mx-2 border-l border-gray-200"></div>
 
       <Tooltip title="放大">
         <Button 
           type="text" 
           onClick={onZoomIn}
+          disabled={!onZoomIn}
           icon={<ZoomInOutlined />}
+          className={onZoomIn ? "hover:bg-gray-100 cursor-pointer" : "cursor-not-allowed opacity-50"}
         />
       </Tooltip>
 
@@ -131,18 +164,21 @@ export const CircuitToolbar: FC<CircuitToolbarProps> = ({
         <Button 
           type="text" 
           onClick={onZoomOut}
+          disabled={!onZoomOut}
           icon={<ZoomOutOutlined />}
+          className={onZoomOut ? "hover:bg-gray-100 cursor-pointer" : "cursor-not-allowed opacity-50"}
         />
       </Tooltip>
 
-      <Divider type="vertical" className="h-6 mx-2" />
+      <div className="h-6 mx-2 border-l border-gray-200"></div>
 
       <Tooltip title="分析电路">
         <Button
           type="text"
           onClick={onAnalysis}
-          disabled={!hasContent}
+          disabled={!hasContent || !onAnalysis}
           icon={<PlayCircleOutlined />}
+          className={getButtonClass(!hasContent || !onAnalysis)}
         />
       </Tooltip>
 
@@ -150,8 +186,9 @@ export const CircuitToolbar: FC<CircuitToolbarProps> = ({
         <Button
           type="text"
           onClick={onClear}
-          disabled={!hasContent}
+          disabled={!hasContent || !onClear}
           icon={<ClearOutlined />}
+          className={getButtonClass(!hasContent || !onClear)}
         />
       </Tooltip>
     </div>

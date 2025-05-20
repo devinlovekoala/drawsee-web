@@ -162,7 +162,7 @@ function App() {
           aiTaskLimit: data.aiTaskLimit
         });
         getConvData();
-        navigate("/blank");
+        navigate("/circuit", { replace: true });
       })
       .catch(() => {
         toast.error("未登录，请先登录");
@@ -197,8 +197,8 @@ function App() {
     // 清除URL中的state参数，避免在跳转后仍然保留requireLogin标志
     window.history.replaceState({}, document.title, window.location.pathname);
     
-    // 跳转到应用页面
-    navigate("/blank", { replace: true });
+    // 跳转到电路分析页面
+    navigate("/circuit", { replace: true });
     
     // 获取会话数据
     getConvData();

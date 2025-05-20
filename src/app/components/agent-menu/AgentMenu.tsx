@@ -1,4 +1,4 @@
-import { SparklesIcon, Cog, BrainCircuit, Wand2, GraduationCap } from 'lucide-react';
+import { SparklesIcon, Cog, BrainCircuit, Wand2, GraduationCap, MessageCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useState } from 'react';
@@ -6,6 +6,14 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/app/compo
 
 // 定义Agent类型，用于侧边栏展示
 const agents = [
+  {
+    id: 'ai-general',
+    name: 'AI通用问答',
+    description: '支持各种问题的通用智能对话系统',
+    icon: MessageCircle,
+    type: 'GENERAL',
+    isActive: true,
+  },
   {
     id: 'ai-solver',
     name: 'AI推理解题',
@@ -20,14 +28,6 @@ const agents = [
     description: '将复杂概念转换为生动直观的动画形式',
     icon: Wand2,
     type: 'ANIMATION',
-    isActive: true,
-  },
-  {
-    id: 'ai-circuit',
-    name: 'AI电子电路分析',
-    description: '电子电路分析与仿真，帮助理解电路原理',
-    icon: BrainCircuit,
-    type: 'CIRCUIT_ANALYSIS',
     isActive: true,
   }
 ];

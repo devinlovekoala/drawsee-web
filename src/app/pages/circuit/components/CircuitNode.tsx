@@ -202,153 +202,69 @@ const SVGComponents: Record<CircuitElementType, React.FC<React.SVGProps<SVGSVGEl
   )
 };
 
-export const CircuitNode = memo(({ data, id, selected }: NodeProps<CircuitNodeData>) => {
-  const { type, label } = data;
+// 使用React.memo包裹电路节点组件，避免不必要的重渲染
+export const CircuitNode = memo(({ data, selected, id }: NodeProps<CircuitNodeData>) => {
+  const [rotation, setRotation] = useState<number>(0);
+  const [hovered, setHovered] = useState<boolean>(false);
+  const [lastValues, setLastValues] = useState({
+    label: data.label || "",
+    value: data.value || ""
+  });
   
-  // 获取元件配置
-  const config = ComponentVisualConfig[type];
-  
-  // 获取元件当前的旋转角度
-  const rotation = data.element?.rotation || 0;
-  
-  // 获取元件值，并执行格式化
-  const value = useMemo(() => {
-    return data.value || data.element?.value || '';
-  }, [data.value, data.element?.value]);
-
-  // 获取当前元件的端口配置
-  const ports = useMemo(() => {
-    const elementType = data.element?.type || '';
-    // 根据元件类型获取默认端口配置
-    return getDefaultPorts(elementType);
-  }, [data.element?.type]);
-  
-  useEffect(() => {
-    // 当旋转角度变化时，触发DOM更新以便ReactFlow重新计算边的位置
-    // 这一步很重要，因为ReactFlow需要检测到DOM变化才能重新计算边
-    const handles = document.querySelectorAll(`[data-nodeid="${id}"] .react-flow__handle`);
-    handles.forEach(handle => {
-      // 触发一个无害的DOM变化
-      handle.setAttribute('data-rotation', `${rotation}`);
-      
-      // 明确设置handle的数据属性，帮助调试和查找
-      const portId = handle.getAttribute('data-handleid');
-      if (portId) {
-        // 查找对应的端口
-        const port = ports.find(p => p.id === portId);
-        if (port) {
-          // 设置明确的数据属性
-          handle.setAttribute('data-port-type', port.type);
-          handle.setAttribute('data-port-side', port.position.side);
-        }
-      }
-    });
+  // 使用useCallback减少函数重新创建
+  const handleRotateClick = useCallback(() => {
+    const newRotation = (rotation + 90) % 360;
+    setRotation(newRotation);
     
-    // 添加50ms后的边缘更新，确保连线跟随端口
-    setTimeout(() => {
-      // 触发ReactFlow实例的节点更新
-      const event = new CustomEvent('circuit-node-rotated', { 
-        detail: { nodeId: id, rotation } 
+    // 分发自定义事件，通知流程图组件更新连接线
+    const rotationEvent = new CustomEvent('circuit-node-rotated', { 
+      detail: { nodeId: id, rotation: newRotation }
+    });
+    document.dispatchEvent(rotationEvent);
+  }, [id, rotation]);
+  
+  // 获取元件中的初始值，使用useMemo避免重复计算
+  useEffect(() => {
+    // 只有当元件的基本属性变化时才更新状态
+    if (data.element && (
+        data.label !== lastValues.label || 
+        data.value !== lastValues.value
+      )) {
+      // 更新最后一次的值
+      setLastValues({
+        label: data.label || "",
+        value: data.value || ""
       });
-      document.dispatchEvent(event);
-    }, 50);
-  }, [rotation, id, ports]);
-
-  // 获取元件的颜色主题
-  const getElementTheme = () => {
-    switch(type) {
-      case CircuitElementType.RESISTOR:
-      case CircuitElementType.CAPACITOR:
-      case CircuitElementType.INDUCTOR:
-        return {
-          primary: '#3B82F6', // 蓝色
-          secondary: '#EFF6FF',
-          border: '#93C5FD',
-          text: '#1E40AF'
-        };
-      case CircuitElementType.VOLTAGE_SOURCE:
-      case CircuitElementType.CURRENT_SOURCE:
-        return {
-          primary: '#10B981', // 绿色
-          secondary: '#ECFDF5',
-          border: '#6EE7B7',
-          text: '#065F46'
-        };
-      case CircuitElementType.DIODE:
-      case CircuitElementType.TRANSISTOR_NPN:
-      case CircuitElementType.TRANSISTOR_PNP:
-        return {
-          primary: '#F59E0B', // 橙色
-          secondary: '#FEF3C7',
-          border: '#FCD34D',
-          text: '#B45309'
-        };
-      case CircuitElementType.GROUND:
-        return {
-          primary: '#6B7280', // 灰色
-          secondary: '#F3F4F6',
-          border: '#D1D5DB',
-          text: '#374151'
-        };
-      case CircuitElementType.OPAMP:
-        return {
-          primary: '#8B5CF6', // 紫色
-          secondary: '#F5F3FF',
-          border: '#C4B5FD',
-          text: '#5B21B6'
-        };
-      default:
-        return {
-          primary: '#3B82F6',
-          secondary: '#EFF6FF',
-          border: '#93C5FD',
-          text: '#1E40AF'
-        };
+      
+      // 设置初始旋转值
+      if (data.element.rotation !== undefined) {
+        setRotation(data.element.rotation);
+      }
     }
-  };
+  }, [data.element, data.label, data.value, lastValues]);
   
-  const theme = getElementTheme();
-  
-  // 获取元件类型的文本描述
-  const getElementTypeName = () => {
-    switch(type) {
-      case CircuitElementType.RESISTOR: return '电阻器';
-      case CircuitElementType.CAPACITOR: return '电容器';
-      case CircuitElementType.INDUCTOR: return '电感器';
-      case CircuitElementType.VOLTAGE_SOURCE: return '电压源';
-      case CircuitElementType.CURRENT_SOURCE: return '电流源';
-      case CircuitElementType.DIODE: return '二极管';
-      case CircuitElementType.TRANSISTOR_NPN: return 'NPN晶体管';
-      case CircuitElementType.TRANSISTOR_PNP: return 'PNP晶体管';
-      case CircuitElementType.GROUND: return '接地';
-      case CircuitElementType.OPAMP: return '运算放大器';
-      default: return '元件';
+  // 使用useMemo缓存端口列表，避免每次渲染都重新计算
+  const ports = useMemo(() => {
+    if (data.ports && data.ports.length > 0) {
+      return data.ports;
+    } else if (data.element && data.element.ports && data.element.ports.length > 0) {
+      return data.element.ports;
+    } else {
+      return getDefaultPorts(data.type);
     }
-  };
+  }, [data.ports, data.element, data.type]);
   
-  // 获取元件单位
-  const getElementUnit = () => {
-    switch(type) {
-      case CircuitElementType.RESISTOR: return 'Ω';
-      case CircuitElementType.CAPACITOR: return 'F';
-      case CircuitElementType.INDUCTOR: return 'H';
-      case CircuitElementType.VOLTAGE_SOURCE: return 'V';
-      case CircuitElementType.CURRENT_SOURCE: return 'A';
-      default: return '';
-    }
-  };
-  
-  // 计算合适的元件尺寸
-  const elementSize = {
-    width: config.width + 20, // 增加边距
-    height: config.height + 20
-  };
+  // 使用useMemo缓存SVG组件
+  const SvgComponent = useMemo(() => {
+    const validType = data.type || CircuitElementType.RESISTOR;
+    return SVGComponents[validType] || SVGComponents[CircuitElementType.RESISTOR];
+  }, [data.type]);
   
   // 获取端口的位置样式
-  const getPortStyle = (port: Port): React.CSSProperties => {
+  const getPortStyle = useCallback((port: Port): React.CSSProperties => {
     const baseStyle: React.CSSProperties = {
       position: 'absolute',
-      width: 8,  // 调整端口大小
+      width: 8,
       height: 8,
       background: '#fff',
       border: '2px solid #3B82F6',
@@ -357,193 +273,50 @@ export const CircuitNode = memo(({ data, id, selected }: NodeProps<CircuitNodeDa
       transform: 'translate(-50%, -50%)',
     };
 
-    // 获取当前旋转角度
-    const currentRotation = data.element?.rotation || 0;
-    const normalizedRotation = currentRotation % 360;
-    
     // 处理初始位置（未旋转时）
     const { x, y, side } = port.position;
     const style = { ...baseStyle };
-
-    // 根据旋转角度计算端口位置
-    switch(normalizedRotation) {
-      case 0: // 0度旋转
-        switch(side) {
-          case 'left':
-            style.left = `${x}%`;
-            style.top = `${y}%`;
-            break;
-          case 'right':
-            style.left = `${x}%`;
-            style.top = `${y}%`;
-            break;
-          case 'top':
-            style.left = `${x}%`;
-            style.top = '0%';
-            break;
-          case 'bottom':
-            style.left = `${x}%`;
-            style.top = '100%';
-            break;
-        }
-        break;
-      
-      case 90: // 90度旋转
-        switch(side) {
-          case 'left': // 左边变成了底部
-            style.left = `${y}%`;
-            style.top = '100%';
-            break;
-          case 'right': // 右边变成了顶部
-            style.left = `${y}%`;
-            style.top = '0%';
-            break;
-          case 'top': // 顶部变成了右边
-            style.left = '100%';
-            style.top = `${100-x}%`;
-            break;
-          case 'bottom': // 底部变成了左边
-            style.left = '0%';
-            style.top = `${100-x}%`;
-            break;
-        }
-        break;
-      
-      case 180: // 180度旋转
-        switch(side) {
-          case 'left': // 左边变成了右边
-            style.left = '100%';
-            style.top = `${100-y}%`;
-            break;
-          case 'right': // 右边变成了左边
-            style.left = '0%';
-            style.top = `${100-y}%`;
-            break;
-          case 'top': // 顶部变成了底部
-            style.left = `${100-x}%`;
-            style.top = '100%';
-            break;
-          case 'bottom': // 底部变成了顶部
-            style.left = `${100-x}%`;
-            style.top = '0%';
-            break;
-        }
-        break;
-      
-      case 270: // 270度旋转
-        switch(side) {
-          case 'left': // 左边变成了顶部
-            style.left = `${100-y}%`;
-            style.top = '0%';
-            break;
-          case 'right': // 右边变成了底部
-            style.left = `${100-y}%`;
-            style.top = '100%';
-            break;
-          case 'top': // 顶部变成了左边
-            style.left = '0%';
-            style.top = `${x}%`;
-            break;
-          case 'bottom': // 底部变成了右边
-            style.left = '100%';
-            style.top = `${x}%`;
-            break;
-        }
-        break;
-    }
-
-    return style;
-  };
-
-  // 根据旋转角度计算端口位置
-  const getPortPosition = (side: 'left' | 'right' | 'top' | 'bottom', rotation: number): Position => {
-    // 规范化旋转角度
-    const normalizedRotation = rotation % 360;
     
-    // 根据旋转角度映射端口位置
-    switch(normalizedRotation) {
-      case 0:
-        switch(side) {
-          case 'left': return Position.Left;
-          case 'right': return Position.Right;
-          case 'top': return Position.Top;
-          case 'bottom': return Position.Bottom;
-          default: return Position.Left;
-        }
-      case 90:
-        switch(side) {
-          case 'left': return Position.Bottom;
-          case 'right': return Position.Top;
-          case 'top': return Position.Right;
-          case 'bottom': return Position.Left;
-          default: return Position.Left;
-        }
-      case 180:
-        switch(side) {
-          case 'left': return Position.Right;
-          case 'right': return Position.Left;
-          case 'top': return Position.Bottom;
-          case 'bottom': return Position.Top;
-          default: return Position.Left;
-        }
-      case 270:
-        switch(side) {
-          case 'left': return Position.Top;
-          case 'right': return Position.Bottom;
-          case 'top': return Position.Left;
-          case 'bottom': return Position.Right;
-          default: return Position.Left;
-        }
-      default:
-        return Position.Left;
+    // 根据端口所在的边设置位置
+    switch(side) {
+      case 'left':
+        style.left = `${x}%`;
+        style.top = `${y}%`;
+        break;
+      case 'right':
+        style.left = `${x}%`;
+        style.top = `${y}%`;
+        break;
+      case 'top':
+        style.left = `${x}%`;
+        style.top = '0%';
+        break;
+      case 'bottom':
+        style.left = `${x}%`;
+        style.top = '100%';
+        break;
     }
-  };
-
-  const renderSvgComponent = () => {
-    const type = data.element?.type;
-    if (!type) return null;
-
-    const SvgComponent = SVGComponents[type] || null;
-    if (!SvgComponent) return null;
-
-    // 获取元件主题色
-    const color = theme.text;
-
-    return (
-      <div style={{ 
-        width: '100%', 
-        height: '100%', 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'center',
-        color: color,
-      }}>
-        <SvgComponent />
-      </div>
-    );
-  };
-
+    
+    return style;
+  }, []);
+  
   // 特定元件的端口映射修正
-  // 这个函数用于对特定元件在旋转时保持端口与实际SVG图形中的连接点对齐
-  const getFixedPortStyle = (port: Port, portStyle: React.CSSProperties): React.CSSProperties => {
-    const { type } = data.element || { type: CircuitElementType.RESISTOR };
-    const normalizedRotation = rotation % 360;
+  const getFixedPortStyle = useCallback((port: Port, portStyle: React.CSSProperties): React.CSSProperties => {
+    const type = data.type;
     
     // 根据元件类型和旋转角度进行特殊的位置调整
     if (type === CircuitElementType.RESISTOR) {
       // 电阻器的端口位置修正
-      if (normalizedRotation === 0 || normalizedRotation === 180) {
-        return portStyle; // 0度和180度不需要特殊调整
-      } else if (normalizedRotation === 90 || normalizedRotation === 270) {
+      if (rotation === 90 || rotation === 270) {
         // 90度和270度时，保持水平距离不变
         if (port.id === 'port1' || port.id === 'port2') {
           return {
             ...portStyle,
             // 微调定位，确保端点与SVG图形上的连接点对齐
-            left: normalizedRotation === 90 ? 
+            left: rotation === 90 ? 
               (port.id === 'port1' ? '50%' : '50%') :
               (port.id === 'port1' ? '50%' : '50%'),
-            top: normalizedRotation === 90 ?
+            top: rotation === 90 ?
               (port.id === 'port1' ? '100%' : '0%') : 
               (port.id === 'port1' ? '0%' : '100%'),
           };
@@ -551,67 +324,136 @@ export const CircuitNode = memo(({ data, id, selected }: NodeProps<CircuitNodeDa
       }
     } else if (type === CircuitElementType.CAPACITOR || type === CircuitElementType.INDUCTOR) {
       // 电容器和电感器端口位置修正
-      if (normalizedRotation === 90 || normalizedRotation === 270) {
+      if (rotation === 90 || rotation === 270) {
         return {
           ...portStyle,
           // 确保端口垂直对齐
           left: '50%', 
           top: port.id === 'port1' ? 
-            (normalizedRotation === 90 ? '100%' : '0%') : 
-            (normalizedRotation === 90 ? '0%' : '100%')
+            (rotation === 90 ? '100%' : '0%') : 
+            (rotation === 90 ? '0%' : '100%')
         };
       }
     } else if (type === CircuitElementType.VOLTAGE_SOURCE || type === CircuitElementType.CURRENT_SOURCE) {
       // 电源端口位置修正
-      if (normalizedRotation === 90 || normalizedRotation === 270) {
+      if (rotation === 90 || rotation === 270) {
         return {
           ...portStyle,
           // 确保端口垂直对齐
           left: '50%',
           top: port.id === 'positive' ? 
-            (normalizedRotation === 90 ? '100%' : '0%') : 
-            (normalizedRotation === 90 ? '0%' : '100%')
+            (rotation === 90 ? '100%' : '0%') : 
+            (rotation === 90 ? '0%' : '100%')
         };
       }
     } else if (type === CircuitElementType.DIODE) {
       // 二极管端口位置修正
-      if (normalizedRotation === 90 || normalizedRotation === 270) {
+      if (rotation === 90 || rotation === 270) {
         return {
           ...portStyle,
           // 确保端口垂直对齐
           left: '50%',
           top: port.id === 'anode' ? 
-            (normalizedRotation === 90 ? '100%' : '0%') : 
-            (normalizedRotation === 90 ? '0%' : '100%')
+            (rotation === 90 ? '100%' : '0%') : 
+            (rotation === 90 ? '0%' : '100%')
         };
       }
     }
     
     // 其他元件或旋转角度，使用默认位置
     return portStyle;
-  };
+  }, [data.type, rotation]);
+  
+  // 优化双击处理函数的性能
+  const handleDoubleClick = useCallback((event: React.MouseEvent) => {
+    // 阻止冒泡，确保事件不向上传播
+    event.stopPropagation();
+    
+    // 自定义双击事件
+    const doubleClickEvent = new CustomEvent('circuit-node-double-clicked', {
+      detail: { nodeId: id }
+    });
+    document.dispatchEvent(doubleClickEvent);
+  }, [id]);
+  
+  // 获取元件主题样式，使用useMemo优化
+  const elementTheme = useMemo(() => {
+    const themes = {
+      default: { bg: '#F0F9FF', border: '#3B82F6', text: '#1F2937' },
+      warning: { bg: '#FEF3C7', border: '#F59E0B', text: '#92400E' },
+      danger: { bg: '#FEE2E2', border: '#EF4444', text: '#B91C1C' },
+      success: { bg: '#D1FAE5', border: '#10B981', text: '#065F46' },
+    };
+    return themes.default;
+  }, []);
+  
+  // 获取元件类型名称，使用useMemo优化
+  const elementTypeName = useMemo(() => {
+    const typeNames = {
+      [CircuitElementType.RESISTOR]: '电阻',
+      [CircuitElementType.CAPACITOR]: '电容',
+      [CircuitElementType.INDUCTOR]: '电感',
+      [CircuitElementType.VOLTAGE_SOURCE]: '电压源',
+      [CircuitElementType.CURRENT_SOURCE]: '电流源',
+      [CircuitElementType.DIODE]: '二极管',
+      [CircuitElementType.TRANSISTOR_NPN]: 'NPN晶体管',
+      [CircuitElementType.TRANSISTOR_PNP]: 'PNP晶体管',
+      [CircuitElementType.GROUND]: '接地',
+      [CircuitElementType.OPAMP]: '运放',
+      [CircuitElementType.WIRE]: '导线',
+      [CircuitElementType.JUNCTION]: '节点',
+    };
+    return typeNames[data.type] || '元件';
+  }, [data.type]);
 
+  // 考虑到元件的旋转，处理端口位置
+  const getPortPosition = useCallback((side: 'left' | 'right' | 'top' | 'bottom', rotation: number): Position => {
+    // 根据旋转角度确定端口的位置
+    if (rotation === 0) {
+      if (side === 'left') return Position.Left;
+      if (side === 'right') return Position.Right;
+      if (side === 'top') return Position.Top;
+      if (side === 'bottom') return Position.Bottom;
+    } else if (rotation === 90) {
+      if (side === 'left') return Position.Top;
+      if (side === 'right') return Position.Bottom;
+      if (side === 'top') return Position.Right;
+      if (side === 'bottom') return Position.Left;
+    } else if (rotation === 180) {
+      if (side === 'left') return Position.Right;
+      if (side === 'right') return Position.Left;
+      if (side === 'top') return Position.Bottom;
+      if (side === 'bottom') return Position.Top;
+    } else if (rotation === 270) {
+      if (side === 'left') return Position.Bottom;
+      if (side === 'right') return Position.Top;
+      if (side === 'top') return Position.Left;
+      if (side === 'bottom') return Position.Right;
+    }
+    return Position.Left; // 默认值
+  }, []);
+  
+  // 渲染组件
   return (
-    <div 
-      className="relative circuit-node-container" 
-      style={{ 
-        width: elementSize.width, 
-        height: elementSize.height,
-        transition: 'all 0.2s ease',
-        boxShadow: selected ? `0 0 0 2px ${theme.primary}, 0 3px 7px rgba(0,0,0,0.1)` : 'none',
-        background: 'transparent', // 改为透明背景
-        overflow: 'visible',
+    <div
+      className={`relative p-2 ${
+        selected ? 'outline outline-2 outline-blue-500' : 'outline-none'
+      }`}
+      style={{
+        width: 'fit-content',
+        height: 'fit-content',
+        minWidth: '60px',
+        minHeight: '60px',
+        cursor: 'grab',
+        transform: `rotate(${rotation}deg)`,
+        transformOrigin: 'center center',
+        transition: 'transform 0.2s ease',
+        backgroundColor: hovered ? 'rgba(240, 249, 255, 0.9)' : 'rgba(240, 249, 255, 0.5)',
+        borderRadius: '6px'
       }}
-      data-rotation={rotation}
-      data-element-type={data.element?.type}
-      data-node-id={id}
-      onClick={(e) => {
-        // 只负责处理单击事件，双击由ReactFlow处理
-        e.stopPropagation();
-        if (data.onNodeClick) {
-          data.onNodeClick(id);
-        }
-      }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onDoubleClick={handleDoubleClick}
     >
       {/* 元件SVG */}
       <div 
@@ -623,12 +465,12 @@ export const CircuitNode = memo(({ data, id, selected }: NodeProps<CircuitNodeDa
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
+          color: '#1F2937',
+          padding: '4px'
         }}
       >
         <div 
           style={{ 
-            transform: `rotate(${rotation}deg)`,
-            transition: 'transform 0.3s ease',
             width: '100%',
             height: '100%',
             display: 'flex',
@@ -636,7 +478,7 @@ export const CircuitNode = memo(({ data, id, selected }: NodeProps<CircuitNodeDa
             justifyContent: 'center',
           }}
         >
-          {renderSvgComponent()}
+          <SvgComponent width="40" height="40" style={{color: '#1F2937'}} />
         </div>
       </div>
       
@@ -724,8 +566,8 @@ export const CircuitNode = memo(({ data, id, selected }: NodeProps<CircuitNodeDa
         className={`absolute transform -translate-x-1/2 px-1.5 py-0.5 rounded transition-all duration-200 bg-white border shadow-sm ${selected ? '-top-7' : '-top-6'}`}
         style={{
           left: '50%',
-          borderColor: selected ? theme.primary : theme.border,
-          color: selected ? theme.primary : theme.text,
+          borderColor: selected ? elementTheme.border : elementTheme.border,
+          color: selected ? elementTheme.text : elementTheme.text,
           fontSize: selected ? '11px' : '10px',
           opacity: selected ? 1 : 0.85,
           pointerEvents: 'none', // 不阻止点击事件
@@ -739,8 +581,8 @@ export const CircuitNode = memo(({ data, id, selected }: NodeProps<CircuitNodeDa
           textOverflow: 'ellipsis'
         }}
       >
-        {label}
-        {value && <span style={{marginLeft: '3px', opacity: 0.8}}>({value})</span>}
+        {data.label}
+        {lastValues.value && <span style={{marginLeft: '3px', opacity: 0.8}}>({lastValues.value})</span>}
       </div>
     </div>
   );
