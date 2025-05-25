@@ -53,11 +53,6 @@ export const CircuitToolbar: FC<CircuitToolbarProps> = ({
   hasSelectedNode = false,
   hasContent = false,
 }) => {
-  const modelOptions = [
-    { value: 'deepseekV3', label: 'DeepSeek-V3' },
-    { value: 'gpt-4o', label: 'GPT-4o' },
-    { value: 'doubao', label: '豆包大模型' }
-  ];
 
   // 只在开发环境下输出日志
   if (process.env.NODE_ENV === 'development') {
@@ -77,11 +72,6 @@ export const CircuitToolbar: FC<CircuitToolbarProps> = ({
     return isDisabled 
       ? 'cursor-not-allowed opacity-50' 
       : 'hover:bg-gray-100 cursor-pointer';
-  };
-  
-  // 检查操作功能是否可用
-  const isOperationEnabled = (operation: (() => void) | undefined, condition: boolean): boolean => {
-    return !!operation && condition;
   };
 
   return (

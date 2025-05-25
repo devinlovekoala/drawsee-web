@@ -13,11 +13,15 @@ import CircuitListPage from "@/app/circuit/list/page.tsx";
 import CircuitViewPage from "@/app/circuit/view/[id]/page.tsx";
 import CircuitEditPage from "@/app/circuit/edit/[id]/page.tsx";
 import CircuitCreatePage from "@/app/circuit/create/page.tsx";
+import CircuitExperimentTask from "@/app/pages/circuit-experiment/CircuitExperimentTask";
+import DocumentLibrary from "@/app/pages/circuit-experiment/DocumentLibrary";
+import DocumentUpload from "@/app/pages/circuit-experiment/DocumentUpload";
+import DocumentAnalysis from "@/app/pages/circuit-experiment/DocumentAnalysis";
 
 const router = createBrowserRouter([
   {
     path: '/',
-    element: <App />,
+    element: <App />, 
     children: [
       {
         path: '/',
@@ -58,6 +62,24 @@ const router = createBrowserRouter([
       {
         path: '/circuit/list/*',
         element: <Navigate to="/circuit/list" replace />
+      },
+      // 新增电路实验任务分析路由
+      {
+        path: '/circuit/experiment',
+        element: <CircuitExperimentTask />
+      },
+      // 电路实验文档库路由
+      {
+        path: '/circuit-experiment/documents',
+        element: <DocumentLibrary />
+      },
+      {
+        path: '/circuit-experiment/upload',
+        element: <DocumentUpload />
+      },
+      {
+        path: '/circuit-experiment/document/:id',
+        element: <DocumentAnalysis />
       }
     ]
   },

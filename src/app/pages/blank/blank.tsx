@@ -26,13 +26,13 @@ function Blank() {
     model: ModelType;
   }
 
-  // 从location中获取agent类型和班级ID
-  const agentType = location.state?.agentType as AiTaskType || 'GENERAL';
+  // 优先根据 location.state.aiTaskType 设置类型
+  const initialType = location.state?.aiTaskType === 'circuit-pdf-analyze' ? 'PDF_CIRCUIT_ANALYSIS' : (location.state?.agentType as AiTaskType || 'GENERAL');
   const agentName = location.state?.agentName as string;
   const classId = location.state?.classId as string || null;
 
   const [queryForm, setQueryForm] = useState<QueryForm>({
-    type: agentType,
+    type: initialType,
     prompt: "",
     promptParams: {},
     model: "deepseekV3"
@@ -100,11 +100,11 @@ function Blank() {
   // 当进入页面时，打印调试信息
   useEffect(() => {
     console.log('Blank页面加载，参数:', {
-      agentType,
+      agentType: initialType,
       agentName,
       classId
     });
-  }, [agentType, agentName, classId]);
+  }, [initialType, agentName, classId]);
 
   const [showImageUploader, setShowImageUploader] = useState(false);
   const [solvingWays, setSolvingWays] = useState<string[]>([]);
@@ -313,12 +313,18 @@ function Blank() {
 
   // 根据模式获取页面标题和描述
   const getPageInfo = () => {
-    if (isSolverMode) {
+    if (queryForm.type === "PDF_CIRCUIT_ANALYSIS") {
+      return {
+        title: "实验任务分析",
+        description: "已自动发起实验任务分析，您可继续追问或查看分析结果"
+      };
+    }
+    if (queryForm.type === "SOLVER_FIRST") {
       return {
         title: "AI推理解题",
         description: "上传题目图片或输入题目，让AI为您提供详细解题过程"
       };
-    } else if (isAnimationMode) {
+    } else if (queryForm.type === "ANIMATION") {
       return {
         title: "AI动画生成",
         description: "描述您想要制作的动画内容，AI将为您创建生动的动画展示"
@@ -330,7 +336,7 @@ function Blank() {
       };
     } else {
       return {
-        title: greeting,
+        title: "通用对话",
         description: "有什么可以帮助您的？"
       };
     }

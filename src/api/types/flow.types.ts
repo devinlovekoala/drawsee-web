@@ -129,7 +129,9 @@ export type AiTaskType =
   | "SOLVER_CONTINUE" 
   | "SOLVER_SUMMARY" 
   | "CIRCUIT_ANALYSIS"
-  | "CIRCUIT_DETAIL";
+  | "CIRCUIT_DETAIL"
+  | "PDF_CIRCUIT_ANALYSIS"  // 新增：PDF电路实验文档获取分析回答节点AI任务
+  | "PDF_CIRCUIT_DESIGN";   // 新增：通过电路实验pdf任务文档获取电路分析图AI任务
 
 export interface CreateAiTaskVO {
   taskId: number;

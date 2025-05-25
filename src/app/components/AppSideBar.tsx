@@ -133,6 +133,26 @@ function AppSideBar({activeConversationId, setActiveConversationId, className}: 
 											<BrainCircuit size="18px" className="transition-transform group-hover:scale-110" />
 									</button>
 
+									{/* 新增：电路实验任务分析入口 */}
+									<div className="flex items-center gap-2 mb-3 mt-6">
+											<span className="text-blue-600">
+													{/* 可替换为合适的实验icon */}
+													<svg width="20" height="20" fill="none" viewBox="0 0 20 20"><path d="M5 2h10v2H5V2zm1 3h8v2H6V5zm2 3h4v2H8V8zm-2 3h8v2H6v-2zm-2 3h12v2H4v-2z" fill="#2563eb"/></svg>
+											</span>
+											<h2 className="text-[16px] font-bold text-blue-800">电路实验任务分析</h2>
+									</div>
+									<button
+											onClick={() => handleCustomNavigation('/circuit/experiment')}
+											className="group px-[12px] py-[14px] text-[14px] select-none h-14 items-center leading-5 tracking-normal gap-2 flex w-full cursor-pointer justify-between rounded-lg bg-gradient-to-r from-purple-50 to-purple-100 text-left font-medium text-purple-900 shadow-sm ring-1 ring-purple-200 transition duration-200 hover:shadow-md hover:ring-purple-300 mb-2"
+									>
+											<span className="transition-colors group-hover:text-purple-700 font-semibold flex items-center">
+													{/* 可替换为合适的实验icon */}
+													<svg width="18" height="18" fill="none" viewBox="0 0 20 20"><path d="M5 2h10v2H5V2zm1 3h8v2H6V5zm2 3h4v2H8V8zm-2 3h8v2H6v-2zm-2 3h12v2H4v-2z" fill="#a21caf"/></svg>
+													实验任务分析
+											</span>
+											<svg width="18" height="18" fill="none" viewBox="0 0 20 20"><path d="M10 2a8 8 0 100 16 8 8 0 000-16zm1 12H9v-2h2v2zm0-4H9V6h2v4z" fill="#a21caf"/></svg>
+									</button>
+
 									<Collapsible defaultOpen={true} open={circuitMenuOpen} onOpenChange={setCircuitMenuOpen}>
 											<div className="flex items-center gap-1.5 mb-1">
 													<CollapsibleTrigger className="w-full" asChild>

@@ -1,4 +1,4 @@
-import { SparklesIcon, Cog, BrainCircuit, Wand2, GraduationCap, MessageCircle } from 'lucide-react';
+import { SparklesIcon, Cog, Wand2, GraduationCap, MessageCircle, FileText } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useState } from 'react';
@@ -40,6 +40,14 @@ const learningTools = [
     description: '加入班级、查看课程、学习进度管理',
     icon: GraduationCap,
     path: '/course',
+    isActive: true,
+  },
+  {
+    id: 'experiment-documents',
+    name: '实验文档库',
+    description: '上传和管理电路实验文档，获取AI分析和解答',
+    icon: FileText,
+    path: '/circuit-experiment/documents',
     isActive: true,
   }
 ];
