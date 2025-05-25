@@ -42,6 +42,7 @@ export default function PdfAnalysisPointNode(props: ExtendedNodeProps<'answer-po
       const dto: CreateAiTaskDTO = {
         type: 'PDF_CIRCUIT_DESIGN',
         prompt: '请根据实验任务分析生成电路设计图',
+        // 确保所有参数都包含在promptParams对象内部，并且都是字符串类型
         promptParams: { 
           fileUrl: String(fileUrl),
           fileName: String(data.fileName || ''),

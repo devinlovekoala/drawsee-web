@@ -84,10 +84,11 @@ export default function DocumentLibrary() {
       const taskDto: CreateAiTaskDTO = {
         type: "PDF_CIRCUIT_ANALYSIS",
         prompt: '请分析这个电路实验',
+        // 确保所有参数都包含在promptParams内部，并且都是字符串类型
         promptParams: {
-          fileUrl: document.fileUrl,
-          fileName: document.fileName,
-          title: document.title || document.fileName
+          fileUrl: String(document.fileUrl),
+          fileName: String(document.fileName),
+          title: String(document.title || document.fileName)
         },
         convId: null,
         parentId: null,
