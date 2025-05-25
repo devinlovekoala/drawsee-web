@@ -37,11 +37,11 @@ export function isPdfFile(file: File): boolean {
 /**
  * 检查文件大小是否超过限制
  * @param file 文件对象
- * @param maxSize 最大大小（字节）
+ * @param maxSize 最大大小（MB）
  * @returns 是否超过限制
  */
 export function isFileSizeExceeded(file: File, maxSize: number): boolean {
-  return file.size > maxSize;
+  return file.size > maxSize * 1024 * 1024;
 }
 
 /**

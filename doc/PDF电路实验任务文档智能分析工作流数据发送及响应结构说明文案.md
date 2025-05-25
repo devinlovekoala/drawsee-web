@@ -11,7 +11,7 @@
   "userId": 2001,
   "convId": 3001,
   "parentId": 4001,
-  "type": "circuit-pdf-analyze",
+  "type": "PDF_CIRCUIT_ANALYSIS",
   "prompt": null,
   "promptParams": {
     "fileUrl": "https://drawsee-storage.minio.io/user/document/circuit_experiment_task.pdf"
@@ -27,7 +27,8 @@
 - `convId`: 会话ID
 - `parentId`: 父节点ID
 - `type`: 任务类型（电路PDF分析）
-- `fileUrl`: PDF文件URL
+- `prompt`: 引导模型方向提示词
+- `promptParams`: 内含"fileUrl"字段，传递文档访问链接的信息
 - `model`: 使用的AI模型
 
 ### 2. PdfCircuitDesignGenerateWorkFlow（PDF电路设计生成）
@@ -39,7 +40,8 @@
   "userId": 2001,
   "convId": 3001,
   "parentId": 4001,
-  "type": "circuit-pdf-design",
+  "type": "PDF_CIRCUIT_DESIGN",
+  "prompt": null,
   "promptParams": {
     "fileUrl": "https://drawsee-storage.minio.io/user/document/circuit_experiment_task.pdf"
   },

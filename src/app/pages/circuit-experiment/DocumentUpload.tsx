@@ -29,9 +29,9 @@ export default function DocumentUpload() {
       return;
     }
     
-    // 检查文件大小 (限制为20MB)
-    if (isFileSizeExceeded(file, 20)) {
-      message.error('文件大小不能超过20MB');
+    // 检查文件大小 (限制为30MB)
+    if (isFileSizeExceeded(file, 30)) {
+      message.error('文件大小不能超过30MB');
       return;
     }
     
@@ -89,7 +89,7 @@ export default function DocumentUpload() {
 
         <div className="mb-6">
           <Text type="secondary">
-            上传电路实验PDF文档到您的个人文档库，支持单个文件上传，文件大小不超过20MB。
+            上传电路实验PDF文档到您的个人文档库，支持单个文件上传，文件大小不超过30MB。
           </Text>
         </div>
 
@@ -116,7 +116,7 @@ export default function DocumentUpload() {
               </p>
               <p className="ant-upload-text">点击或拖拽PDF文件到此处上传</p>
               <p className="ant-upload-hint">
-                支持单个PDF文件上传，文件大小不超过20MB
+                支持单个PDF文件上传，文件大小不超过30MB
               </p>
             </Dragger>
           </Form.Item>

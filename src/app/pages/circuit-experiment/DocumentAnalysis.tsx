@@ -7,10 +7,9 @@ import {
   message, 
   Space, 
   Divider,
-  Input,
   Empty
 } from 'antd';
-import { ArrowLeftOutlined, FileTextOutlined, SendOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, FileTextOutlined } from '@ant-design/icons';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { getDocumentById } from '@/api/methods/document.methods';
 import { UserDocumentVO } from '@/api/types/document.types';
@@ -22,7 +21,6 @@ import { ModelSelector } from '../../pages/blank/components/ModelSelector';
 import { ModelType } from '../flow/components/input/FlowInputPanel';
 
 const { Title, Text, Paragraph } = Typography;
-const { TextArea } = Input;
 
 /**
  * 文档分析页面组件
@@ -37,7 +35,6 @@ export default function DocumentAnalysis() {
   const [document, setDocument] = useState<UserDocumentVO | null>(null);
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
-  const [customQuestion, setCustomQuestion] = useState('');
   const [selectedModel, setSelectedModel] = useState<ModelType>('deepseekV3');
   
   // 从location中获取班级ID
@@ -100,13 +97,8 @@ export default function DocumentAnalysis() {
       // 创建分析任务
       const taskDto: CreateAiTaskDTO = {
         type: "PDF_CIRCUIT_ANALYSIS",
-        prompt: '请分析这个电路实验',
-        // 确保所有参数都包含在promptParams内部，并且都是字符串类型
-        promptParams: {
-          fileUrl: String(document.fileUrl),
-          fileName: String(document.fileName),
-          title: String(document.title || document.fileName)
-        },
+        prompt: document.fileUrl, // 直接将fileUrl放入prompt字段
+        promptParams: {}, // 清空promptParams对象
         convId: null,
         parentId: null,
         model: selectedModel, // 使用用户选择的模型
@@ -140,13 +132,8 @@ export default function DocumentAnalysis() {
       // 创建设计任务
       const taskDto: CreateAiTaskDTO = {
         type: "PDF_CIRCUIT_DESIGN",
-        prompt: '请根据实验要求设计电路',
-        // 确保所有参数都包含在promptParams内部，并且都是字符串类型
-        promptParams: {
-          fileUrl: String(document.fileUrl),
-          fileName: String(document.fileName),
-          title: String(document.title || document.fileName)
-        },
+        prompt: document.fileUrl, // 直接将fileUrl放入prompt字段
+        promptParams: {}, // 清空promptParams对象
         convId: null,
         parentId: null,
         model: selectedModel, // 使用用户选择的模型
@@ -165,50 +152,6 @@ export default function DocumentAnalysis() {
     } catch (error) {
       console.error('设计电路失败:', error);
       message.error('设计电路失败');
-    } finally {
-      setAnalyzing(false);
-    }
-  };
-
-  // 处理自定义问题
-  const handleCustomQuestion = async () => {
-    if (!document || !customQuestion.trim()) {
-      message.warning('请输入您的问题');
-      return;
-    }
-    
-    try {
-      setAnalyzing(true);
-      
-      // 创建自定义问题任务
-      const taskDto: CreateAiTaskDTO = {
-        type: "CIRCUIT_ANALYSIS",
-        prompt: customQuestion,
-        // 确保所有参数都包含在promptParams内部，并且都是字符串类型
-        promptParams: {
-          fileUrl: String(document.fileUrl),
-          fileName: String(document.fileName),
-          title: String(document.title || document.fileName)
-        },
-        convId: null,
-        parentId: null,
-        model: selectedModel, // 使用用户选择的模型
-        classId: classId // 传递班级ID
-      };
-      
-      const response = await createAiTask(taskDto);
-      
-      // 增加AI任务计数
-      handleAiTaskCountPlus();
-      
-      // 创建新的对话并导航到对话流页面
-      handleBlankQuery(response);
-      
-      message.success('问题已提交');
-      setCustomQuestion('');
-    } catch (error) {
-      console.error('提交问题失败:', error);
-      message.error('提交问题失败');
     } finally {
       setAnalyzing(false);
     }
@@ -311,26 +254,6 @@ export default function DocumentAnalysis() {
               根据实验要求设计电路
             </Button>
           </Space>
-        </div>
-        
-        <div className="mb-4">
-          <div className="flex">
-            <TextArea
-              placeholder="输入您关于此实验的问题..."
-              value={customQuestion}
-              onChange={(e) => setCustomQuestion(e.target.value)}
-              autoSize={{ minRows: 2, maxRows: 6 }}
-              disabled={analyzing}
-              className="flex-1 mr-2"
-            />
-            <Button
-              type="primary"
-              icon={<SendOutlined />}
-              onClick={handleCustomQuestion}
-              loading={analyzing}
-              disabled={!customQuestion.trim()}
-            />
-          </div>
         </div>
       </Card>
     </div>

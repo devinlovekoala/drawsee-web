@@ -38,16 +38,11 @@ export default function PdfAnalysisPointNode(props: ExtendedNodeProps<'answer-po
     }
     setLoading(true);
     try {
-      // 按照文档规范设置参数，确保所有值都是字符串类型
+      // 按照新的要求设置参数
       const dto: CreateAiTaskDTO = {
         type: 'PDF_CIRCUIT_DESIGN',
-        prompt: '请根据实验任务分析生成电路设计图',
-        // 确保所有参数都包含在promptParams对象内部，并且都是字符串类型
-        promptParams: { 
-          fileUrl: String(fileUrl),
-          fileName: String(data.fileName || ''),
-          title: String(data.title || '电路设计')
-        },
+        prompt: String(fileUrl), // 直接将fileUrl放入prompt字段
+        promptParams: {}, // 清空promptParams对象
         convId: typeof convId === 'number' ? convId : null,
         parentId: Number(id),
         model: selectedModel, // 使用用户选择的模型

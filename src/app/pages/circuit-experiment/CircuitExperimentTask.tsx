@@ -28,9 +28,9 @@ export default function CircuitExperimentTask() {
       return false;
     }
     
-    // 检查文件大小 (限制为20MB)
-    if (isFileSizeExceeded(file, 20)) {
-      message.error('文件大小不能超过20MB');
+    // 检查文件大小 (限制为30MB)
+    if (isFileSizeExceeded(file, 30)) {
+      message.error('文件大小不能超过30MB');
       return false;
     }
 
@@ -98,7 +98,7 @@ export default function CircuitExperimentTask() {
               </p>
               <p className="ant-upload-text">点击或拖拽PDF文件到此处上传</p>
               <p className="ant-upload-hint">
-                支持单个PDF文件上传，文件大小不超过20MB
+                支持单个PDF文件上传，文件大小不超过30MB
               </p>
             </Dragger>
             {uploading && (

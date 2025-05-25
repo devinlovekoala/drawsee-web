@@ -80,16 +80,11 @@ export default function DocumentLibrary() {
   // 跳转到 flow 智能体会话页面并自动分析（实验任务分析agentType）
   const handleAnalyze = async (document: UserDocumentVO) => {
     try {
-      // 构造AI任务参数，按照文档规范设置
+      // 构造AI任务参数，按照新的要求设置
       const taskDto: CreateAiTaskDTO = {
         type: "PDF_CIRCUIT_ANALYSIS",
-        prompt: '请分析这个电路实验',
-        // 确保所有参数都包含在promptParams内部，并且都是字符串类型
-        promptParams: {
-          fileUrl: String(document.fileUrl),
-          fileName: String(document.fileName),
-          title: String(document.title || document.fileName)
-        },
+        prompt: document.fileUrl, // 直接将fileUrl放入prompt字段
+        promptParams: {}, // 清空promptParams对象
         convId: null,
         parentId: null,
         model: selectedModel, // 使用用户选择的模型
