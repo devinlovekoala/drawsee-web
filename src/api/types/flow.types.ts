@@ -1,4 +1,4 @@
-export type NodeType = "root" | "query" | "answer" | "answer-point" | "answer-detail" | "ANSWER_POINT" | "ANSWER_DETAIL" | "knowledge-head" | "knowledge-detail" | "resource" | "circuit-canvas" | "circuit-point" | "circuit-detail";
+export type NodeType = "root" | "query" | "answer" | "answer-point" | "answer-detail" | "ANSWER_POINT" | "ANSWER_DETAIL" | "knowledge-head" | "knowledge-detail" | "resource" | "circuit-canvas" | "circuit-point" | "circuit-detail" | "PDF_DOCUMENT" | "PDF_ANALYSIS_POINT";
 
 export interface ConversationVO {
   id: number;
@@ -76,6 +76,16 @@ interface GeneratedAnimationResourceNodeData extends BaseNodeData {
 
 export type ResourceNodeData = BilibiliResourceNodeData | AnimationResourceNodeData | GeneratedAnimationResourceNodeData;
 
+// PDF相关节点数据类型
+interface PdfDocumentNodeData extends BaseNodeData {
+  fileUrl: string;
+  fileType: string;
+}
+
+interface PdfAnalysisPointNodeData extends BaseNodeData {
+  subtype: 'pdf-analysis-point';
+}
+
 export type NodeData = {
   root: RootNodeData;
   query: QueryNodeData;
@@ -91,6 +101,8 @@ export type NodeData = {
   'circuit-canvas': CircuitCanvasNodeData;
   'circuit-point': CircuitPointNodeData;
   'circuit-detail': CircuitDetailNodeData;
+  'PDF_DOCUMENT': PdfDocumentNodeData;
+  'PDF_ANALYSIS_POINT': PdfAnalysisPointNodeData;
 }
 
 export interface NodeVO {

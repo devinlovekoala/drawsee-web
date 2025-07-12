@@ -94,11 +94,14 @@ export default function DocumentAnalysis() {
     try {
       setAnalyzing(true);
       
-      // 创建分析任务
+      // 保存PDF文件URL到localStorage，供后续节点使用
+      localStorage.setItem('currentPdfUrl', document.fileUrl);
+      
+      // 创建分析任务，严格按照API文档格式
       const taskDto: CreateAiTaskDTO = {
         type: "PDF_CIRCUIT_ANALYSIS",
         prompt: document.fileUrl, // 直接将fileUrl放入prompt字段
-        promptParams: {}, // 清空promptParams对象
+        promptParams: {}, // 空对象，非null
         convId: null,
         parentId: null,
         model: selectedModel, // 使用用户选择的模型
@@ -129,11 +132,14 @@ export default function DocumentAnalysis() {
     try {
       setAnalyzing(true);
       
-      // 创建设计任务
+      // 保存PDF文件URL到localStorage，供后续节点使用
+      localStorage.setItem('currentPdfUrl', document.fileUrl);
+      
+      // 创建设计任务，严格按照API文档格式
       const taskDto: CreateAiTaskDTO = {
         type: "PDF_CIRCUIT_DESIGN",
         prompt: document.fileUrl, // 直接将fileUrl放入prompt字段
-        promptParams: {}, // 清空promptParams对象
+        promptParams: {}, // 空对象，非null
         convId: null,
         parentId: null,
         model: selectedModel, // 使用用户选择的模型

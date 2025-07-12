@@ -16,7 +16,7 @@ import { processTextUpdate } from "../utils/sectionParser";
  * 流程图状态管理Hook
  * 负责管理节点、边、消息处理和临时节点操作
  */
-function useFlowState(convId: number) {
+function useFlowState(convId: number, selectedNode?: Node | null, setSelectedNode?: (node: Node | null) => void) {
 
   // 工具函数
   const {executeFitView, adjustViewportToShowLatestContent, executeLayout} = useFlowTools();
@@ -158,7 +158,6 @@ function useFlowState(convId: number) {
               }
             }
 
-            // 更新节点和边
             return {
               nodes: layoutedNodes,
               edges: currentEdges,
@@ -190,6 +189,12 @@ function useFlowState(convId: number) {
             
             if (targetNode) {
               console.log(`更新节点文本内容，ID: ${nodeId}`);
+              
+              // 同步更新selectedNode状态
+              if (selectedNode && selectedNode.id === nodeId && setSelectedNode) {
+                setSelectedNode(targetNode);
+              }
+              
               setTimeout(() => {
                 adjustViewportToShowLatestContent(targetNode);
               }, 300);
@@ -261,6 +266,14 @@ function useFlowState(convId: number) {
                 }
               } : node
             );
+            
+            // 同步更新selectedNode状态
+            if (selectedNode && selectedNode.id === nodeId && setSelectedNode) {
+              const updatedSelectedNode = updatedNodes.find(node => node.id === nodeId);
+              if (updatedSelectedNode) {
+                setSelectedNode(updatedSelectedNode);
+              }
+            }
             
             // 只有在实际更新了节点的情况下才执行布局，避免不必要的重新布局
             if (JSON.stringify(nodes) !== JSON.stringify(updatedNodes)) {
@@ -354,7 +367,7 @@ function useFlowState(convId: number) {
     }
     // 释放锁
     isChatTaskProcessing.current = false;
-  }, [executeLayout, executeFitView, adjustViewportToShowLatestContent, handleTitleUpdate, convId]);
+  }, [executeLayout, executeFitView, adjustViewportToShowLatestContent, handleTitleUpdate, convId, selectedNode, setSelectedNode]);
 
   /**
    * 添加消息到队列

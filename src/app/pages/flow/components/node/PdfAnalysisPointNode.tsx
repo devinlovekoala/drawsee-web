@@ -1,31 +1,33 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
+import { Button, message } from 'antd';
+import { ToolOutlined } from '@ant-design/icons';
 import { BaseNode, ExtendedNodeProps } from './base/BaseNode';
-import { Button, Typography, message } from 'antd';
 import { createAiTask } from '@/api/methods/flow.methods';
+import { CreateAiTaskDTO } from '@/api/types/flow.types';
 import { useAppContext } from '@/app/contexts/AppContext';
-import { AiTaskType, CreateAiTaskDTO } from '@/api/types/flow.types';
-import { ModelSelector } from '../../../../pages/blank/components/ModelSelector';
-import { ModelType } from '../../../flow/components/input/FlowInputPanel';
+import { useFlowContext } from '@/app/contexts/FlowContext';
+import { ModelSelector } from '../../../blank/components/ModelSelector';
+import { ModelType } from '../input/FlowInputPanel';
 import { useLocation } from 'react-router-dom';
-
-const { Text, Paragraph } = Typography;
 
 /**
  * PDF分析点节点组件
- * 展示分析内容，并支持生成设计图
+ * 显示分析内容并支持生成设计图功能
  */
-export default function PdfAnalysisPointNode(props: ExtendedNodeProps<'answer-point'>) {
+export default function PdfAnalysisPointNode(props: ExtendedNodeProps<'PDF_ANALYSIS_POINT'>) {
   const { data, id } = props;
-  const { title, text, fileUrl, convId } = data;
   const [loading, setLoading] = useState(false);
-  const { handleAiTaskCountPlus } = useAppContext();
   const [selectedModel, setSelectedModel] = useState<ModelType>('deepseekV3');
-  const location = useLocation();
   
-  // 从location中获取班级ID
+  const { handleAiTaskCountPlus } = useAppContext();
+  const { convId } = useFlowContext();
+  const location = useLocation();
   const classId = location.state?.classId as string || null;
+  
+  // 从location state或节点数据中获取fileUrl
+  const fileUrl = location.state?.fileUrl || (data as any).fileUrl || localStorage.getItem('currentPdfUrl');
 
-  // 处理模型选择
+  // 模型选择处理
   const handleModelChange = (model: ModelType) => {
     setSelectedModel(model);
   };
@@ -38,11 +40,11 @@ export default function PdfAnalysisPointNode(props: ExtendedNodeProps<'answer-po
     }
     setLoading(true);
     try {
-      // 按照新的要求设置参数
+      // 按照API文档要求设置参数
       const dto: CreateAiTaskDTO = {
         type: 'PDF_CIRCUIT_DESIGN',
         prompt: String(fileUrl), // 直接将fileUrl放入prompt字段
-        promptParams: {}, // 清空promptParams对象
+        promptParams: {}, // 空对象
         convId: typeof convId === 'number' ? convId : null,
         parentId: Number(id),
         model: selectedModel, // 使用用户选择的模型
@@ -58,33 +60,32 @@ export default function PdfAnalysisPointNode(props: ExtendedNodeProps<'answer-po
     }
   };
 
-  // 自定义内容区域
-  const customContent = useMemo(() => (
-    <>
-      <div className="flex items-center mb-2">
-        <svg width="1em" height="1em" viewBox="0 0 1024 1024" fill="#52c41a" style={{marginRight: 6, verticalAlign: 'middle'}}><path d="M512 64C264.6 64 64 264.6 64 512s200.6 448 448 448 448-200.6 448-448S759.4 64 512 64zm0 820c-205.9 0-372-166.1-372-372S306.1 140 512 140s372 166.1 372 372-166.1 372-372 372z"/><path d="M464 336h96v352h-96z"/><path d="M464 688h96v96h-96z"/></svg>
-        <span className="font-semibold text-base">{title || '分析点'}</span>
-      </div>
-      <Paragraph>{text}</Paragraph>
-      <div className="flex items-center gap-2 mt-2">
+  // 自定义内容渲染
+  const customContent = (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-sm font-medium text-blue-600">分析点</span>
         <ModelSelector
           selectedModel={selectedModel}
           onModelChange={handleModelChange}
         />
-        <Button 
-          icon={<svg width="1em" height="1em" viewBox="0 0 1024 1024" fill="#1890ff" style={{verticalAlign: 'middle'}}><path d="M512 64C264.6 64 64 264.6 64 512s200.6 448 448 448 448-200.6 448-448S759.4 64 512 64zm0 820c-205.9 0-372-166.1-372-372S306.1 140 512 140s372 166.1 372 372-166.1 372-372 372z"/><path d="M464 336h96v352h-96z"/><path d="M464 688h96v96h-96z"/></svg>} 
-          type="primary" 
-          size="small" 
-          loading={loading}
-          onClick={handleDesign}
-        >
-          生成电路设计图
-        </Button>
       </div>
-    </>
-  ), [title, text, loading, handleDesign, selectedModel]);
+      <div className="mb-3">
+        <p className="text-sm leading-relaxed">{data.text}</p>
+      </div>
+      <Button
+        type="primary"
+        size="small"
+        icon={<ToolOutlined />}
+        onClick={handleDesign}
+        loading={loading}
+        block
+      >
+        基于此点生成电路设计
+      </Button>
+    </div>
+  );
 
-  // 直接用BaseNode统一渲染
   return (
     <BaseNode
       {...props}

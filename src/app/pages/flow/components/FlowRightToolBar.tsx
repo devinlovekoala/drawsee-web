@@ -1,4 +1,4 @@
-import { MapPin, RefreshCcw } from 'lucide-react';
+import { MapPin, RefreshCcw, PanelRight, PanelRightClose } from 'lucide-react';
 import { useState } from 'react';
 
 interface FlowToolBarProps {
@@ -7,9 +7,19 @@ interface FlowToolBarProps {
   onNodeWidthChange: (width: number) => void;
   showMiniMap: boolean;
   setShowMiniMap: (show: boolean) => void;
+  showDetailPanel: boolean;
+  onToggleDetailPanel: () => void;
 }
 
-function FlowRightToolBar({ onRelayout, onNodeWidthChange, nodeWidth, showMiniMap, setShowMiniMap }: FlowToolBarProps) {
+function FlowRightToolBar({ 
+  onRelayout, 
+  onNodeWidthChange, 
+  nodeWidth, 
+  showMiniMap, 
+  setShowMiniMap,
+  showDetailPanel,
+  onToggleDetailPanel
+}: FlowToolBarProps) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false); // 控制下拉框的显示状态
 
   const handleWidthChange = (width: number) => {
@@ -28,6 +38,7 @@ function FlowRightToolBar({ onRelayout, onNodeWidthChange, nodeWidth, showMiniMa
         <RefreshCcw className="mr-2" size={16} />
         重新布局
       </button>
+      
       {/* 选择节点宽度 */}
       <div className="relative flex items-center bg-white rounded-lg shadow-[0_0_0_1px_rgba(0,0,0,0.1)] h-8">
         <label className="text-gray-700 px-2 border-r border-gray-200 h-full flex items-center">节点宽度</label>
@@ -64,6 +75,17 @@ function FlowRightToolBar({ onRelayout, onNodeWidthChange, nodeWidth, showMiniMa
           </div>
         </div>
       </div>
+
+      {/* 详情面板切换按钮 */}
+      <button
+        onClick={onToggleDetailPanel}
+        className="flex items-center text-gray-800 bg-white hover:bg-gray-100 active:bg-gray-200 transition duration-200 rounded-lg px-2 py-1 shadow-[0_0_0_1px_rgba(0,0,0,0.1)] transform hover:scale-105 h-8"
+        title={showDetailPanel ? '关闭详情面板' : '打开详情面板'}
+      >
+        {showDetailPanel ? <PanelRightClose className="mr-2" size={16} /> : <PanelRight className="mr-2" size={16} />}
+        {showDetailPanel ? '关闭详情' : '节点详情'}
+      </button>
+      
       {/* 小地图 */}
       <button
         onClick={() => setShowMiniMap(!showMiniMap)}

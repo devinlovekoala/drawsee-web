@@ -24,6 +24,7 @@ export interface ExtendedNodeProps<T extends NodeType> extends Omit<NodeProps, '
   customContent?: React.ReactNode;
   showSourceHandle?: boolean;
   showTargetHandle?: boolean;
+  compactMode?: boolean; // 新增紧凑模式属性
 }
 
 // 全局节点渲染缓存
@@ -114,6 +115,7 @@ export const BaseNode = React.memo(function BaseNode<T extends NodeType>({
   showSourceHandle = true,
   showTargetHandle = true,
   selected,
+  compactMode = false, // 新增紧凑模式参数
 }: ExtendedNodeProps<T>) {
   const nodeData = data as {
     title: string;
@@ -130,14 +132,17 @@ export const BaseNode = React.memo(function BaseNode<T extends NodeType>({
   const [currentZoom, setCurrentZoom] = useState(() => getViewport().zoom);
   const [isSimplifiedView, setIsSimplifiedView] = useState(() => getViewport().zoom < ZOOM_THRESHOLD);
 
+  // 在紧凑模式下，始终使用简化视图
+  const shouldUseSimplifiedView = compactMode || isSimplifiedView;
+
   // 计算预览文本字体大小 - 缩放越小，字体越大
   const previewFontSize = useMemo(() => {
-    if (!isSimplifiedView) return MIN_PREVIEW_FONT_SIZE;
+    if (!shouldUseSimplifiedView) return MIN_PREVIEW_FONT_SIZE;
     // 线性插值计算字体大小，缩放越小字体越大
     const zoomFactor = Math.min(ZOOM_THRESHOLD, currentZoom) / ZOOM_THRESHOLD;
     const fontSize = MAX_PREVIEW_FONT_SIZE - zoomFactor * (MAX_PREVIEW_FONT_SIZE - MIN_PREVIEW_FONT_SIZE);
     return Math.max(MIN_PREVIEW_FONT_SIZE, Math.min(MAX_PREVIEW_FONT_SIZE, fontSize));
-  }, [currentZoom, isSimplifiedView]);
+  }, [currentZoom, shouldUseSimplifiedView]);
   
   // 使用useMemo缓存计算结果
   const { hasTitle, hasText, formattedDate, textPreview, nodeHeight } = useMemo(() => {    
@@ -152,10 +157,10 @@ export const BaseNode = React.memo(function BaseNode<T extends NodeType>({
   
   // 分别为简化视图和正常视图设置不同的样式
   const simplifiedNodeStyles = useMemo(() => ({
-    width: nodeWidth || NODE_WIDTH,
-    height: `${nodeHeight}px`,
-    minHeight: `${NODE_MIN_HEIGHT}px`
-  }), [nodeHeight, nodeWidth]);
+    width: compactMode ? 320 : (nodeWidth || NODE_WIDTH), // 紧凑模式下使用更大的宽度
+    height: compactMode ? 150 : `${nodeHeight}px`, // 紧凑模式下使用更大的高度
+    minHeight: compactMode ? 150 : `${NODE_MIN_HEIGHT}px`
+  }), [nodeHeight, nodeWidth, compactMode]);
   
   const normalNodeStyles = useMemo(() => ({
     width: nodeWidth || NODE_WIDTH,
@@ -176,7 +181,7 @@ export const BaseNode = React.memo(function BaseNode<T extends NodeType>({
   }, [
     id, selected, nodeData.title, nodeData.text, nodeData.height, 
     nodeData?.mode, nodeData?.process, nodeData?.frame, nodeData?.objectName, nodeData?.objectNames, nodeData?.urls,
-    headerContent, footerContent, customContent, showSourceHandle, showTargetHandle
+    headerContent, footerContent, customContent, showSourceHandle, showTargetHandle, compactMode
   ]);
   
   // 定期检查缩放级别
@@ -208,23 +213,68 @@ export const BaseNode = React.memo(function BaseNode<T extends NodeType>({
   
   // 使用缓存渲染或创建新的渲染结果
   const renderContent = useCallback(() => {
-    // 如果是简化视图模式，不使用缓存，直接显示标题而非预览文本
-    if (isSimplifiedView) {
+    // 如果是紧凑模式或简化视图模式，显示简化内容
+    if (shouldUseSimplifiedView || compactMode) {
       return (
-        <div className="skeleton-view" style={{ height: '100%', width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-          {hasTitle ? (
-            <div 
-              className="node-preview-title text-center px-2"
-              style={{ fontSize: `${previewFontSize * 0.8}rem`, fontWeight: 'bold', color: '#333' }}
-            >
-              {nodeData.title}
-            </div>
-          ) : textPreview && (
-            <div 
-              className="node-preview-text text-center px-2"
-              style={{ fontSize: `${previewFontSize * 0.7}rem` }}
-            >
-              {textPreview}
+        <div className="compact-node-content" style={{ 
+          height: '100%', 
+          width: '100%', 
+          display: 'flex', 
+          flexDirection: 'column', 
+          justifyContent: 'space-between',
+          padding: '12px' 
+        }}>
+          {/* 上半部分：标题和内容预览 */}
+          <div className="compact-node-main flex-1 flex flex-col justify-center items-center">
+            {hasTitle ? (
+              <div 
+                className="node-title text-center text-sm font-medium text-gray-800 mb-2"
+                style={{ 
+                  fontSize: compactMode ? '0.875rem' : `${previewFontSize * 0.8}rem`, 
+                  fontWeight: 'bold',
+                  lineHeight: '1.3',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  display: '-webkit-box',
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: 'vertical'
+                }}
+              >
+                {nodeData.title}
+              </div>
+            ) : null}
+            {textPreview && (
+              <div 
+                className="node-preview text-center text-xs text-gray-600 mb-2"
+                style={{ 
+                  fontSize: compactMode ? '0.75rem' : `${previewFontSize * 0.6}rem`,
+                  lineHeight: '1.2',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  display: '-webkit-box',
+                  WebkitLineClamp: compactMode ? 2 : 3,
+                  WebkitBoxOrient: 'vertical'
+                }}
+              >
+                {textPreview}
+              </div>
+            )}
+            {/* 紧凑模式下显示节点类型标识 */}
+            {compactMode && (
+              <div className="node-type-indicator">
+                <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-600">
+                  {type}
+                </span>
+              </div>
+            )}
+          </div>
+          
+          {/* 下半部分：功能按钮 */}
+          {compactMode && footerContent && (
+            <div className="compact-node-footer mt-3 flex justify-center">
+              <div className="compact-footer-content">
+                {footerContent}
+              </div>
             </div>
           )}
         </div>
@@ -233,7 +283,6 @@ export const BaseNode = React.memo(function BaseNode<T extends NodeType>({
     
     // 在非简化视图下，使用缓存 (如果存在)
     if (nodeContentCache[id]) {
-      //console.log('使用缓存', id);
       return nodeContentCache[id];
     }
     
@@ -285,9 +334,9 @@ export const BaseNode = React.memo(function BaseNode<T extends NodeType>({
     nodeContentCache[id] = content;
     return content;
   }, [
-    isSimplifiedView, id, selected, hasTitle, nodeData.title, headerContent, 
+    shouldUseSimplifiedView, compactMode, id, selected, hasTitle, nodeData.title, headerContent, 
     customContent, hasText, nodeData.text, footerContent, formattedDate, 
-    textPreview, previewFontSize
+    textPreview, previewFontSize, type
   ]);
   
   const canBeDeleted = useMemo(() => {
@@ -304,33 +353,36 @@ export const BaseNode = React.memo(function BaseNode<T extends NodeType>({
     <>
       <div
         ref={nodeRef}
-        className={`base-node ${selected ? 'node-selected' : ''} ${isSimplifiedView ? 'simplified-view' : ''}`} 
-        style={isSimplifiedView ? simplifiedNodeStyles : normalNodeStyles}
+        className={`base-node ${selected ? 'node-selected' : ''} ${shouldUseSimplifiedView || compactMode ? 'simplified-view' : ''}`} 
+        style={shouldUseSimplifiedView || compactMode ? simplifiedNodeStyles : normalNodeStyles}
+        data-type={type}
       >
         {renderContent()}
       </div>
       
-      {/* ToolBar */}
-      <NodeToolbar position={Position.Top} align={'end'} >
-        <div className="flex items-center gap-2">
-          {/* 灰色背景 */}
-          <DownloadImgButton element={nodeRef.current!} size={20} className="bg-gray-50" />
-          {
-            canBeCopied &&
-            <CopyButton getText={() => nodeData.text || ''} size={20} className="bg-gray-50" />
-          }
-          {
-            selected && canBeDeleted &&
-            <button
-              className="p-2 bg-red-50 rounded-lg text-red-600 hover:bg-red-100 active:bg-red-200 transition-colors duration-200"
-              title="删除节点"
-              onClick={() => openDeleteNodeDialog(id)}
-            >
-              <Trash2 size={20} />
-            </button>
-          }
-        </div>
-      </NodeToolbar>
+      {/* 紧凑模式下不显示工具栏 */}
+      {!compactMode && (
+        <NodeToolbar position={Position.Top} align={'end'} >
+          <div className="flex items-center gap-2">
+            {/* 灰色背景 */}
+            <DownloadImgButton element={nodeRef.current!} size={20} className="bg-gray-50" />
+            {
+              canBeCopied &&
+              <CopyButton getText={() => nodeData.text || ''} size={20} className="bg-gray-50" />
+            }
+            {
+              selected && canBeDeleted &&
+              <button
+                className="p-2 bg-red-50 rounded-lg text-red-600 hover:bg-red-100 active:bg-red-200 transition-colors duration-200"
+                title="删除节点"
+                onClick={() => openDeleteNodeDialog(id)}
+              >
+                <Trash2 size={20} />
+              </button>
+            }
+          </div>
+        </NodeToolbar>
+      )}
 
       {/* Handles 始终保持相同位置 */}
       {showSourceHandle && (

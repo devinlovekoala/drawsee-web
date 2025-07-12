@@ -14,27 +14,24 @@ import ReactFlow, {
   applyEdgeChanges,
   useReactFlow,
   ReactFlowProvider,
-  Panel
 } from 'reactflow';
-import { Button, Dropdown, message, Space, Modal, Spin } from 'antd';
-import { DownOutlined, PlusOutlined, PlayCircleOutlined, SaveOutlined } from '@ant-design/icons';
+import { message, Modal, Spin } from 'antd';
 import 'reactflow/dist/style.css';
 import { CircuitNode } from './CircuitNode';
 import ConnectionEdge, { ConnectionPreview } from './ConnectionEdge';
 import ComponentConfig from './ComponentConfig';
 import { 
-  CircuitElementType, 
-  CircuitDesign, 
+  CircuitElementType,
+  CircuitDesign,
   Port,
   CircuitElement
 } from '@/api/types/circuit.types';
 import { createAiTask } from '@/api/methods/flow.methods';
 import { saveCircuitDesign } from '@/api/methods/circuit.methods';
-import { CircuitNodeData, ModelType } from '../types';
+import { CircuitNodeData } from '../types';
 import { useAppContext } from '@/app/contexts/AppContext';
 import { CreateAiTaskDTO } from '@/api/types/flow.types';
 import { useHotkeys } from 'react-hotkeys-hook';
-import { ModelSelector } from '@/app/pages/blank/components/ModelSelector';
 import { ModelType as FlowModelType } from '@/app/pages/flow/components/input/FlowInputPanel';
 import ElementLibrary from './ElementLibrary';
 import CircuitToolbar from './CircuitToolbar';

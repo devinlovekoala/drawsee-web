@@ -9,6 +9,9 @@ import CircuitPointNode from "@/app/pages/flow/components/node/CircuitPointNode"
 import CircuitDetailNode from "@/app/pages/flow/components/node/CircuitDetailNode";
 import AnswerPointNode from "@/app/pages/flow/components/node/AnswerPointNode";
 import AnswerDetailNode from "@/app/pages/flow/components/node/AnswerDetailNode";
+import PdfDocumentNode from "./components/node/PdfDocumentNode";
+import PdfAnalysisPointNode from "./components/node/PdfAnalysisPointNode";
+import NodeDetailPanel from "./components/NodeDetailPanel";
 import {useCallback, useState, useEffect} from "react";
 import {useLocation, useNavigate} from "react-router-dom";
 import {useWatcher} from "alova/client";
@@ -33,21 +36,39 @@ import FlowLeftToolBar from "./components/FlowLeftToolBar";
 import { TASK_KEY_PREFIX } from "@/common/constant/storage-key.constant";
 import { useViewportChange } from "./hooks/useViewportChange";
 
+// 创建紧凑模式的节点类型
+const CompactRootNode = (props: any) => <RootNode {...props} compactMode={true} />;
+const CompactQueryNode = (props: any) => <QueryNode {...props} compactMode={true} />;
+const CompactAnswerNode = (props: any) => <AnswerNode {...props} compactMode={true} />;
+const CompactAnswerPointNode = (props: any) => <AnswerPointNode {...props} compactMode={true} />;
+const CompactAnswerDetailNode = (props: any) => <AnswerDetailNode {...props} compactMode={true} />;
+const CompactKnowledgeHeadNode = (props: any) => <KnowledgeHeadNode {...props} compactMode={true} />;
+const CompactKnowledgeDetailNode = (props: any) => <KnowledgeDetailNode {...props} compactMode={true} />;
+const CompactCircuitCanvasNode = (props: any) => <CircuitCanvasNode {...props} compactMode={true} />;
+const CompactCircuitPointNode = (props: any) => <CircuitPointNode {...props} compactMode={true} />;
+const CompactCircuitDetailNode = (props: any) => <CircuitDetailNode {...props} compactMode={true} />;
+const CompactResourceNode = (props: any) => <ResourceNode {...props} compactMode={true} />;
+const CompactPdfDocumentNode = (props: any) => <PdfDocumentNode {...props} compactMode={true} />;
+const CompactPdfAnalysisPointNode = (props: any) => <PdfAnalysisPointNode {...props} compactMode={true} />;
+
 const nodeTypes = {
-  'root': RootNode,
-  'query': QueryNode,
-  'answer': AnswerNode,
-  'answer-point': AnswerPointNode,
-  'answer-detail': AnswerDetailNode,
-  'ANSWER_POINT': AnswerPointNode,
-  'ANSWER_DETAIL': AnswerDetailNode,
-  'knowledge-head': KnowledgeHeadNode,
-  'knowledge-detail': KnowledgeDetailNode,
-  'resource': ResourceNode,
+  'root': CompactRootNode,
+  'query': CompactQueryNode,
+  'answer': CompactAnswerNode,
+  'answer-point': CompactAnswerPointNode,
+  'answer-detail': CompactAnswerDetailNode,
+  'ANSWER_POINT': CompactAnswerPointNode,
+  'ANSWER_DETAIL': CompactAnswerDetailNode,
+  'knowledge-head': CompactKnowledgeHeadNode,
+  'knowledge-detail': CompactKnowledgeDetailNode,
+  'resource': CompactResourceNode,
   // 电路分析节点类型 - 统一使用小写中划线形式
-  'circuit-canvas': CircuitCanvasNode,   // 电路画布节点
-  'circuit-point': CircuitPointNode,     // 电路分析点节点
-  'circuit-detail': CircuitDetailNode,   // 电路分析详情节点
+  'circuit-canvas': CompactCircuitCanvasNode,   // 电路画布节点
+  'circuit-point': CompactCircuitPointNode,     // 电路分析点节点
+  'circuit-detail': CompactCircuitDetailNode,   // 电路分析详情节点
+  // PDF相关节点类型
+  'PDF_DOCUMENT': CompactPdfDocumentNode,       // PDF文档节点
+  'PDF_ANALYSIS_POINT': CompactPdfAnalysisPointNode, // PDF分析点节点
 } as const;
 
 function Flow() {
@@ -59,6 +80,8 @@ function Flow() {
   const [userInput, setUserInput] = useState<string>('');
   // 展示小地图
   const [showMiniMap, setShowMiniMap] = useState<boolean>(true);
+  // 显示详情面板
+  const [showDetailPanel, setShowDetailPanel] = useState<boolean>(true);
   
   // 获取location中的convId、taskId和classId
   const location = useLocation();
@@ -68,8 +91,15 @@ function Flow() {
   const classId = locationState?.classId || 
     (convId ? sessionStorage.getItem(`circuit_class_id_${convId}`) : null); // 从sessionStorage获取班级ID
   
-  // 使用FlowState Hook
-  const {elements, setElements, isChatting, rootNodeId, chat, addChatTask} = useFlowState(convId);
+  // 使用流程图状态管理Hook，传递selectedNode和setSelectedNode
+  const {
+    elements,
+    isChatting,
+    rootNodeId,
+    chat,
+    setElements,
+    addChatTask
+  } = useFlowState(convId, selectedNode, setSelectedNode);
   
   // 处理返回班级列表
   const handleBackToCourses = useCallback(() => {
@@ -165,7 +195,8 @@ function Flow() {
       if (selectionChanged) {
         window.dispatchEvent(new CustomEvent('node-selection-change'));
         if (selectedNodeId && selectedNodeId !== selectedNode?.id) {
-          setSelectedNode(newNodes.find(node => node.id === selectedNodeId) || null);
+          const selectedFlowNode = newNodes.find(node => node.id === selectedNodeId);
+          setSelectedNode(selectedFlowNode || null);
           const tempQueryNode = newNodes.find(node => node.id.startsWith(TEMP_QUERY_NODE_ID_PREFIX));
           if (tempQueryNode) {
             newNodes = nodesAndEdgesNoneTempQueryNode.current?.nodes || newNodes;
@@ -195,6 +226,17 @@ function Flow() {
       // 应用节点变化
       newNodes = applyNodeChanges(changes, newNodes);
 
+      // 同步更新selectedNode以支持流式内容更新
+      if (selectedNode && !selectionChanged) {
+        const updatedSelectedNode = newNodes.find(node => node.id === selectedNode.id);
+        if (updatedSelectedNode && (
+          updatedSelectedNode.data.text !== selectedNode.data.text ||
+          updatedSelectedNode.data.updatedAt !== selectedNode.data.updatedAt
+        )) {
+          setSelectedNode(updatedSelectedNode);
+        }
+      }
+
       // 如果需要重新布局，执行布局计算
       if (needsRelayout) {
         console.log('检测到显著布局变化，进行重新布局', {
@@ -218,7 +260,7 @@ function Flow() {
         edges: newEdges,
       };
     });
-  }, [executeFitView, executeLayout, nodesAndEdgesNoneTempQueryNode, rootNodeId, selectedNode?.id, setElements]);
+  }, [executeFitView, executeLayout, nodesAndEdgesNoneTempQueryNode, rootNodeId, selectedNode?.id, selectedNode, setElements, setSelectedNode, setUserInput]);
 
   // 边变化监听
   const onEdgesChange: OnEdgesChange = useCallback((changes) => {
@@ -276,6 +318,7 @@ function Flow() {
       // 如果没有节点数据，直接设置为空并结束加载
       if (!apiNodes || apiNodes.length === 0) {
         setElements({nodes: [], edges: []});
+        setSelectedNode(null); // 清空选中节点
         setIsLoading(false);
         return;
       }
@@ -343,6 +386,14 @@ function Flow() {
       const layoutedNodes = executeLayout(flowNodes, flowEdges, true);
       setElements({nodes: layoutedNodes, edges: flowEdges});
 
+      // 如果当前有选中的节点，更新selectedNode以反映最新数据
+      if (selectedNode && selectedNode.id) {
+        const updatedSelectedNode = layoutedNodes.find(node => node.id === selectedNode.id);
+        if (updatedSelectedNode) {
+          setSelectedNode(updatedSelectedNode);
+        }
+      }
+
       // 如果是新创建的conv，那么就chat
       if (taskIdFromLocation) {
         // 检查该taskId是否已经执行过
@@ -365,6 +416,7 @@ function Flow() {
     .onError(() => {
       // 出错时设置加载状态为false
       setIsLoading(false);
+      setSelectedNode(null); // 清空选中节点
       toast.error('获取节点数据失败');
     });
   
@@ -431,6 +483,26 @@ function Flow() {
     executeFitView(elements.nodes.sort((a, b) => parseInt(a.id) - parseInt(b.id)).slice(0, 1).map(node => node.id), 250);
   }, [elements.nodes, executeFitView]);
 
+  // 关闭详情面板
+  const handleCloseDetailPanel = useCallback(() => {
+    setShowDetailPanel(false);
+    setSelectedNode(null);
+  }, []);
+
+  // 切换详情面板显示
+  const toggleDetailPanel = useCallback(() => {
+    setShowDetailPanel(!showDetailPanel);
+    if (!showDetailPanel) {
+      // 如果要显示面板，但没有选中节点，则选中根节点
+      if (!selectedNode && elements.nodes.length > 0) {
+        const rootNode = elements.nodes.find(node => node.type === 'root');
+        if (rootNode) {
+          setSelectedNode(rootNode);
+        }
+      }
+    }
+  }, [showDetailPanel, selectedNode, elements.nodes]);
+
   // 加载中
   if (isLoading) {
     return <LoadingSpinner />;
@@ -444,75 +516,90 @@ function Flow() {
       chat: flowChat,
       addChatTask
     }}>
-      <ReactFlow 
-        nodes={elements.nodes} 
-        edges={elements.edges}
-        onNodesChange={onNodesChange} // 节点变化监听
-        onEdgesChange={onEdgesChange} // 边变化监听
-        onError={onError} // 错误处理
-        onInit={onInit} // 初始化
-        nodeTypes={nodeTypes} // 节点类型
-        style={{backgroundColor: "#EEEBE8", borderRadius: '8px'}} // 背景样式
-        nodesDraggable={false} // 节点不可拖拽
-        draggable={false} // 节点不可拖拽
-        selectionKeyCode={null} // 取消选择快捷键
-        multiSelectionKeyCode={null} // 取消多选快捷键
-        deleteKeyCode={null} // 取消删除快捷键
-        panActivationKeyCode={"Space"} // 平移快捷键
-        onlyRenderVisibleElements={true} // 只渲染可见元素，提高性能
-        maxZoom={2} // 最大缩放
-        minZoom={0.01} // 最小缩放
-        defaultViewport={{ x: 0, y: 0, zoom: 0.5 }} // 默认视图
-        defaultEdgeOptions={{ // 默认边样式
-          type: 'smoothstep', // 平滑曲线
-          animated: false, // 动画
-          selectable: false, // 不可选择
-          style: {
-            stroke: '#999', // 线条的颜色，使用十六进制表示法，这里是灰色
-            strokeWidth: 5, // 线条的宽度，单位是像素
-            strokeLinecap: 'round', // 线条的端点样式，这里是圆形的端点
-            strokeLinejoin: 'round', // 线条的连接点样式，这里是圆形的连接
-            strokeDasharray: '25 30', // 线条的虚线样式，表示线段和空白的长度，这里是每段线段和空白各10个单位
-            strokeDashoffset: 0, // 虚线的偏移量，控制虚线的起始位置，这里是0，表示从起始位置开始
-            strokeOpacity: 0.85, // 线条的透明度，范围从0（完全透明）到1（完全不透明），这里是完全不透明
-          }
-        }}
-      >
-        {/* 背景 */}
-        <Background variant={BackgroundVariant.Lines} size={10}/>
-        {/* 小地图 */}
-        {showMiniMap && (
-          <MiniMap nodeStrokeWidth={3} nodeColor={'#b8b8b8'} style={{borderRadius: '10px'}} />
-        )}
-        {/* 底部输入框 */}
-        <Panel position={"bottom-center"}>
-          <FlowInputPanel
+      <div className="flex h-full">
+        {/* 左侧React Flow区域 */}
+        <div className={`flex-1 ${showDetailPanel ? 'transition-all duration-300 ease-in-out' : ''}`}>
+          <ReactFlow 
+            nodes={elements.nodes} 
+            edges={elements.edges}
+            onNodesChange={onNodesChange} // 节点变化监听
+            onEdgesChange={onEdgesChange} // 边变化监听
+            onError={onError} // 错误处理
+            onInit={onInit} // 初始化
+            nodeTypes={nodeTypes} // 节点类型
+            style={{backgroundColor: "#EEEBE8", borderRadius: '8px'}} // 背景样式
+            nodesDraggable={false} // 节点不可拖拽
+            draggable={false} // 节点不可拖拽
+            selectionKeyCode={null} // 取消选择快捷键
+            multiSelectionKeyCode={null} // 取消多选快捷键
+            deleteKeyCode={null} // 取消删除快捷键
+            panActivationKeyCode={"Space"} // 平移快捷键
+            onlyRenderVisibleElements={true} // 只渲染可见元素，提高性能
+            maxZoom={2} // 最大缩放
+            minZoom={0.01} // 最小缩放
+            defaultViewport={{ x: 0, y: 0, zoom: 0.5 }} // 默认视图
+            defaultEdgeOptions={{ // 默认边样式
+              type: 'smoothstep', // 平滑曲线
+              animated: false, // 动画
+              selectable: false, // 不可选择
+              style: {
+                stroke: '#999', // 线条的颜色，使用十六进制表示法，这里是灰色
+                strokeWidth: 5, // 线条的宽度，单位是像素
+                strokeLinecap: 'round', // 线条的端点样式，这里是圆形的端点
+                strokeLinejoin: 'round', // 线条的连接点样式，这里是圆形的连接
+                strokeDasharray: '25 30', // 线条的虚线样式，表示线段和空白的长度，这里是每段线段和空白各10个单位
+                strokeDashoffset: 0, // 虚线的偏移量，控制虚线的起始位置，这里是0，表示从起始位置开始
+                strokeOpacity: 0.85, // 线条的透明度，范围从0（完全透明）到1（完全不透明），这里是完全不透明
+              }
+            }}
+          >
+            {/* 背景 */}
+            <Background variant={BackgroundVariant.Lines} size={10}/>
+            {/* 小地图 */}
+            {showMiniMap && (
+              <MiniMap nodeStrokeWidth={3} nodeColor={'#b8b8b8'} style={{borderRadius: '10px'}} />
+            )}
+            {/* 底部输入框 */}
+            <Panel position={"bottom-center"}>
+              <FlowInputPanel
+                selectedNode={selectedNode}
+                prompt={userInput}
+                setPrompt={setUserInput}
+                canInput={canInput}
+                canNotInputReason={canNotInputReason}
+                addTempQueryNodeTask={addTempQueryNodeTask}
+                parentIdOfTempQueryNode={parentIdOfTempQueryNode}
+              />
+            </Panel>
+            {/* 顶部右侧工具栏 */}
+            <Panel position={"top-right"}>
+              <FlowRightToolBar
+                showMiniMap={showMiniMap}
+                setShowMiniMap={setShowMiniMap}
+                onRelayout={handleRelayout} 
+                onNodeWidthChange={handleNodeWidthChange} 
+                nodeWidth={nodeWidth}
+                showDetailPanel={showDetailPanel}
+                onToggleDetailPanel={toggleDetailPanel}
+              />
+            </Panel>
+            {/* 顶部左侧工具栏 */}
+            <Panel position={"top-left"}>
+              <FlowLeftToolBar 
+                onBack={classId ? handleBackToCourses : undefined}
+              />
+            </Panel>
+          </ReactFlow>
+        </div>
+        
+        {/* 右侧详情面板 */}
+        {showDetailPanel && (
+          <NodeDetailPanel
             selectedNode={selectedNode}
-            prompt={userInput}
-            setPrompt={setUserInput}
-            canInput={canInput}
-            canNotInputReason={canNotInputReason}
-            addTempQueryNodeTask={addTempQueryNodeTask}
-            parentIdOfTempQueryNode={parentIdOfTempQueryNode}
+            onClose={handleCloseDetailPanel}
           />
-        </Panel>
-        {/* 顶部右侧工具栏 */}
-        <Panel position={"top-right"}>
-          <FlowRightToolBar
-            showMiniMap={showMiniMap}
-            setShowMiniMap={setShowMiniMap}
-            onRelayout={handleRelayout} 
-            onNodeWidthChange={handleNodeWidthChange} 
-            nodeWidth={nodeWidth} 
-          />
-        </Panel>
-        {/* 顶部左侧工具栏 */}
-        <Panel position={"top-left"}>
-          <FlowLeftToolBar 
-            onBack={classId ? handleBackToCourses : undefined}
-          />
-        </Panel>
-      </ReactFlow>
+        )}
+      </div>
     </FlowContext.Provider>
   );
 }

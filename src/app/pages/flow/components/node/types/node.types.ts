@@ -70,6 +70,8 @@ export type NodeData<T extends string> =
   T extends 'circuit-canvas' ? AnswerNodeData :
   T extends 'circuit-point' ? AnswerNodeData :
   T extends 'circuit-detail' ? AnswerNodeData :
+  T extends 'PDF_DOCUMENT' ? BaseNodeData :
+  T extends 'PDF_ANALYSIS_POINT' ? BaseNodeData :
   BaseNodeData;
 
 export type FlowNode<T extends NodeType> = Node<NodeData<T>>;
@@ -81,3 +83,5 @@ export type AnswerDetailNode = FlowNode<'answer-detail'>;
 export type KnowledgeHeadNode = FlowNode<'knowledge-head'>;
 export type KnowledgeDetailNode = FlowNode<'knowledge-detail'>;
 export type ResourceNode = FlowNode<'resource'>;
+export type PdfDocumentNode = FlowNode<'PDF_DOCUMENT'>;
+export type PdfAnalysisPointNode = FlowNode<'PDF_ANALYSIS_POINT'>;
