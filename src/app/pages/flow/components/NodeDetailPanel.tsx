@@ -1,7 +1,7 @@
-import React, { useMemo, useEffect, useState } from 'react';
+import React, { useMemo, useEffect, useState, useRef, useCallback } from 'react';
 import { Node } from '@xyflow/react';
 import { format } from 'date-fns';
-import { X, Clock, Tag, MessageSquare, Circle, CheckCircle, AlertCircle, FileText, Zap, Brain, Search, Image, Play, BookOpen } from 'lucide-react';
+import { X, Clock, Tag, MessageSquare, Circle, CheckCircle, AlertCircle, FileText, Zap, Brain, Search, Image, BookOpen } from 'lucide-react';
 import MarkdownWithLatex from './markdown/MarkdownWithLatex';
 import { NodeData } from './node/types/node.types';
 import { NodeType } from '@/api/types/flow.types';
@@ -16,6 +16,8 @@ const CircuitFlowWithProvider = React.lazy(() =>
 interface NodeDetailPanelProps {
   selectedNode: Node | null;
   onClose: () => void;
+  // 添加获取最新节点数据的函数
+  getLatestNodeData?: (nodeId: string) => Node | null;
 }
 
 // 节点类型图标映射
@@ -76,31 +78,151 @@ const getNumberField = (obj: any, field: string): number | undefined => {
   return obj && typeof obj[field] === 'number' ? obj[field] : undefined;
 };
 
-export default function NodeDetailPanel({ selectedNode, onClose }: NodeDetailPanelProps) {
+export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeData }: NodeDetailPanelProps) {
   const nodeData = selectedNode?.data as NodeData<NodeType>;
   const [nodeContentKey, setNodeContentKey] = useState(0); // 用于强制重新渲染
   const [lastTextContent, setLastTextContent] = useState<string>(''); // 跟踪上次的文本内容
+  const [forceRefresh, setForceRefresh] = useState(0); // 添加强制刷新状态
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<number>(0); // 跟踪上次更新时间
+  const scrollRef = useRef<HTMLDivElement>(null); // 用于自动滚动
   
-  // 监听节点数据变化，实现流式更新
+  // 安全地获取文本内容
+  const getCurrentText = useCallback((node: Node | null): string => {
+    if (!node?.data?.text) return '';
+    return typeof node.data.text === 'string' ? node.data.text : String(node.data.text);
+  }, []);
+  
+  // 监听选中节点变化，立即更新状态
   useEffect(() => {
-    if (selectedNode && nodeData) {
-      const currentText = getStringField(nodeData, 'text') || '';
-      const currentUpdatedAt = nodeData.updatedAt;
+    if (selectedNode) {
+      const currentText = getCurrentText(selectedNode);
+      const currentUpdatedAt = (selectedNode.data?.updatedAt as number) || 0;
+      const currentForceRefresh = (selectedNode.data?.forceRefresh as number) || 0;
       
-      // 检查文本内容是否实际发生了变化
+      console.log('selectedNode变化，立即更新状态:', {
+        nodeId: selectedNode.id,
+        textLength: currentText.length,
+        updatedAt: currentUpdatedAt,
+        forceRefresh: currentForceRefresh,
+        process: selectedNode.data?.process
+      });
+      
+      // 立即更新状态
       if (currentText !== lastTextContent) {
-        console.log('NodeDetailPanel检测到文本内容变化:', {
-          nodeId: selectedNode.id,
-          oldLength: lastTextContent.length,
-          newLength: currentText.length,
-          updatedAt: currentUpdatedAt
-        });
-        
         setLastTextContent(currentText);
         setNodeContentKey(prev => prev + 1);
       }
+      
+      if (currentUpdatedAt !== lastUpdatedAt) {
+        setLastUpdatedAt(currentUpdatedAt);
+        setForceRefresh(prev => prev + 1);
+      }
+      
+      if (currentForceRefresh && currentForceRefresh !== forceRefresh) {
+        setForceRefresh(currentForceRefresh);
+      }
+      
+      // 特别监听isGenerated状态变化
+      const currentIsGenerated = (selectedNode.data?.isGenerated as boolean) || false;
+      if (currentIsGenerated !== lastTextContent.includes('已生成')) {
+        console.log(`检测到isGenerated状态变化，节点 ${selectedNode.id}:`, currentIsGenerated);
+        setForceRefresh(prev => prev + 1);
+      }
     }
-  }, [selectedNode?.id, selectedNode?.data?.text, selectedNode?.data?.updatedAt, nodeData, lastTextContent]);
+  }, [selectedNode, getCurrentText, lastTextContent, lastUpdatedAt, forceRefresh]);
+
+  // 额外的实时检测机制 - 针对正在生成的节点
+  useEffect(() => {
+    if (!selectedNode) return;
+    
+    const nodeType = selectedNode.type as NodeType;
+    const process = getStringField(nodeData, 'process');
+    const isDetailNode = nodeType === 'answer-detail' || nodeType === 'ANSWER_DETAIL' || 
+                        nodeType === 'circuit-detail' || nodeType === 'knowledge-detail';
+    
+    // 只对正在生成的详情节点进行高频检测
+    if (isDetailNode && process === 'generating') {
+      console.log(`为正在生成的详情节点 ${selectedNode.id} 设置实时检测`);
+      
+      const realTimeCheck = setInterval(() => {
+        // 使用getLatestNodeData获取最新的节点数据
+        const latestNode = getLatestNodeData ? getLatestNodeData(selectedNode.id) : selectedNode;
+        const currentText = getCurrentText(latestNode);
+        const currentUpdatedAt = (latestNode?.data?.updatedAt as number) || 0;
+        
+        // 检查是否有新的文本内容
+        if (currentText !== lastTextContent || currentUpdatedAt !== lastUpdatedAt) {
+          console.log(`实时检测到内容变化，节点 ${selectedNode.id}，文本长度: ${currentText.length}，更新时间: ${currentUpdatedAt}`);
+          setLastTextContent(currentText);
+          setLastUpdatedAt(currentUpdatedAt);
+          setForceRefresh(prev => prev + 1);
+        }
+      }, 100); // 100ms 间隔检测
+      
+      return () => clearInterval(realTimeCheck);
+    }
+  }, [selectedNode, nodeData, getCurrentText, lastTextContent, lastUpdatedAt, getLatestNodeData]);
+
+  // 为正在生成的详情节点添加额外的高频检查
+  useEffect(() => {
+    if (!selectedNode || !nodeData) return;
+    
+    const nodeType = selectedNode?.type as NodeType;
+    const process = getStringField(nodeData, 'process');
+    const isDetailNode = nodeType === 'answer-detail' || nodeType === 'ANSWER_DETAIL' || 
+                        nodeType === 'circuit-detail' || nodeType === 'knowledge-detail';
+    
+    if (isDetailNode && (process === 'generating' || !process)) {
+      console.log(`为详情节点 ${selectedNode.id} 设置高频检查，当前process: ${process}`);
+      
+      let lastCheckedLength = 0;
+      const interval = setInterval(() => {
+        // 使用getLatestNodeData获取最新的节点数据
+        const latestNode = getLatestNodeData ? getLatestNodeData(selectedNode.id) : selectedNode;
+        const latestText = getStringField(latestNode?.data, 'text') || '';
+        
+        if (latestText.length !== lastCheckedLength) {
+          console.log(`高频检查检测到文本变化，节点ID: ${selectedNode.id}，新长度: ${latestText.length}，旧长度: ${lastCheckedLength}`);
+          lastCheckedLength = latestText.length;
+          setLastTextContent(latestText);
+          setNodeContentKey(prev => prev + 1);
+          
+          // 自动滚动到底部
+          if (scrollRef.current) {
+            scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+          }
+        }
+      }, 50); // 减少到50ms检查一次，提高实时性
+      
+      return () => {
+        clearInterval(interval);
+      };
+    }
+  }, [selectedNode?.id, selectedNode?.type, getStringField(nodeData, 'process'), getLatestNodeData]);
+
+  // 专门监听selectedNode的文本变化，确保最实时的更新
+  useEffect(() => {
+    if (selectedNode?.id) {
+      // 使用getLatestNodeData获取最新的节点数据
+      const latestNode = getLatestNodeData ? getLatestNodeData(selectedNode.id) : selectedNode;
+      const currentText = latestNode?.data?.text;
+      
+      if (currentText && typeof currentText === 'string') {
+        if (currentText !== lastTextContent) {
+          console.log(`检测到文本变化，立即刷新UI，节点ID: ${selectedNode.id}，新长度: ${currentText.length}，旧长度: ${lastTextContent.length}`);
+          setLastTextContent(currentText);
+          setNodeContentKey(prev => prev + 1);
+          
+          // 自动滚动到底部
+          setTimeout(() => {
+            if (scrollRef.current) {
+              scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+            }
+          }, 10);
+        }
+      }
+    }
+  }, [selectedNode?.data?.text, selectedNode?.id, getLatestNodeData, lastTextContent]);
 
   // 当选中的节点改变时，重置文本内容跟踪
   useEffect(() => {
@@ -119,14 +241,81 @@ export default function NodeDetailPanel({ selectedNode, onClose }: NodeDetailPan
     return format(new Date(nodeData.createdAt), 'yyyy年MM月dd日 HH:mm');
   }, [nodeData?.createdAt]);
 
-  // 获取节点状态
+  // 获取节点状态 - 使用最新的节点数据
   const nodeStatus = useMemo(() => {
-    if (!nodeData) return null;
+    // 优先使用最新的节点数据
+    const latestNode = selectedNode?.id && getLatestNodeData ? 
+                      getLatestNodeData(selectedNode.id) : selectedNode;
+    const currentNodeData = latestNode?.data as NodeData<NodeType> || nodeData;
     
-    const isGenerated = getBooleanField(nodeData, 'isGenerated');
-    const process = getStringField(nodeData, 'process');
+    if (!currentNodeData) return null;
     
-    if (isGenerated) {
+    const isGenerated = getBooleanField(currentNodeData, 'isGenerated');
+    const process = getStringField(currentNodeData, 'process');
+    const nodeType = selectedNode?.type as NodeType;
+    
+    console.log('节点状态计算:', {
+      nodeId: selectedNode?.id,
+      nodeType,
+      isGenerated,
+      process,
+      timestamp: Date.now()
+    });
+    
+    // 对于分点节点，优先检查是否已有子节点完成
+    if (nodeType === 'answer-point' || nodeType === 'ANSWER_POINT' || 
+        nodeType === 'knowledge-head' || nodeType === 'circuit-point') {
+      
+      // 如果明确标记为已生成且process为completed，显示已完成
+      if (isGenerated && process === 'completed') {
+        return { text: '已完成', color: 'text-green-600 bg-green-50' };
+      }
+      
+      // 如果process为generating，显示生成中
+      if (process === 'generating') {
+        return { text: '生成中', color: 'text-blue-600 bg-blue-50' };
+      }
+      
+      // 默认状态
+      return { text: '待生成', color: 'text-gray-600 bg-gray-50' };
+    }
+    
+    // 对于详情节点（answer-detail, ANSWER_DETAIL, circuit-detail, knowledge-detail等）
+    if (nodeType === 'answer-detail' || nodeType === 'ANSWER_DETAIL' || 
+        nodeType === 'circuit-detail' || nodeType === 'knowledge-detail') {
+      
+      // 如果明确标记为已完成
+      if (process === 'completed') {
+        return { text: '已生成完毕', color: 'text-green-600 bg-green-50' };
+      }
+      
+      // 如果明确标记为已生成（兼容性处理）
+      if (isGenerated && process !== 'generating') {
+        return { text: '已生成完毕', color: 'text-green-600 bg-green-50' };
+      }
+      
+      // 如果正在生成中
+      if (process === 'generating') {
+        return { text: '生成中', color: 'text-blue-600 bg-blue-50' };
+      }
+      
+      // 如果生成失败
+      if (process === 'failed') {
+        return { text: '生成失败', color: 'text-red-600 bg-red-50' };
+      }
+      
+      // 如果有内容但没有明确状态，可能还在生成
+      const text = getStringField(currentNodeData, 'text');
+      if (text && text.length > 0 && !isGenerated) {
+        return { text: '生成中', color: 'text-blue-600 bg-blue-50' };
+      }
+      
+      // 默认状态
+      return { text: '待生成', color: 'text-gray-600 bg-gray-50' };
+    }
+    
+    // 对于其他节点类型的处理
+    if (isGenerated || process === 'completed') {
       return { text: '已生成', color: 'text-green-600 bg-green-50' };
     }
     
@@ -134,8 +323,12 @@ export default function NodeDetailPanel({ selectedNode, onClose }: NodeDetailPan
       return { text: '生成中', color: 'text-blue-600 bg-blue-50' };
     }
     
+    if (process === 'failed') {
+      return { text: '生成失败', color: 'text-red-600 bg-red-50' };
+    }
+    
     return { text: '待生成', color: 'text-gray-600 bg-gray-50' };
-  }, [nodeData]);
+  }, [selectedNode?.id, selectedNode?.type, nodeData, getLatestNodeData, forceRefresh, lastUpdatedAt]);
 
   // 获取模式信息
   const modeInfo = useMemo(() => {
@@ -173,28 +366,97 @@ export default function NodeDetailPanel({ selectedNode, onClose }: NodeDetailPan
     return nodeType === 'circuit-canvas' || nodeType === 'circuit-point' || nodeType === 'circuit-detail';
   }, [selectedNode?.type]);
 
-  // 获取文本内容和其他字段信息
+  // 获取文本内容和其他字段信息 - 使用最新的节点数据
   const nodeFields = useMemo(() => {
-    if (!nodeData) return {};
+    // 优先使用最新的节点数据
+    const latestNode = selectedNode?.id && getLatestNodeData ? 
+                      getLatestNodeData(selectedNode.id) : selectedNode;
+    const currentNodeData = latestNode?.data as NodeData<NodeType> || nodeData;
+    
+    if (!currentNodeData) return {};
     
     return {
-      title: getStringField(nodeData, 'title'),
-      text: getStringField(nodeData, 'text'),
-      subtype: getStringField(nodeData, 'subtype'),
-      angle: getStringField(nodeData, 'angle'),
-      objectName: getStringField(nodeData, 'objectName'),
-      urls: getArrayField(nodeData, 'urls'),
-      parentId: getNumberField(nodeData, 'parentId')
+      title: getStringField(currentNodeData, 'title'),
+      text: getStringField(currentNodeData, 'text'),
+      subtype: getStringField(currentNodeData, 'subtype'),
+      angle: getStringField(currentNodeData, 'angle'),
+      objectName: getStringField(currentNodeData, 'objectName'),
+      urls: getArrayField(currentNodeData, 'urls'),
+      parentId: getNumberField(currentNodeData, 'parentId')
     };
-  }, [nodeData]);
+  }, [selectedNode?.id, nodeData, getLatestNodeData, forceRefresh, lastUpdatedAt]);
 
-  // 检查是否正在生成内容
+  // 检查是否正在生成内容 - 使用最新的节点数据
   const isGenerating = useMemo(() => {
-    const process = getStringField(nodeData, 'process');
-    const isGenerated = getBooleanField(nodeData, 'isGenerated');
+    // 优先使用最新的节点数据
+    const latestNode = selectedNode?.id && getLatestNodeData ? 
+                      getLatestNodeData(selectedNode.id) : selectedNode;
+    const currentNodeData = latestNode?.data as NodeData<NodeType> || nodeData;
+    
+    const process = getStringField(currentNodeData, 'process');
+    const isGenerated = getBooleanField(currentNodeData, 'isGenerated');
+    const nodeType = selectedNode?.type as NodeType;
+    
+    // 对于已明确标记为已生成且process为completed的节点，直接返回false
+    if (isGenerated && process === 'completed') {
+      return false;
+    }
+    
+    // 如果process明确为generating，返回true
+    if (process === 'generating') {
+      return true;
+    }
+    
+    // 对于分点节点（answer-point, knowledge-head, circuit-point等），
+    // 如果明确标记为已生成，则认为不再生成中
+    if (nodeType === 'answer-point' || nodeType === 'ANSWER_POINT' || 
+        nodeType === 'knowledge-head' || nodeType === 'circuit-point') {
+      return !isGenerated && process === 'generating'; // 只有在明确生成中状态才显示生成中
+    }
+    
+    // 对于详情节点（answer-detail, ANSWER_DETAIL, circuit-detail, knowledge-detail等），
+    // 检查是否正在流式生成内容
+    if (nodeType === 'answer-detail' || nodeType === 'ANSWER_DETAIL' || 
+        nodeType === 'circuit-detail' || nodeType === 'knowledge-detail') {
+      
+      console.log(`详情节点 ${selectedNode?.id} 状态检查:`, {
+        process,
+        isGenerated,
+        hasText: !!nodeFields.text,
+        textLength: nodeFields.text?.length || 0
+      });
+      
+      // 如果明确标记为已完成，则不再生成中
+      if (process === 'completed') {
+        return false;
+      }
+      
+      // 如果明确标记为已生成，则不再生成中
+      if (isGenerated === true) {
+        return false;
+      }
+      
+      // 如果正在生成中，返回true
+      if (process === 'generating') {
+        return true;
+      }
+      
+      // 默认情况：如果没有明确的状态，且有文本内容，但process不是completed也不是generating，
+      // 则认为已经完成（因为done消息可能没有正确更新状态）
+      const text = nodeFields.text;
+      if (text && text.length > 0) {
+        // 如果有文本但process既不是generating也不是completed，很可能是已经完成的
+        return process === 'generating';
+      }
+      
+      // 完全没有内容的情况
+      return false;
+    }
+    
+    // 其他情况根据文本内容和状态判断
     const text = nodeFields.text;
-    return process === 'generating' || (!isGenerated && text && text.length > 0);
-  }, [nodeData, nodeFields.text]);
+    return process === 'generating' || (!isGenerated && text && text.length > 0 && process !== 'completed');
+  }, [selectedNode?.id, selectedNode?.type, nodeData, nodeFields.text, getLatestNodeData, forceRefresh, lastUpdatedAt]);
 
   // 渲染电路内容
   const renderCircuitContent = useMemo(() => {
@@ -265,7 +527,7 @@ export default function NodeDetailPanel({ selectedNode, onClose }: NodeDetailPan
       </div>
 
       {/* 内容区域 */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4">
         {/* 基本信息 */}
         <div className="space-y-3">
           {/* 节点标题 */}
@@ -313,16 +575,32 @@ export default function NodeDetailPanel({ selectedNode, onClose }: NodeDetailPan
                 <div className="w-1 h-1 bg-blue-500 rounded-full animate-bounce"></div>
                 <div className="w-1 h-1 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
                 <div className="w-1 h-1 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                <span className="ml-1">实时更新中</span>
+                <span className="ml-1">
+                  {(() => {
+                    const nodeType = selectedNode?.type as NodeType;
+                    
+                    // 根据节点类型显示不同的提示文字
+                    if (nodeType === 'answer-detail' || nodeType === 'ANSWER_DETAIL' || 
+                        nodeType === 'circuit-detail' || nodeType === 'knowledge-detail') {
+                      return '内容生成中...';
+                    } else if (nodeType === 'answer-point' || nodeType === 'ANSWER_POINT' || 
+                               nodeType === 'knowledge-head' || nodeType === 'circuit-point') {
+                      return '分析中...';
+                    } else {
+                      return '生成中...';
+                    }
+                  })()}
+                </span>
               </div>
             )}
           </div>
-          <div className="prose prose-sm max-w-none" key={`content-${nodeContentKey}-${selectedNode.id}`}>
+          <div className="prose prose-sm max-w-none" key={`content-${nodeContentKey}-${selectedNode.id}-${forceRefresh}-${lastUpdatedAt}`}>
             {text ? (
               <div className="relative">
                 <MarkdownWithLatex 
                   text={text} 
                   isStreaming={Boolean(isGenerating)}
+                  key={`markdown-${selectedNode.id}-${forceRefresh}-${text.length}-${lastUpdatedAt}`}
                 />
                 {/* 如果正在生成，显示闪烁光标 */}
                 {isGenerating && (

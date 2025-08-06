@@ -250,6 +250,7 @@ export function processCompletedNode(
  * 节点内容更新处理函数
  * 用于替代原有的processSectionMarkers
  * 仅处理节点文本更新，不执行分点逻辑
+ * 优化版本：更快速的文本拼接和状态更新
  * 
  * @param textData 文本数据
  * @param nodes 当前节点列表
@@ -266,23 +267,28 @@ export function processTextUpdate(
   updated: boolean
 } {
   const nodeId = textData.nodeId.toString();
-  const targetNode = nodes.find(node => node.id === nodeId);
+  const targetNodeIndex = nodes.findIndex(node => node.id === nodeId);
   
-  if (!targetNode) {
+  if (targetNodeIndex === -1) {
     return { nodes, edges, updated: false };
   }
   
-  // 简单更新节点文本内容，不执行分点逻辑
-  const updatedNodes = nodes.map(node =>
-    node.id === nodeId ? 
-    {
-      ...node, 
-      data: {
-        ...node.data, 
-        text: ((node.data.text || '') as string) + textData.content
-      }
-    } : node
-  );
+  // 优化: 直接修改数组中的节点，减少内存分配
+  const updatedNodes = [...nodes];
+  const targetNode = updatedNodes[targetNodeIndex];
+  
+  // 快速文本拼接和状态更新
+  updatedNodes[targetNodeIndex] = {
+    ...targetNode,
+    data: {
+      ...targetNode.data,
+      text: ((targetNode.data.text || '') as string) + textData.content,
+      updatedAt: Date.now(), // 添加时间戳以触发UI更新
+      process: 'generating' // 确保状态为生成中
+    }
+  };
+  
+  console.log(`文本更新完成，节点ID: ${nodeId}，新文本长度: ${((targetNode.data.text || '') as string + textData.content).length}`);
   
   return { 
     nodes: updatedNodes, 

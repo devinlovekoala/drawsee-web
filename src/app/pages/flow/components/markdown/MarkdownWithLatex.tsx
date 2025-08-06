@@ -211,7 +211,7 @@ const MarkdownWithLatex: React.FC<MarkdownWithLatexProps> = ({
 	const renderedContent = useMemo(() => {
 		// 对于流式内容，不使用缓存，直接渲染
 		if (isStreaming) {
-			console.log('流式内容，跳过缓存直接渲染');
+			console.log('流式内容，跳过缓存直接渲染，文本长度:', text.length);
 			return (
 				<ReactMarkdown
 					remarkPlugins={[remarkMath, remarkParse, remarkRehype, remarkGfm]}
@@ -271,9 +271,14 @@ const MarkdownWithLatex: React.FC<MarkdownWithLatexProps> = ({
 
 // 修改memo的比较函数，确保流式内容能及时更新
 export default React.memo(MarkdownWithLatex, (prevProps, nextProps) => {
-	// 如果是流式内容，任何text变化都要重新渲染
+	// 如果是流式内容，需要比较所有属性的变化
 	if (nextProps.isStreaming || prevProps.isStreaming) {
-		return prevProps.text === nextProps.text && prevProps.className === nextProps.className && prevProps.isStreaming === nextProps.isStreaming;
+		const textChanged = prevProps.text !== nextProps.text;
+		const classNameChanged = prevProps.className !== nextProps.className;
+		const streamingChanged = prevProps.isStreaming !== nextProps.isStreaming;
+		
+		// 任何属性变化都要重新渲染
+		return !textChanged && !classNameChanged && !streamingChanged;
 	}
 	
 	// 非流式内容使用默认比较

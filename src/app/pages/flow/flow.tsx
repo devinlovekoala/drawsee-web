@@ -127,6 +127,11 @@ function Flow() {
   // 使用AppContext Hook
   const {nodeWidth, setNodeWidth} = useAppContext();
 
+  // 获取最新的节点数据的函数
+  const getLatestNodeData = useCallback((nodeId: string): Node | null => {
+    return elements.nodes.find(node => node.id === nodeId) || null;
+  }, [elements.nodes]);
+
   // 节点变化监听
   const onNodesChange: OnNodesChange = useCallback((changes) => {
     setElements(({nodes, edges}) => {
@@ -231,8 +236,10 @@ function Flow() {
         const updatedSelectedNode = newNodes.find(node => node.id === selectedNode.id);
         if (updatedSelectedNode && (
           updatedSelectedNode.data.text !== selectedNode.data.text ||
-          updatedSelectedNode.data.updatedAt !== selectedNode.data.updatedAt
+          updatedSelectedNode.data.updatedAt !== selectedNode.data.updatedAt ||
+          updatedSelectedNode.data.process !== selectedNode.data.process
         )) {
+          console.log(`检测到选中节点内容变化，立即同步更新: ${selectedNode.id}`);
           setSelectedNode(updatedSelectedNode);
         }
       }
@@ -351,6 +358,24 @@ function Flow() {
             }
           });
         }
+        
+        // 处理circuit-point节点
+        if (node.type === 'circuit-point') {
+          apiNodes.forEach(apiNode => {
+            if (apiNode.parentId === node.id && apiNode.type === 'circuit-detail') {
+              data.isGenerated = true;
+            }
+          });
+        }
+        
+        // 对于详情节点，如果有文本内容，设置为已完成状态
+        if ((node.type === 'answer-detail' || node.type === 'ANSWER_DETAIL' || 
+             node.type === 'circuit-detail' || node.type === 'knowledge-detail') && 
+            node.data.text && typeof node.data.text === 'string' && node.data.text.length > 0) {
+          console.log(`初始化详情节点 ${node.id} 状态为已完成，类型: ${node.type}`);
+          data.isGenerated = true;
+          data.process = 'completed';
+        }
         if (node.data.subtype === 'solver-first' || node.data.subtype === 'solver-continue') {
           apiNodes.forEach(apiNode => {
             if (
@@ -435,6 +460,87 @@ function Flow() {
       window.removeEventListener('node-deleted', handleNodeDeleted as EventListener);
     };
   }, [send]);
+
+  // 监听自动选中详情节点事件
+  useEffect(() => {
+    const handleAutoSelectDetailNode = (event: CustomEvent) => {
+      const { parentNodeId, detailNodeType, detailNodeTypes } = event.detail;
+      console.log('收到自动选中详情节点事件:', { parentNodeId, detailNodeType, detailNodeTypes });
+      
+      // 延迟一段时间执行，确保详情节点已经创建和渲染
+      const attemptSelectDetailNode = (attempt = 1, maxAttempts = 10) => {
+        setTimeout(() => {
+          // 查找对应的详情节点
+          const supportedTypes = detailNodeTypes || [detailNodeType];
+          const detailNode = elements.nodes.find(node => {
+            // 检查节点类型是否匹配
+            const typeMatches = supportedTypes.includes(node.type);
+            // 检查父节点ID是否匹配
+            const parentMatches = node.data.parentId && node.data.parentId.toString() === parentNodeId;
+            return typeMatches && parentMatches;
+          });
+          
+          if (detailNode) {
+            console.log(`找到详情节点 ${detailNode.id}，自动选中并开启右侧面板实时显示`);
+            
+            // 确保右侧详情面板是打开的
+            if (!showDetailPanel) {
+              setShowDetailPanel(true);
+            }
+            
+            // 设置选中的节点
+            setSelectedNode(detailNode);
+            
+            // 确保节点被选中的视觉状态
+            setElements(({ nodes, edges }) => ({
+              nodes: nodes.map(node => ({
+                ...node,
+                selected: node.id === detailNode.id
+              })),
+              edges
+            }));
+            
+            // 聚焦到该节点
+            setTimeout(() => {
+              executeFitView([detailNode.id], 500, 100, 1.2, 0.3);
+            }, 200);
+            
+          } else if (attempt < maxAttempts) {
+            console.log(`第${attempt}次未找到详情节点，重试中...`);
+            attemptSelectDetailNode(attempt + 1, maxAttempts);
+          } else {
+            console.warn(`尝试${maxAttempts}次后仍未找到详情节点`);
+          }
+        }, attempt * 100); // 减少重试间隔，提高响应速度
+      };
+      
+      attemptSelectDetailNode();
+    };
+    
+    // 添加事件监听
+    window.addEventListener('auto-select-detail-node', handleAutoSelectDetailNode as EventListener);
+    
+    // 清理函数
+    return () => {
+      window.removeEventListener('auto-select-detail-node', handleAutoSelectDetailNode as EventListener);
+    };
+  }, [elements.nodes, setSelectedNode, setElements, showDetailPanel, executeFitView]);
+  
+  // 监听节点变化，确保详情节点创建时自动开启详情面板
+  useEffect(() => {
+    // 检查是否有正在生成的详情节点
+    const hasGeneratingDetailNode = elements.nodes.some(node => {
+      const isDetailNode = node.type && ['answer-detail', 'ANSWER_DETAIL', 'circuit-detail', 'knowledge-detail'].includes(node.type);
+      const isGenerating = node.data?.process === 'generating';
+      return isDetailNode && isGenerating;
+    });
+    
+    // 如果有正在生成的详情节点但详情面板未打开，自动打开
+    if (hasGeneratingDetailNode && !showDetailPanel) {
+      console.log('检测到正在生成的详情节点，自动打开详情面板');
+      setShowDetailPanel(true);
+    }
+  }, [elements.nodes, showDetailPanel]);
   
   const handleRelayout = useCallback((resetHeight: boolean = false, newNodeWidth?: number) => {
     if (isChatting) return;
@@ -459,6 +565,11 @@ function Flow() {
 
   // 处理对话
   const flowChat = useCallback((taskId: number) => {
+    // 确保详情面板是打开的，便于观察流式内容
+    if (!showDetailPanel) {
+      setShowDetailPanel(true);
+    }
+    
     // 将当前选中的节点的selected设置为false
     setSelectedNode(null);
     setElements(({nodes, edges}) => {
@@ -471,7 +582,7 @@ function Flow() {
       };
     });
     chat(taskId);
-  }, [chat, setElements, setSelectedNode]);
+  }, [chat, setElements, setSelectedNode, showDetailPanel]);
 
   // 错误处理
   const onError = useCallback((code: string, message: string) => {
@@ -597,6 +708,7 @@ function Flow() {
           <NodeDetailPanel
             selectedNode={selectedNode}
             onClose={handleCloseDetailPanel}
+            getLatestNodeData={getLatestNodeData}
           />
         )}
       </div>

@@ -57,6 +57,17 @@ function KnowledgeHeadNode({ showSourceHandle, showTargetHandle, data, ...props 
       });
       setTimeout(() => {
         chat(response.taskId);
+        
+        // 在启动流式响应后，延迟一段时间自动切换到详情节点
+        setTimeout(() => {
+          // 通过全局事件通知需要自动选中对应的详情节点
+          window.dispatchEvent(new CustomEvent('auto-select-detail-node', {
+            detail: {
+              parentNodeId: props.id,
+              detailNodeType: 'knowledge-detail'
+            }
+          }));
+        }, 800); // 给一点时间让节点创建
       }, 200);
     }).catch(error => {
       console.error('知识详情AI任务失败', error);

@@ -44,15 +44,16 @@ function CircuitDetailNode({ data, ...props }: ExtendedNodeProps<'circuit-detail
     if (nodeData.parentPointId) {
       // 仅在组件首次加载时更新父节点状态，避免重复更新导致布局变形
       const parentId = parseInt(nodeData.parentPointId);
-      console.log('更新父节点状态:', parentId);
+      console.log('CircuitDetailNode更新父节点状态:', parentId);
       
-      // 使用一个小延时确保父节点已存在
+      // 使用一个小延时确保父节点已存在，并且将状态设为已完成
       setTimeout(() => {
         addChatTask({
           type: 'data',
           data: {
             nodeId: parentId,
-            isGenerated: true
+            isGenerated: true,
+            process: 'completed' // 明确设置为已完成状态
           }
         });
       }, 100);

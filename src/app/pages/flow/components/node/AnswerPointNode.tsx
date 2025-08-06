@@ -8,8 +8,8 @@ import { useAppContext } from '@/app/contexts/AppContext';
 import { ModelType } from '../input/FlowInputPanel';
 import { ModelSelector } from '../../../blank/components/ModelSelector';
 import { useLocation } from 'react-router-dom';
-import { Edit2, Check, X, Pencil } from 'lucide-react';
-import { Handle, Position, NodeToolbar } from '@xyflow/react';
+import { Check, X, Pencil } from 'lucide-react';
+import { Position, NodeToolbar } from '@xyflow/react';
 
 /**
  * 回答角度节点组件
@@ -37,6 +37,20 @@ function AnswerPointNode({ data, ...props }: ExtendedNodeProps<'answer-point' | 
       setEditedText(data.text || '');
     }
   }, [data.text, isEditing, showEditDialog]);
+  
+  // 监听父组件传入的状态变化
+  useEffect(() => {
+    // 同步外部状态到内部状态
+    if (data.isGenerated !== undefined && typeof data.isGenerated === 'boolean') {
+      setIsGenerated(data.isGenerated);
+    }
+    
+    // 监听节点process状态变化
+    if (data.process === 'completed' && !isGenerated) {
+      console.log(`AnswerPointNode节点 ${props.id} 流程已完成，设置为已生成状态`);
+      setIsGenerated(true);
+    }
+  }, [data.isGenerated, data.process, props.id, isGenerated]);
 
   // 处理模型变更
   const handleModelChange = useCallback((model: ModelType) => {
@@ -117,20 +131,52 @@ function AnswerPointNode({ data, ...props }: ExtendedNodeProps<'answer-point' | 
     createAiTask(createAiTaskDTO).then((response) => {
       toast.success("问题已发送");
       handleAiTaskCountPlus();
-      setIsGenerated(true); // 在成功响应后设置
+      setIsGenerated(false); // 先设为false，因为详情还在生成中
+      
+      // 立即更新节点数据以标记为生成中状态
       addChatTask({
         type: 'data',
         data: {
           nodeId: parseInt(props.id),
-          isGenerated: true
+          isGenerated: false, // 暂时设为false，因为详情还在生成中
+          process: 'generating' // 明确标记为生成中
         }
       });
+      
+      // 打印调试信息
+      console.log('答案详情AI任务创建成功，taskId:', response.taskId, '节点ID:', props.id);
+      console.log('即将启动AI任务流程，新创建的详情节点将自动选中');
+      
       setTimeout(() => {
+        console.log('开始获取答案详情流式响应，taskId:', response.taskId);
         chat(response.taskId);
-      }, 200);
+        
+        // 在启动流式响应后，立即通知需要自动选中对应的详情节点
+        setTimeout(() => {
+          // 通过全局事件通知需要自动选中对应的详情节点
+          window.dispatchEvent(new CustomEvent('auto-select-detail-node', {
+            detail: {
+              parentNodeId: props.id,
+              detailNodeType: 'answer-detail',
+              detailNodeTypes: ['answer-detail', 'ANSWER_DETAIL'] // 支持多种类型
+            }
+          }));
+        }, 300); // 减少延迟，更快速地触发自动选择
+      }, 100); // 减少初始延迟
     }).catch(error => {
       console.error('通用详情AI任务失败', error);
       toast.error(error.response?.data?.message || error.message || "创建任务失败，请重试");
+      setIsGenerated(false); // 任务失败时重置状态
+      
+      // 更新节点状态为失败状态
+      addChatTask({
+        type: 'data',
+        data: {
+          nodeId: parseInt(props.id),
+          isGenerated: false,
+          process: 'failed' // 标记为失败状态
+        }
+      });
     }).finally(() => {
       setIsLoading(false); // 请求完成后重置加载状态
     });
@@ -238,18 +284,43 @@ function AnswerPointNode({ data, ...props }: ExtendedNodeProps<'answer-point' | 
           footerContent={
             <button
               onClick={handleGeneralDetailChat}
-              disabled={!!(isGenerated || isLoading || isChatting || isEditing || showEditDialog)}
+              disabled={!!(
+                (isGenerated && data.process === 'completed') || 
+                isLoading || 
+                isChatting || 
+                isEditing || 
+                showEditDialog ||
+                data.process === 'generating'
+              )}
               className={`px-6 py-2.5 font-medium rounded transition-colors ${
-                isGenerated 
-                  ? 'bg-yellow-500 text-white cursor-not-allowed'
+                (isGenerated && data.process === 'completed')
+                  ? 'bg-green-500 text-white cursor-not-allowed'
                   : isLoading
                     ? 'bg-gray-500 text-white cursor-wait'
-                    : isEditing || showEditDialog
-                      ? 'bg-gray-400 text-white cursor-not-allowed'
-                      : 'bg-blue-500 text-white hover:bg-blue-600'
+                    : data.process === 'generating'
+                      ? 'bg-blue-400 text-white cursor-wait'
+                      : isEditing || showEditDialog
+                        ? 'bg-gray-400 text-white cursor-not-allowed'
+                        : data.process === 'failed'
+                          ? 'bg-red-500 text-white hover:bg-red-600'
+                          : 'bg-blue-500 text-white hover:bg-blue-600'
               }`}
             >
-              {isGenerated ? '已经解析' : isLoading ? '解析中...' : isEditing || showEditDialog ? '正在编辑...' : '继续解析'}
+              {(() => {
+                if (isGenerated && data.process === 'completed') {
+                  return '已完成';
+                } else if (isLoading) {
+                  return '解析中...';
+                } else if (data.process === 'generating') {
+                  return '生成中...';
+                } else if (isEditing || showEditDialog) {
+                  return '正在编辑...';
+                } else if (data.process === 'failed') {
+                  return '重新解析';
+                } else {
+                  return '继续解析';
+                }
+              })()}
             </button>
           }
         />

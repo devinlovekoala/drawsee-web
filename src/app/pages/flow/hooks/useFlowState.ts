@@ -65,10 +65,24 @@ function useFlowState(convId: number, selectedNode?: Node | null, setSelectedNod
             break;
           }
           
+          // 设置节点为正在生成状态
           if (nodeVO.type === 'answer' || nodeVO.type === 'knowledge-detail') {
             lastFocusNodeId.current = nodeVO.id.toString();
             // 添加到活跃节点跟踪列表
             activeNodeIds.current.add(nodeVO.id.toString());
+          }
+          
+          // 如果是详情节点，也添加到活跃节点列表，并准备自动选中
+          if (nodeVO.type === 'answer-detail' || nodeVO.type === 'ANSWER_DETAIL' || 
+              nodeVO.type === 'circuit-detail' || nodeVO.type === 'knowledge-detail') {
+            console.log(`创建详情节点 ${nodeVO.id}，准备自动选中并开始流式显示`);
+            lastFocusNodeId.current = nodeVO.id.toString();
+            activeNodeIds.current.add(nodeVO.id.toString());
+            
+            // 确保新创建的详情节点标记为正在生成状态
+            if (!nodeVO.data) nodeVO.data = {};
+            nodeVO.data.process = 'generating';
+            nodeVO.data.isGenerated = false;
           }
           setElements(({nodes, edges}) => {
             const tempQueryNode = nodes.find(node => node.id.startsWith(TEMP_QUERY_NODE_ID_PREFIX));
@@ -158,6 +172,29 @@ function useFlowState(convId: number, selectedNode?: Node | null, setSelectedNod
               }
             }
 
+            // 如果是详情节点，自动选中该节点以便在右侧面板显示
+            if ((nodeVO.type === 'answer-detail' || nodeVO.type === 'ANSWER_DETAIL' || 
+                 nodeVO.type === 'circuit-detail' || nodeVO.type === 'knowledge-detail') && 
+                setSelectedNode) {
+              const newDetailNode = layoutedNodes.find(node => node.id === newNode.id);
+              if (newDetailNode) {
+                console.log(`立即自动选中详情节点 ${newDetailNode.id}，类型: ${nodeVO.type}`);
+                // 立即选中，并确保详情面板显示流式内容
+                setSelectedNode(newDetailNode);
+                
+                // 确保节点在视图中正确选中状态
+                setTimeout(() => {
+                  const updatedNodes = layoutedNodes.map(node => ({
+                    ...node,
+                    selected: node.id === newDetailNode.id
+                  }));
+                  
+                  // 返回更新后的节点列表，确保选中状态正确
+                  setElements(prev => ({ ...prev, nodes: updatedNodes }));
+                }, 100);
+              }
+            }
+
             return {
               nodes: layoutedNodes,
               edges: currentEdges,
@@ -188,16 +225,28 @@ function useFlowState(convId: number, selectedNode?: Node | null, setSelectedNod
             const targetNode = updatedNodes.find(node => node.id === nodeId);
             
             if (targetNode) {
-              console.log(`更新节点文本内容，ID: ${nodeId}`);
+              console.log(`更新节点文本内容，ID: ${nodeId}，内容长度: ${textData.content.length}，时间戳: ${targetNode.data.updatedAt}`);
               
-              // 同步更新selectedNode状态
+              // 立即同步更新selectedNode状态，确保右侧面板实时显示
               if (selectedNode && selectedNode.id === nodeId && setSelectedNode) {
-                setSelectedNode(targetNode);
+                console.log(`立即更新选中节点状态，确保右侧面板实时显示，文本长度: ${(targetNode.data.text as string || '').length}`);
+                // 强制触发状态更新 - 立即执行，不延迟
+                const updatedSelectedNode = {
+                  ...targetNode,
+                  data: {
+                    ...targetNode.data,
+                    // 确保有时间戳变化以触发UI更新
+                    updatedAt: Date.now(),
+                    forceRefresh: Date.now() // 添加强制刷新标识
+                  }
+                };
+                setSelectedNode(updatedSelectedNode);
               }
               
+              // 减少视口调整延迟，提高响应速度
               setTimeout(() => {
                 adjustViewportToShowLatestContent(targetNode);
-              }, 300);
+              }, 50);
             } else {
               // 数据可能先于节点到达，这是正常的
               console.log(`尚未找到节点ID: ${nodeId} 对应的节点，文本数据可能先于节点到达`);
@@ -267,10 +316,11 @@ function useFlowState(convId: number, selectedNode?: Node | null, setSelectedNod
               } : node
             );
             
-            // 同步更新selectedNode状态
+            // 同步更新selectedNode状态 - 立即更新确保右侧面板实时显示
             if (selectedNode && selectedNode.id === nodeId && setSelectedNode) {
               const updatedSelectedNode = updatedNodes.find(node => node.id === nodeId);
               if (updatedSelectedNode) {
+                console.log(`立即同步更新选中节点数据，节点ID: ${nodeId}`);
                 setSelectedNode(updatedSelectedNode);
               }
             }
@@ -310,6 +360,52 @@ function useFlowState(convId: number, selectedNode?: Node | null, setSelectedNod
         // 完成
         case 'done': {
           console.log('接收到done消息，准备完成对话');
+          
+          // 将所有活跃节点状态设置为已完成
+          setElements(({nodes, edges}) => {
+            const updatedNodes = nodes.map(node => {
+              // 如果节点正在生成中或者是最后活跃的节点，设置为已完成
+              if (activeNodeIds.current.has(node.id) || 
+                  (lastFocusNodeId.current && node.id === lastFocusNodeId.current) ||
+                  node.data.process === 'generating') {
+                console.log(`设置节点 ${node.id} 状态为已完成`);
+                return {
+                  ...node,
+                  data: {
+                    ...node.data,
+                    process: 'completed',
+                    isGenerated: true
+                  }
+                };
+              }
+              return node;
+            });
+            
+            // 如果当前选中的节点状态发生了变化，同步更新selectedNode
+            if (selectedNode && setSelectedNode) {
+              const updatedSelectedNode = updatedNodes.find(node => node.id === selectedNode.id);
+              if (updatedSelectedNode && 
+                  (updatedSelectedNode.data.process !== selectedNode.data.process ||
+                   updatedSelectedNode.data.isGenerated !== selectedNode.data.isGenerated)) {
+                console.log(`同步更新选中节点 ${selectedNode.id} 的状态为已完成`);
+                // 立即更新，不使用setTimeout延迟
+                setSelectedNode({
+                  ...updatedSelectedNode,
+                  data: {
+                    ...updatedSelectedNode.data,
+                    // 确保状态同步
+                    process: 'completed',
+                    isGenerated: true,
+                    // 添加时间戳确保UI更新
+                    updatedAt: Date.now(),
+                    forceRefresh: Date.now()
+                  }
+                });
+              }
+            }
+            
+            return { nodes: updatedNodes, edges };
+          });
           
           // 将最后聚焦的节点从活跃列表中移除
           if (lastFocusNodeId.current) {

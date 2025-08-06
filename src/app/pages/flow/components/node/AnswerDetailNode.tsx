@@ -1,11 +1,40 @@
 import { BaseNode, ExtendedNodeProps } from './base/BaseNode';
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
+import { useFlowContext } from '@/app/contexts/FlowContext';
 
 /**
  * 详细回答节点组件
  * 用于渲染ANSWER_DETAIL类型的节点，显示特定角度的详细解析
  */
 function AnswerDetailNode({ data, ...props }: ExtendedNodeProps<'answer-detail' | 'ANSWER_DETAIL'>) {
+  const { addChatTask } = useFlowContext();
+  
+  // 组件挂载时的初始化逻辑
+  useEffect(() => {
+    console.log('AnswerDetailNode组件挂载，信息：', {
+      id: props.id,
+      type: props.type,
+      data: data
+    });
+    
+    // 如果有父节点ID，更新父节点的isGenerated状态
+    if (data.parentId) {
+      const parentId = typeof data.parentId === 'number' ? data.parentId : parseInt(String(data.parentId));
+      console.log('AnswerDetailNode更新父节点状态:', parentId);
+      
+      // 立即更新父节点状态，减少延迟
+      addChatTask({
+        type: 'data',
+        data: {
+          nodeId: parentId,
+          isGenerated: true,
+          process: 'completed' // 明确设置为已完成状态
+        }
+      });
+    }
+    // 只在组件挂载时执行一次
+  }, [props.id, data.parentId, addChatTask]);
+  
   // 添加角度信息到标题
   const headerContent = useMemo(() => {
     if (data.angle) {
