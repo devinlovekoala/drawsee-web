@@ -103,7 +103,7 @@ function RootNode({ showSourceHandle = true, selected }: ExtendedNodeProps<'root
         {showSourceHandle && (
           <Handle 
             type="source" 
-            position={Position.Bottom} 
+            position={Position.Right} 
             className={`node-handle ${selected ? 'selected' : ''}`}
           />
         )}

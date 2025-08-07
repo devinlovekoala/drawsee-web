@@ -155,11 +155,11 @@ export const BaseNode = React.memo(function BaseNode<T extends NodeType>({
     };
   }, [nodeData.title, nodeData.text, nodeData.createdAt, nodeData.height]);
   
-  // 分别为简化视图和正常视图设置不同的样式
+  // 分别为简化视图和正常视图设置不同的样式 - 优化更大节点的显示
   const simplifiedNodeStyles = useMemo(() => ({
-    width: compactMode ? 320 : (nodeWidth || NODE_WIDTH), // 紧凑模式下使用更大的宽度
-    height: compactMode ? 150 : `${nodeHeight}px`, // 紧凑模式下使用更大的高度
-    minHeight: compactMode ? 150 : `${NODE_MIN_HEIGHT}px`
+    width: compactMode ? 380 : (nodeWidth || NODE_WIDTH), // 紧凑模式下使用更大的宽度（从320增加到380）
+    height: compactMode ? 180 : `${nodeHeight}px`, // 紧凑模式下使用更大的高度（从150增加到180）
+    minHeight: compactMode ? 180 : `${NODE_MIN_HEIGHT}px`
   }), [nodeHeight, nodeWidth, compactMode]);
   
   const normalNodeStyles = useMemo(() => ({
@@ -384,18 +384,18 @@ export const BaseNode = React.memo(function BaseNode<T extends NodeType>({
         </NodeToolbar>
       )}
 
-      {/* Handles 始终保持相同位置 */}
+      {/* Handles - 横向布局：从右侧输出，从左侧接入 */}
       {showSourceHandle && (
         <Handle
           type="source"
-          position={Position.Bottom}
+          position={Position.Right}
           className={`node-handle ${selected ? 'selected' : ''}`}
         />
       )}
       {showTargetHandle && (
         <Handle
           type="target"
-          position={Position.Top}
+          position={Position.Left}
           className={`node-handle ${selected ? 'selected' : ''}`}
         />
       )}

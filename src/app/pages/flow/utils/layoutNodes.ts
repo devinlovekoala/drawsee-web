@@ -73,25 +73,20 @@ export async function mrtreeLayout(nodes: Node[], edges: Edge[], shouldUpdateSer
       sources: [edge.source],
       targets: [edge.target]
     })) as ElkExtendedEdge[];
-    // 准备ELK图
+    // 准备ELK图 - 为更大节点优化的紧凑布局
     const graph = {
       id: "root",
       layoutOptions: {
         "elk.interactiveLayout": "true",
-        "elk.direction": "DOWN",
+        "elk.direction": "RIGHT", // 从DOWN改为RIGHT，实现横向布局
         "elk.algorithm": "mrtree",
-        //"elk.childAreaHeight": "140.0",
-        //"elk.padding": "[top=20.0,left=20.0,bottom=20.0,right=20.0]",
         "elk.nodeSize.constraints": "[]",
         "elk.interactive": "true",
-        //"elk.spacing.portsSurrounding": "[top=0.0,left=0.0,bottom=0.0,right=0.0]",
-        //"elk.childAreaWidth": "50.0",
-        "elk.spacing.nodeNode": "40.0",
-        //"elk.mrtree.weighting": "CONSTRAINT",
+        "elk.spacing.nodeNode": "35.0", // 同级节点间距（从50减少到35）
+        "elk.layered.spacing.nodeNodeBetweenLayers": "120.0", // 层级间距（从150减少到120）
         "elk.mrtree.edgeRoutingMode": "AVOID_OVERLAP",
-        //"elk.resolvedAlgorithm": "Layout Algorithm: org.eclipse.elk.mrtree",
-        //"elk.hierarchyHandling": "SEPARATE_CHILDREN",
-        //"elk.nodeLabels.padding": "[top=5.0,left=5.0,bottom=5.0,right=5.0]"
+        "elk.spacing.portPort": "8.0", // 端口间距（从10减少到8）
+        "elk.margins": "15.0", // 图的边距（从20减少到15）
       },
       children: elkNodes,
       edges: elkEdges
@@ -161,7 +156,13 @@ export async function mrtreeLayout(nodes: Node[], edges: Edge[], shouldUpdateSer
 }
 
 const dagreGraph = new dagre.graphlib.Graph().setDefaultEdgeLabel(() => ({}));
-dagreGraph.setGraph({ rankdir: 'TB' });
+dagreGraph.setGraph({ 
+  rankdir: 'LR', // 从TB（Top-Bottom）改为LR（Left-Right）
+  nodesep: 35,   // 同一层级节点间的垂直间距（从50减少到35，为更大节点腾出空间）
+  ranksep: 120,  // 不同层级间的水平间距（从150减少到120，紧凑布局）
+  marginx: 15,   // 图的左右边距（从20减少到15）
+  marginy: 15    // 图的上下边距（从20减少到15）
+});
 
 export function dagreLayout(nodes: Node[], edges: Edge[], shouldUpdateServer: boolean = false): { nodes: Node[], edges: Edge[] } {
   // 记录开始时间
@@ -357,23 +358,23 @@ export function entitreeFlexLayout(nodes: Node[], edges: Edge[], shouldUpdateSer
       };
     });
     
-    // 优化布局设置参数，使布局更加紧凑
+    // 优化布局设置参数，使用横向布局 - 压缩间距以容纳更大的节点
     const settings = {
       clone: false,
       enableFlex: true,
-      // 进一步调整节点间距，使布局更加紧凑
-      firstDegreeSpacing: 35, // 相同父节点的子节点间距 (原来45，再减小10)
-      nextAfterSpacing: 6,    // 减小间距 (原来8，再减小2)
-      nextBeforeSpacing: 6,   // 减小间距 (原来8，再减小2)
+      // 横向布局的节点间距设置 - 为更大节点优化的紧凑布局
+      firstDegreeSpacing: 35, // 相同父节点的子节点垂直间距（从50减少到35）
+      nextAfterSpacing: 6,    // 相邻节点间距（从8减少到6）
+      nextBeforeSpacing: 6,   // 相邻节点间距（从8减少到6）
       nodeHeight: 40,
       nodeWidth: 40,
-      orientation: "vertical",
+      orientation: "horizontal", // 关键改变：从vertical改为horizontal
       rootX: 0,
       rootY: 0,
-      secondDegreeSpacing: 12, // 不同父节点的节点间距 (原来15，再减小3)
+      secondDegreeSpacing: 18, // 不同父节点的节点垂直间距（从25减少到18）
       sourcesAccessor: "parents",
-      // 保持父子节点之间的垂直间距
-      sourceTargetSpacing: 85, // 父子节点间距保持不变
+      // 父子节点之间的水平间距（横向布局的核心参数） - 压缩以适应更大节点
+      sourceTargetSpacing: 140, // 父子节点水平间距，从180减少到140，为更大节点腾出空间
       targetsAccessor: "children",
     } as Partial<Settings>;
     
