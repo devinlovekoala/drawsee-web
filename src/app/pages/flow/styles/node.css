@@ -281,7 +281,7 @@
 
 .base-node-title {
   font-size: var(--base-node-title-font-size);
-  font-weight: 600;
+  font-weight: 700; /* 从600增加到700，让标题更加粗体醒目 */
   transition: color 0.2s ease-in-out;
   margin: 0;
   line-height: 1.4;
@@ -447,7 +447,7 @@
 }
 
 :root {
-  --base-node-title-font-size: 1.8rem; /* 定义标题字体大小变量 */
+  --base-node-title-font-size: 2.2rem; /* 增大标题字体，从1.8rem增加到2.2rem，让标题更醒目 */
   --base-node-content-font-size: 1.5rem; /* 定义内容字体大小变量 */
   --base-node-footer-font-size: 1.2rem; /* 定义底部字体大小变量 */
 } 

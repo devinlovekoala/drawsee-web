@@ -10,11 +10,11 @@ import CopyButton from '../../button/CopyButton';
 import DownloadImgButton from '../../button/DownloadImgButton';
 import { Trash2 } from 'lucide-react';
 
-// 缩放阈值常量
-const ZOOM_THRESHOLD = 0.40; // 低于此值时使用简化显示
+// 缩放阈值常量 - 调整为更高的阈值，让更多情况下显示大标题
+const ZOOM_THRESHOLD = 0.55; // 从0.40提高到0.55，让更多缩放级别下显示醒目标题
 const ZOOM_CHECK_INTERVAL = 200; // 检查缩放级别的间隔(ms)
-const MIN_PREVIEW_FONT_SIZE = 2.5; // 最小预览文本字体大小(rem)
-const MAX_PREVIEW_FONT_SIZE = 7; // 最大预览文本字体大小(rem)
+const MIN_PREVIEW_FONT_SIZE = 3.0; // 最小预览文本字体大小(rem) - 增大基础字体
+const MAX_PREVIEW_FONT_SIZE = 8; // 最大预览文本字体大小(rem) - 增大最大字体
 
 // 扩展 NodeProps 的接口
 export interface ExtendedNodeProps<T extends NodeType> extends Omit<NodeProps, 'data'> {
@@ -213,7 +213,7 @@ export const BaseNode = React.memo(function BaseNode<T extends NodeType>({
   
   // 使用缓存渲染或创建新的渲染结果
   const renderContent = useCallback(() => {
-    // 如果是紧凑模式或简化视图模式，显示简化内容
+    // 如果是紧凑模式或简化视图模式，显示简化内容 - 专注于大标题显示
     if (shouldUseSimplifiedView || compactMode) {
       return (
         <div className="compact-node-content" style={{ 
@@ -221,49 +221,56 @@ export const BaseNode = React.memo(function BaseNode<T extends NodeType>({
           width: '100%', 
           display: 'flex', 
           flexDirection: 'column', 
-          justifyContent: 'space-between',
-          padding: '12px' 
+          justifyContent: 'center', // 改为居中对齐，让标题更突出
+          alignItems: 'center',
+          padding: '16px' // 增加padding给标题更多空间
         }}>
-          {/* 上半部分：标题和内容预览 */}
+          {/* 主要内容：突出显示大标题 */}
           <div className="compact-node-main flex-1 flex flex-col justify-center items-center">
             {hasTitle ? (
               <div 
-                className="node-title text-center text-sm font-medium text-gray-800 mb-2"
+                className="node-title text-center font-bold text-gray-900" // 增加font-bold和更深的颜色
                 style={{ 
-                  fontSize: compactMode ? '0.875rem' : `${previewFontSize * 0.8}rem`, 
-                  fontWeight: 'bold',
-                  lineHeight: '1.3',
+                  fontSize: compactMode ? '1.25rem' : `${previewFontSize * 1.2}rem`, // 大幅增加字体大小 
+                  fontWeight: '700', // 更粗的字体
+                  lineHeight: '1.4', // 适当增加行高
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
                   display: '-webkit-box',
-                  WebkitLineClamp: 2,
-                  WebkitBoxOrient: 'vertical'
+                  WebkitLineClamp: compactMode ? 3 : 4, // 增加显示行数
+                  WebkitBoxOrient: 'vertical',
+                  maxWidth: '100%',
+                  wordBreak: 'break-word' // 支持中文换行
                 }}
               >
                 {nodeData.title}
               </div>
-            ) : null}
-            {textPreview && (
+            ) : (
+              // 如果没有标题，显示节点类型作为大标题
               <div 
-                className="node-preview text-center text-xs text-gray-600 mb-2"
+                className="node-type-title text-center font-bold text-gray-700"
                 style={{ 
-                  fontSize: compactMode ? '0.75rem' : `${previewFontSize * 0.6}rem`,
-                  lineHeight: '1.2',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  display: '-webkit-box',
-                  WebkitLineClamp: compactMode ? 2 : 3,
-                  WebkitBoxOrient: 'vertical'
+                  fontSize: compactMode ? '1.1rem' : `${previewFontSize * 1.0}rem`,
+                  fontWeight: '600',
+                  lineHeight: '1.3',
+                  textTransform: 'capitalize' // 首字母大写
                 }}
               >
-                {textPreview}
+                {type.replace(/-/g, ' ')} {/* 将连字符替换为空格 */}
               </div>
             )}
-            {/* 紧凑模式下显示节点类型标识 */}
-            {compactMode && (
-              <div className="node-type-indicator">
-                <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-600">
-                  {type}
+            
+            {/* 节点类型标识 - 作为副标题显示 */}
+            {compactMode && hasTitle && (
+              <div className="node-type-indicator mt-2">
+                <span 
+                  className="px-3 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200"
+                  style={{
+                    fontSize: '0.85rem',
+                    fontWeight: '500'
+                  }}
+                >
+                  {type.replace(/-/g, ' ')}
                 </span>
               </div>
             )}
@@ -271,8 +278,8 @@ export const BaseNode = React.memo(function BaseNode<T extends NodeType>({
           
           {/* 下半部分：功能按钮 */}
           {compactMode && footerContent && (
-            <div className="compact-node-footer mt-3 flex justify-center">
-              <div className="compact-footer-content">
+            <div className="compact-node-footer mt-2 flex justify-center">
+              <div className="compact-footer-content scale-90"> {/* 稍微缩小按钮 */}
                 {footerContent}
               </div>
             </div>
