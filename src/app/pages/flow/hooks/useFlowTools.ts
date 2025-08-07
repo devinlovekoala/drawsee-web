@@ -1,20 +1,18 @@
 import { useCallback } from "react";
 import { entitreeFlexLayout } from "../utils/layoutNodes";
 import { Edge, Node, useReactFlow } from "@xyflow/react";
-import { useAppContext } from "@/app/contexts/AppContext";
 
-// 默认的fitView配置
+// 默认的fitView配置 - 调整为更灵活的范围
 const DEFAULT_FIT_VIEW_CONFIG = {
   duration: 650,
-  maxZoom: 0.90,
-  minZoom: 0.75,  
-  padding: 0.3
+  maxZoom: 1.5,
+  minZoom: 0.3,  
+  padding: 0.2
 };
 
 function useFlowTools() {
 
 	const { fitView, getViewport, setViewport } = useReactFlow();
-  const { nodeWidth } = useAppContext();
 
 	/**
    * 执行fitView操作
@@ -63,20 +61,20 @@ function useFlowTools() {
     }
   }, [getViewport, setViewport]);
 
-  const executeLayout = useCallback((nodes: Node[], edges: Edge[], updateServer: boolean = false, resetHeight: boolean = false, newNodeWidth?: number) => {
+  const executeLayout = useCallback((nodes: Node[], edges: Edge[], updateServer: boolean = false, resetHeight: boolean = false) => {
     // 记录开始时间
     //const startTime = performance.now();
-    const trueNodeWidth = newNodeWidth ? newNodeWidth : nodeWidth;
+    
     //console.log('trueNodeWidth', trueNodeWidth);
     // 执行布局计算
-    const { nodes: layoutedNodes } = entitreeFlexLayout(nodes, edges, trueNodeWidth, updateServer, resetHeight);
+    const { nodes: layoutedNodes } = entitreeFlexLayout(nodes, edges, updateServer, resetHeight);
     
     // 记录结束时间
     //const endTime = performance.now();
     //console.log(`布局计算耗时: ${endTime - startTime}ms`);
     
     return layoutedNodes;
-  }, [nodeWidth]);
+  }, []);
 
   return {
     executeFitView,

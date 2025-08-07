@@ -24,13 +24,13 @@ import { FlowInputPanel } from './components/input/FlowInputPanel';
 import '@xyflow/react/dist/style.css';
 import useTempQueryNode from "./hooks/useTempQueryNode";
 import useFlowTools from "./hooks/useFlowTools";
+import { useAdaptiveZoom } from "./hooks/useAdaptiveZoom";
 import { toast } from "sonner";
 // 导入优化后的CSS样式
 import './styles/index.css';
 import { TEMP_QUERY_NODE_ID_PREFIX } from "./constants";
 import { FlowContext, FlowLocationState } from "@/app/contexts/FlowContext";
 import FlowRightToolBar from "./components/FlowRightToolBar";
-import { useAppContext } from "@/app/contexts/AppContext";
 import ResourceNode from "./components/node/resource/ResourceNode";
 import FlowLeftToolBar from "./components/FlowLeftToolBar";
 import { TASK_KEY_PREFIX } from "@/common/constant/storage-key.constant";
@@ -122,10 +122,10 @@ function Flow() {
   } = useTempQueryNode(convId, isChatting, selectedNode, rootNodeId, elements, setElements);
 
   // 使用FlowTools Hook
-  const {executeLayout, executeFitView} = useFlowTools();
-
-  // 使用AppContext Hook
-  const {nodeWidth, setNodeWidth} = useAppContext();
+  const {executeLayout} = useFlowTools();
+  
+  // 使用自适应缩放Hook
+  const { smartFitView } = useAdaptiveZoom();
 
   // 获取最新的节点数据的函数
   const getLatestNodeData = useCallback((nodeId: string): Node | null => {
@@ -258,8 +258,10 @@ function Flow() {
 
       // 执行视图调整
       if (fitViewNodeId) {
-        console.log('执行fitView', fitViewNodeId);
-        executeFitView([fitViewNodeId], 350);
+        console.log('执行智能fitView', fitViewNodeId);
+        setTimeout(() => {
+          smartFitView([fitViewNodeId], newNodes, 0, 350);
+        }, 50);
       }
 
       return {
@@ -267,7 +269,7 @@ function Flow() {
         edges: newEdges,
       };
     });
-  }, [executeFitView, executeLayout, nodesAndEdgesNoneTempQueryNode, rootNodeId, selectedNode?.id, selectedNode, setElements, setSelectedNode, setUserInput]);
+  }, [executeLayout, nodesAndEdgesNoneTempQueryNode, rootNodeId, selectedNode?.id, selectedNode, setElements, setSelectedNode, setUserInput, smartFitView]);
 
   // 边变化监听
   const onEdgesChange: OnEdgesChange = useCallback((changes) => {
@@ -500,9 +502,15 @@ function Flow() {
               edges
             }));
             
-            // 聚焦到该节点
+            // 聚焦到该节点 - 使用智能缩放
             setTimeout(() => {
-              executeFitView([detailNode.id], 500, 100, 1.2, 0.3);
+              smartFitView(
+                [detailNode.id], 
+                elements.nodes,
+                200,
+                500,
+                detailNode.type
+              );
             }, 200);
             
           } else if (attempt < maxAttempts) {
@@ -524,7 +532,7 @@ function Flow() {
     return () => {
       window.removeEventListener('auto-select-detail-node', handleAutoSelectDetailNode as EventListener);
     };
-  }, [elements.nodes, setSelectedNode, setElements, showDetailPanel, executeFitView]);
+  }, [elements.nodes, setSelectedNode, setElements, showDetailPanel, smartFitView]);
   
   // 监听节点变化，确保详情节点创建时自动开启详情面板
   useEffect(() => {
@@ -542,26 +550,23 @@ function Flow() {
     }
   }, [elements.nodes, showDetailPanel]);
   
-  const handleRelayout = useCallback((resetHeight: boolean = false, newNodeWidth?: number) => {
+  const handleRelayout = useCallback((resetHeight: boolean = false) => {
     if (isChatting) return;
     console.log('handleRelayout');
     setElements(({nodes, edges}) => {
-      const layoutedNodes = executeLayout(nodes, edges, true, resetHeight, newNodeWidth);
-      executeFitView(layoutedNodes.map(node => node.id), 350, 600, 0.8, 0.2);
+      const layoutedNodes = executeLayout(nodes, edges, true, resetHeight);
+      
+      // 使用智能fitView进行重布局后的视图调整
+      setTimeout(() => {
+        smartFitView(layoutedNodes.map(node => node.id), layoutedNodes, 100, 600);
+      }, 50);
+      
       return {
         nodes: layoutedNodes,
         edges
       };
     });
-  }, [executeFitView, executeLayout, isChatting, setElements]);
-
-  // 处理节点宽度变化
-  const handleNodeWidthChange = useCallback((width: number) => {
-    setNodeWidth(width);
-    setTimeout(() => {
-      handleRelayout(true, width);
-    }, 100);
-  }, [handleRelayout, setNodeWidth]);
+  }, [executeLayout, isChatting, setElements, smartFitView]);
 
   // 处理对话
   const flowChat = useCallback((taskId: number) => {
@@ -591,8 +596,18 @@ function Flow() {
 
   // 初始化
   const onInit = useCallback(() => {
-    executeFitView(elements.nodes.sort((a, b) => parseInt(a.id) - parseInt(b.id)).slice(0, 1).map(node => node.id), 250);
-  }, [elements.nodes, executeFitView]);
+    if (elements.nodes.length === 0) return;
+    
+    console.log(`智能初始化: 节点数量=${elements.nodes.length}`);
+    
+    // 使用智能fitView进行初始化
+    smartFitView(
+      elements.nodes.map(node => node.id), 
+      elements.nodes,
+      250,
+      650
+    );
+  }, [elements.nodes, smartFitView]);
 
   // 关闭详情面板
   const handleCloseDetailPanel = useCallback(() => {
@@ -646,9 +661,9 @@ function Flow() {
             deleteKeyCode={null} // 取消删除快捷键
             panActivationKeyCode={"Space"} // 平移快捷键
             onlyRenderVisibleElements={true} // 只渲染可见元素，提高性能
-            maxZoom={2} // 最大缩放
-            minZoom={0.01} // 最小缩放
-            defaultViewport={{ x: 0, y: 0, zoom: 0.5 }} // 默认视图
+            maxZoom={3} // 最大缩放增大，支持更详细的查看
+            minZoom={0.05} // 最小缩放减小，支持更大范围的概览
+            defaultViewport={{ x: 0, y: 0, zoom: 0.8 }} // 默认视图，将由智能缩放覆盖
             defaultEdgeOptions={{ // 默认边样式
               type: 'smoothstep', // 平滑曲线
               animated: false, // 动画
@@ -688,8 +703,6 @@ function Flow() {
                 showMiniMap={showMiniMap}
                 setShowMiniMap={setShowMiniMap}
                 onRelayout={handleRelayout} 
-                onNodeWidthChange={handleNodeWidthChange} 
-                nodeWidth={nodeWidth}
                 showDetailPanel={showDetailPanel}
                 onToggleDetailPanel={toggleDetailPanel}
               />

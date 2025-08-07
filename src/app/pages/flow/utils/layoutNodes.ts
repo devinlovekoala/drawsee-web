@@ -267,7 +267,7 @@ export function dagreLayout(nodes: Node[], edges: Edge[], shouldUpdateServer: bo
   }
 }
 
-export function entitreeFlexLayout(nodes: Node[], edges: Edge[], nodeWidth: number, shouldUpdateServer: boolean = false, resetHeight: boolean = false): { nodes: Node[], edges: Edge[] } {
+export function entitreeFlexLayout(nodes: Node[], edges: Edge[], shouldUpdateServer: boolean = false, resetHeight: boolean = false): { nodes: Node[], edges: Edge[] } {
   try {
     if (nodes.length === 0) {
       return { nodes, edges };
@@ -298,7 +298,7 @@ export function entitreeFlexLayout(nodes: Node[], edges: Edge[], nodeWidth: numb
     const specialNodeHeights: Record<string, number> = {};
     
     nodes.forEach(node => {
-      const width = node.type !== 'root' ? nodeWidth : ROOT_NODE_SIZE;
+      const width = node.type !== 'root' ? NODE_WIDTH : ROOT_NODE_SIZE;
       let height: number;
       
       // 特殊处理特定类型节点以保持其高度稳定
@@ -318,7 +318,7 @@ export function entitreeFlexLayout(nodes: Node[], edges: Edge[], nodeWidth: numb
           specialNodeHeights[node.id] = height;
         } else {
           // 如果都没有，则计算高度并缓存
-          height = calculateNodeHeight(node as Node<NodeData<NodeType>>, nodeWidth);
+          height = calculateNodeHeight(node as Node<NodeData<NodeType>>, NODE_WIDTH);
           nodeTypeHeightMap[node.type] = height;
           specialNodeHeights[node.id] = height;
         }
@@ -334,7 +334,7 @@ export function entitreeFlexLayout(nodes: Node[], edges: Edge[], nodeWidth: numb
         height = node.data.height as number;
       } else {
         // 如果没有缓存高度或需要重置高度，则计算高度
-        height = calculateNodeHeight(node as Node<NodeData<NodeType>>, nodeWidth);
+        height = calculateNodeHeight(node as Node<NodeData<NodeType>>, NODE_WIDTH);
         
         // 将没有高度信息的节点添加到需要更新的列表中
         if (!node.id.startsWith(TEMP_QUERY_NODE_ID_PREFIX) && shouldUpdateServer) {
@@ -357,23 +357,23 @@ export function entitreeFlexLayout(nodes: Node[], edges: Edge[], nodeWidth: numb
       };
     });
     
-    // 优化布局设置参数，使布局更加稳定
+    // 优化布局设置参数，使布局更加紧凑
     const settings = {
       clone: false,
       enableFlex: true,
-      // 调整节点间距，使布局更加紧凑但不拥挤
-      firstDegreeSpacing: 75, // 相同父节点的子节点间距
-      nextAfterSpacing: 10,
-      nextBeforeSpacing: 10,
+      // 进一步调整节点间距，使布局更加紧凑
+      firstDegreeSpacing: 35, // 相同父节点的子节点间距 (原来45，再减小10)
+      nextAfterSpacing: 6,    // 减小间距 (原来8，再减小2)
+      nextBeforeSpacing: 6,   // 减小间距 (原来8，再减小2)
       nodeHeight: 40,
       nodeWidth: 40,
       orientation: "vertical",
       rootX: 0,
       rootY: 0,
-      secondDegreeSpacing: 20, // 不同父节点的节点间距
+      secondDegreeSpacing: 12, // 不同父节点的节点间距 (原来15，再减小3)
       sourcesAccessor: "parents",
-      // 增加父子节点之间的垂直间距，避免节点重叠
-      sourceTargetSpacing: 120,
+      // 保持父子节点之间的垂直间距
+      sourceTargetSpacing: 85, // 父子节点间距保持不变
       targetsAccessor: "children",
     } as Partial<Settings>;
     
