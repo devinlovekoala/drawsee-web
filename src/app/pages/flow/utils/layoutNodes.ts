@@ -351,23 +351,23 @@ export function entitreeFlexLayout(nodes: Node[], edges: Edge[], shouldUpdateSer
       };
     });
     
-    // 极度紧凑布局设置 - 大幅压缩所有间距参数
+    // 调整布局设置 - 增大纵向间距，减小横向间距
     const settings = {
       clone: false,
       enableFlex: true,
-      // 横向布局的节点间距设置 - 极致紧凑布局
-      firstDegreeSpacing: 15, // 相同父节点的子节点垂直间距（从25大幅减少到15）
-      nextAfterSpacing: 2,    // 相邻节点间距（从4减少到2，几乎贴合）
-      nextBeforeSpacing: 2,   // 相邻节点间距（从4减少到2，几乎贴合）
+      // 横向布局的节点间距设置 - 调大纵向间距
+      firstDegreeSpacing: 35, // 相同父节点的子节点垂直间距（从15增加到35，增大纵向间隔）
+      nextAfterSpacing: 3,    // 相邻节点间距（从2微调到3）
+      nextBeforeSpacing: 3,   // 相邻节点间距（从2微调到3）
       nodeHeight: 40,
       nodeWidth: 40,
       orientation: "horizontal", // 关键改变：从vertical改为horizontal
       rootX: 0,
       rootY: 0,
-      secondDegreeSpacing: 8, // 不同父节点的节点垂直间距（从12进一步减少到8）
+      secondDegreeSpacing: 20, // 不同父节点的节点垂直间距（从8增加到20，增大纵向间隔）
       sourcesAccessor: "parents",
-      // 父子节点之间的水平间距（横向布局的核心参数）- 极致压缩，相对于900px节点宽度这是很小的间距
-      sourceTargetSpacing: 50, // 从80大幅减少到50，让连接线变得很短
+      // 父子节点之间的水平间距（横向布局的核心参数）- 继续缩小横向间距
+      sourceTargetSpacing: 35, // 从50进一步减少到35，让连接线更短，横向更紧凑
       targetsAccessor: "children",
     } as Partial<Settings>;
     

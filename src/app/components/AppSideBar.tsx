@@ -87,8 +87,16 @@ function AppSideBar({activeConversationId, setActiveConversationId, className}: 
 
     const handleConversationClick = useCallback((convId: number) => {
       setActiveConversationId(convId);
-      handleCustomNavigation('/flow', {convId} as FlowLocationState);
-    }, [handleCustomNavigation, setActiveConversationId]);
+      
+      // 强制会话切换：无论当前在什么页面，都确保能正确切换
+      if (location.pathname === '/flow') {
+        // 如果已经在flow页面，使用replace确保state更新
+        navigate('/flow', { state: {convId} as FlowLocationState, replace: true });
+      } else {
+        // 如果不在flow页面，正常导航
+        handleCustomNavigation('/flow', {convId} as FlowLocationState);
+      }
+    }, [handleCustomNavigation, setActiveConversationId, location.pathname, navigate]);
 
 		const { openSideBar } = useAppContext();
 

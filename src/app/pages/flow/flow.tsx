@@ -109,27 +109,10 @@ function Flow() {
       return;
     }
     
-    // 如果当前没有选中节点或保护引用，直接设置
-    if (!selectedNode || !detailNodeRef.current) {
-      setSelectedNode(newNode);
-      return;
-    }
-    
-  // 如果当前有被保护的详情节点，且新选择的节点不是该详情节点本身
-  if (detailNodeRef.current && selectedNode?.id === detailNodeRef.current && 
-      newNode?.id !== detailNodeRef.current) {
-    const detailTypes = ['answer-detail', 'ANSWER_DETAIL', 'circuit-detail', 'knowledge-detail', 'PDF_ANALYSIS_POINT'];
-    // 只在节点确实已完成且会话ID匹配时才阻止切换
-    // 添加更严格的检查：确保不是在加载状态，且会话ID确实匹配
-    if (!isLoading && selectedNode.type && detailTypes.includes(selectedNode.type) && 
-        selectedNode.data?.process === 'completed' &&
-        selectedNode.data?.convId === convId) { // 严格检查会话ID匹配
-      console.log(`阻止从受保护的详情节点 ${selectedNode.id} 切换到 ${newNode?.id || 'null'}`);
-      return; // 阻止切换
-    }
-  }    // 执行正常的节点选择
+    // 🔥 简化保护逻辑：直接允许所有节点选择，移除复杂的保护机制
+    console.log('执行正常的节点选择，无保护机制阻挡');
     setSelectedNode(newNode);
-  }, [selectedNode, convId, isLoading]);
+  }, [isLoading]);
 
   // 使用流程图状态管理Hook，传递selectedNode和保护的setSelectedNode
   const {
@@ -242,20 +225,8 @@ function Flow() {
         if (selectedNodeId && selectedNodeId !== selectedNode?.id) {
           const selectedFlowNode = newNodes.find(node => node.id === selectedNodeId);
           
-          // 检查是否有保护锁定的详情节点 - 但在强制切换或加载时跳过保护
-          if (!isForceSwitching.current && !isLoading && detailNodeRef.current && selectedNode?.id === detailNodeRef.current) {
-            const detailTypes = ['answer-detail', 'ANSWER_DETAIL', 'circuit-detail', 'knowledge-detail', 'PDF_ANALYSIS_POINT'];
-            if (selectedNode.type && detailTypes.includes(selectedNode.type) && 
-                selectedNode.data?.process === 'completed' &&
-                selectedNode.data?.convId === convId) { // 添加会话ID检查
-              console.log(`阻止从已完成的详情节点 ${selectedNode.id} 自动跳转到 ${selectedNodeId}`);
-              // 保持原有的selectedNode，不进行跳转
-              return {
-                nodes: newNodes,
-                edges: newEdges,
-              };
-            }
-          }
+          // 🔥 移除保护机制：用户点击任何节点都应该能够正常选择和显示详情
+          console.log(`正常节点选择：从 ${selectedNode?.id || 'null'} 切换到 ${selectedNodeId}`);
           
           protectedSetSelectedNode(selectedFlowNode || null);
           const tempQueryNode = newNodes.find(node => node.id.startsWith(TEMP_QUERY_NODE_ID_PREFIX));
@@ -385,16 +356,35 @@ function Flow() {
     // 🚀 启用最高优先级强制切换模式，bypass所有保护机制
     isForceSwitching.current = true;
     
+    // 立即强制停止任何可能阻挡UI交互的状态
+    setIsLoading(false); // 立即清除loading状态，防止UI被阻挡
+    
     // 最高优先级强制切换：立即清除所有阻挡机制和保护状态
     detailNodeRef.current = null;
-    
-    // 强制设置加载状态，禁用所有保护机制
-    setIsLoading(true);
     
     // 立即同步清空所有状态，确保无任何残留
     setSelectedNode(null);
     setUserInput('');
     setElements({ nodes: [], edges: [] });
+    
+    // 🔥 强制关闭详情面板，确保不会阻挡新会话的加载
+    setShowDetailPanel(false);
+    
+    // 强制清除所有React Flow的选择状态
+    setTimeout(() => {
+      // 触发一个空的节点变化，清除内部选择状态
+      setElements(prev => ({
+        nodes: prev.nodes.map(node => ({ ...node, selected: false })),
+        edges: prev.edges
+      }));
+    }, 5);
+    
+    // 然后再重新设置loading状态，开始新会话的加载
+    setTimeout(() => {
+      setIsLoading(true);
+      // 重新打开详情面板（如果需要的话）
+      setShowDetailPanel(true);
+    }, 10); // 极短延迟，确保UI状态先被清除
     
     // 清除所有保护事件和全局状态
     window.dispatchEvent(new CustomEvent('detail-node-protection-clear'));
@@ -782,14 +772,20 @@ function Flow() {
       chat: flowChat,
       addChatTask
     }}>
-      <div className="flex h-full">
+      <div className="flex h-full relative" style={{ pointerEvents: 'auto', position: 'relative', isolation: 'isolate' }}>
         {/* 左侧React Flow区域 */}
-        <div className={`flex-1 ${showDetailPanel ? 'transition-all duration-300 ease-in-out' : ''}`}>
+        <div className={`flex-1 ${showDetailPanel ? 'transition-all duration-300 ease-in-out' : ''}`} style={{ pointerEvents: 'auto', position: 'relative' }}>
           <ReactFlow 
             nodes={elements.nodes} 
             edges={elements.edges}
             onNodesChange={onNodesChange} // 节点变化监听
             onEdgesChange={onEdgesChange} // 边变化监听
+            onNodeClick={(_event, node) => {
+              // 🔥 用户点击任何节点就强制打开节点详情，并选中该节点
+              console.log('直接点击节点:', node.id, '强制显示详情面板');
+              protectedSetSelectedNode(node);
+              setShowDetailPanel(true); // 强制显示详情面板
+            }}
             onError={onError} // 错误处理
             onInit={onInit} // 初始化
             nodeTypes={nodeTypes} // 节点类型
