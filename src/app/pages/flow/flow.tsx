@@ -12,7 +12,7 @@ import AnswerDetailNode from "@/app/pages/flow/components/node/AnswerDetailNode"
 import PdfDocumentNode from "./components/node/PdfDocumentNode";
 import PdfAnalysisPointNode from "./components/node/PdfAnalysisPointNode";
 import NodeDetailPanel from "./components/NodeDetailPanel";
-import {useCallback, useState, useEffect} from "react";
+import {useCallback, useState, useEffect, useRef} from "react";
 import {useLocation, useNavigate} from "react-router-dom";
 import {useWatcher} from "alova/client";
 import {getNodesByConvId} from "@/api/methods/flow.methods.ts";
@@ -82,6 +82,8 @@ function Flow() {
   const [showMiniMap, setShowMiniMap] = useState<boolean>(true);
   // 显示详情面板
   const [showDetailPanel, setShowDetailPanel] = useState<boolean>(true);
+  // 强制会话切换标记 - 最高优先级标记，用于bypass所有保护机制
+  const isForceSwitching = useRef<boolean>(false);
   
   // 获取location中的convId、taskId和classId
   const location = useLocation();
@@ -91,7 +93,45 @@ function Flow() {
   const classId = locationState?.classId || 
     (convId ? sessionStorage.getItem(`circuit_class_id_${convId}`) : null); // 从sessionStorage获取班级ID
   
-  // 使用流程图状态管理Hook，传递selectedNode和setSelectedNode
+    // 防护包装的setSelectedNode函数 - 防止用户在详情节点生成完毕后误切换
+  const protectedSetSelectedNode = useCallback((newNode: Node | null) => {
+    // 最高优先级：如果正在强制切换会话，无条件允许所有操作
+    if (isForceSwitching.current) {
+      console.log('🚀 强制会话切换模式，完全bypass所有保护机制');
+      setSelectedNode(newNode);
+      return;
+    }
+    
+    // 在会话切换期间，完全禁用保护机制，无条件允许所有操作
+    if (isLoading) {
+      console.log('会话加载中，强制执行节点选择，完全忽略保护机制');
+      setSelectedNode(newNode);
+      return;
+    }
+    
+    // 如果当前没有选中节点或保护引用，直接设置
+    if (!selectedNode || !detailNodeRef.current) {
+      setSelectedNode(newNode);
+      return;
+    }
+    
+  // 如果当前有被保护的详情节点，且新选择的节点不是该详情节点本身
+  if (detailNodeRef.current && selectedNode?.id === detailNodeRef.current && 
+      newNode?.id !== detailNodeRef.current) {
+    const detailTypes = ['answer-detail', 'ANSWER_DETAIL', 'circuit-detail', 'knowledge-detail', 'PDF_ANALYSIS_POINT'];
+    // 只在节点确实已完成且会话ID匹配时才阻止切换
+    // 添加更严格的检查：确保不是在加载状态，且会话ID确实匹配
+    if (!isLoading && selectedNode.type && detailTypes.includes(selectedNode.type) && 
+        selectedNode.data?.process === 'completed' &&
+        selectedNode.data?.convId === convId) { // 严格检查会话ID匹配
+      console.log(`阻止从受保护的详情节点 ${selectedNode.id} 切换到 ${newNode?.id || 'null'}`);
+      return; // 阻止切换
+    }
+  }    // 执行正常的节点选择
+    setSelectedNode(newNode);
+  }, [selectedNode, convId, isLoading]);
+
+  // 使用流程图状态管理Hook，传递selectedNode和保护的setSelectedNode
   const {
     elements,
     isChatting,
@@ -99,7 +139,7 @@ function Flow() {
     chat,
     setElements,
     addChatTask
-  } = useFlowState(convId, selectedNode, setSelectedNode);
+  } = useFlowState(convId, selectedNode, protectedSetSelectedNode);
   
   // 处理返回班级列表
   const handleBackToCourses = useCallback(() => {
@@ -186,14 +226,14 @@ function Flow() {
       const averageHeightChange = changedNodesCount > 0 ? totalHeightChange / changedNodesCount : 0;
       const significantChangeRatio = significantChanges / totalNodes;
 
-      // 判断是否需要重新布局
+      // 判断是否需要重新布局 - 提高阈值，减少不必要的重布局
       needsRelayout = (
-        // 条件1: 显著变化的节点比例超过阈值
-        significantChangeRatio > 0.3 ||
-        // 条件2: 平均高度变化超过阈值
-        (changedNodesCount > 0 && averageHeightChange > 30) ||
-        // 条件3: 变化的节点数量超过总节点数的一定比例，且平均变化较大
-        (changedNodesCount > totalNodes * 0.4 && averageHeightChange > 15)
+        // 条件1: 显著变化的节点比例超过阈值（提高到50%）
+        significantChangeRatio > 0.5 ||
+        // 条件2: 平均高度变化超过阈值（提高到50px）
+        (changedNodesCount > 0 && averageHeightChange > 50) ||
+        // 条件3: 变化的节点数量超过总节点数的一定比例，且平均变化较大（提高阈值）
+        (changedNodesCount > totalNodes * 0.6 && averageHeightChange > 25)
       );
 
       // 处理选择变化
@@ -201,7 +241,23 @@ function Flow() {
         window.dispatchEvent(new CustomEvent('node-selection-change'));
         if (selectedNodeId && selectedNodeId !== selectedNode?.id) {
           const selectedFlowNode = newNodes.find(node => node.id === selectedNodeId);
-          setSelectedNode(selectedFlowNode || null);
+          
+          // 检查是否有保护锁定的详情节点 - 但在强制切换或加载时跳过保护
+          if (!isForceSwitching.current && !isLoading && detailNodeRef.current && selectedNode?.id === detailNodeRef.current) {
+            const detailTypes = ['answer-detail', 'ANSWER_DETAIL', 'circuit-detail', 'knowledge-detail', 'PDF_ANALYSIS_POINT'];
+            if (selectedNode.type && detailTypes.includes(selectedNode.type) && 
+                selectedNode.data?.process === 'completed' &&
+                selectedNode.data?.convId === convId) { // 添加会话ID检查
+              console.log(`阻止从已完成的详情节点 ${selectedNode.id} 自动跳转到 ${selectedNodeId}`);
+              // 保持原有的selectedNode，不进行跳转
+              return {
+                nodes: newNodes,
+                edges: newEdges,
+              };
+            }
+          }
+          
+          protectedSetSelectedNode(selectedFlowNode || null);
           const tempQueryNode = newNodes.find(node => node.id.startsWith(TEMP_QUERY_NODE_ID_PREFIX));
           if (tempQueryNode) {
             newNodes = nodesAndEdgesNoneTempQueryNode.current?.nodes || newNodes;
@@ -211,7 +267,7 @@ function Flow() {
           setUserInput('');
         } else if (unselectedNodeId) {
           const rootNode = newNodes.find(node => node.id === rootNodeId);
-          setSelectedNode(selectedNode?.id === rootNodeId ? null : rootNode || null);
+          protectedSetSelectedNode(selectedNode?.id === rootNodeId ? null : rootNode || null);
           if (rootNode) {
             newNodes = newNodes.map(node => ({
               ...node,
@@ -240,7 +296,16 @@ function Flow() {
           updatedSelectedNode.data.process !== selectedNode.data.process
         )) {
           console.log(`检测到选中节点内容变化，立即同步更新: ${selectedNode.id}`);
-          setSelectedNode(updatedSelectedNode);
+          
+          // 检查是否是受保护的详情节点
+          const detailTypes = ['answer-detail', 'ANSWER_DETAIL', 'circuit-detail', 'knowledge-detail', 'PDF_ANALYSIS_POINT'];
+          if (updatedSelectedNode.type && detailTypes.includes(updatedSelectedNode.type) && 
+              updatedSelectedNode.data.process === 'completed') {
+            console.log(`详情节点 ${updatedSelectedNode.id} 已完成，确保保持选中状态`);
+            detailNodeRef.current = updatedSelectedNode.id; // 设置保护锁
+          }
+          
+          protectedSetSelectedNode(updatedSelectedNode);
         }
       }
 
@@ -269,7 +334,7 @@ function Flow() {
         edges: newEdges,
       };
     });
-  }, [executeLayout, nodesAndEdgesNoneTempQueryNode, rootNodeId, selectedNode?.id, selectedNode, setElements, setSelectedNode, setUserInput, smartFitView]);
+  }, [executeLayout, nodesAndEdgesNoneTempQueryNode, rootNodeId, selectedNode?.id, selectedNode, setElements, protectedSetSelectedNode, setUserInput, smartFitView]);
 
   // 边变化监听
   const onEdgesChange: OnEdgesChange = useCallback((changes) => {
@@ -313,11 +378,29 @@ function Flow() {
     };
   }, [isChatting, isLoading, elements.nodes.length, executeLayout, setElements]);
 
-  // 监听convId变化，立即重置状态
+  // 监听convId变化，立即重置所有状态 - 确保会话切换正常
   useEffect(() => {
+    console.log('🔄 会话切换检测到，convId变化为:', convId);
+    
+    // 🚀 启用最高优先级强制切换模式，bypass所有保护机制
+    isForceSwitching.current = true;
+    
+    // 最高优先级强制切换：立即清除所有阻挡机制和保护状态
+    detailNodeRef.current = null;
+    
+    // 强制设置加载状态，禁用所有保护机制
     setIsLoading(true);
+    
+    // 立即同步清空所有状态，确保无任何残留
     setSelectedNode(null);
     setUserInput('');
+    setElements({ nodes: [], edges: [] });
+    
+    // 清除所有保护事件和全局状态
+    window.dispatchEvent(new CustomEvent('detail-node-protection-clear'));
+    window.dispatchEvent(new CustomEvent('force-conversation-switch', { detail: { convId } }));
+    
+    console.log('✅ 强制会话切换状态重置完成，无条件允许新会话加载');
   }, [convId]);
 
   // 获取节点数据，当convId变化时，重新发送请求
@@ -329,6 +412,9 @@ function Flow() {
         setElements({nodes: [], edges: []});
         setSelectedNode(null); // 清空选中节点
         setIsLoading(false);
+        // 关闭强制切换模式
+        isForceSwitching.current = false;
+        console.log('✅ 空会话加载完成，恢复正常操作模式');
         return;
       }
       // 将apiNodes转换为flowNodes
@@ -417,7 +503,7 @@ function Flow() {
       if (selectedNode && selectedNode.id) {
         const updatedSelectedNode = layoutedNodes.find(node => node.id === selectedNode.id);
         if (updatedSelectedNode) {
-          setSelectedNode(updatedSelectedNode);
+          protectedSetSelectedNode(updatedSelectedNode);
         }
       }
 
@@ -438,12 +524,18 @@ function Flow() {
 
       setTimeout(() => {
         setIsLoading(false);
+        // 关闭强制切换模式，恢复正常保护机制
+        isForceSwitching.current = false;
+        console.log('✅ 新会话加载完成，恢复正常操作模式');
       }, 500);
     })
     .onError(() => {
       // 出错时设置加载状态为false
       setIsLoading(false);
       setSelectedNode(null); // 清空选中节点
+      // 即使出错也要关闭强制切换模式
+      isForceSwitching.current = false;
+      console.log('❌ 会话加载失败，但仍恢复正常操作模式');
       toast.error('获取节点数据失败');
     });
   
@@ -469,6 +561,16 @@ function Flow() {
       const { parentNodeId, detailNodeType, detailNodeTypes } = event.detail;
       console.log('收到自动选中详情节点事件:', { parentNodeId, detailNodeType, detailNodeTypes });
       
+      // 检查当前是否有被保护的详情节点
+      if (detailNodeRef.current && selectedNode?.id === detailNodeRef.current) {
+        const detailTypes = ['answer-detail', 'ANSWER_DETAIL', 'circuit-detail', 'knowledge-detail', 'PDF_ANALYSIS_POINT'];
+        if (selectedNode.type && detailTypes.includes(selectedNode.type) && 
+            selectedNode.data?.process === 'completed') {
+          console.log(`当前详情节点 ${selectedNode.id} 已完成且被保护，忽略自动选择事件`);
+          return;
+        }
+      }
+      
       // 延迟一段时间执行，确保详情节点已经创建和渲染
       const attemptSelectDetailNode = (attempt = 1, maxAttempts = 10) => {
         setTimeout(() => {
@@ -491,7 +593,7 @@ function Flow() {
             }
             
             // 设置选中的节点
-            setSelectedNode(detailNode);
+            protectedSetSelectedNode(detailNode);
             
             // 确保节点被选中的视觉状态
             setElements(({ nodes, edges }) => ({
@@ -532,7 +634,7 @@ function Flow() {
     return () => {
       window.removeEventListener('auto-select-detail-node', handleAutoSelectDetailNode as EventListener);
     };
-  }, [elements.nodes, setSelectedNode, setElements, showDetailPanel, smartFitView]);
+  }, [elements.nodes, protectedSetSelectedNode, setElements, showDetailPanel, smartFitView, selectedNode]);
   
   // 监听节点变化，确保详情节点创建时自动开启详情面板
   useEffect(() => {
@@ -587,7 +689,7 @@ function Flow() {
       };
     });
     chat(taskId);
-  }, [chat, setElements, setSelectedNode, showDetailPanel]);
+  }, [chat, setElements, protectedSetSelectedNode, showDetailPanel]);
 
   // 错误处理
   const onError = useCallback((code: string, message: string) => {
@@ -623,11 +725,49 @@ function Flow() {
       if (!selectedNode && elements.nodes.length > 0) {
         const rootNode = elements.nodes.find(node => node.type === 'root');
         if (rootNode) {
-          setSelectedNode(rootNode);
+          protectedSetSelectedNode(rootNode);
         }
       }
     }
   }, [showDetailPanel, selectedNode, elements.nodes]);
+
+  // 防止详情节点生成完毕后跳转到父节点的保护机制
+  const detailNodeRef = useRef<string | null>(null);
+  
+  useEffect(() => {
+    if (!selectedNode) return;
+    
+    // 详情节点类型
+    const detailTypes = ['answer-detail', 'ANSWER_DETAIL', 'circuit-detail', 'knowledge-detail', 'PDF_ANALYSIS_POINT'];
+    
+    // 如果当前节点是详情节点
+    if (selectedNode.type && detailTypes.includes(selectedNode.type)) {
+      // 记录当前详情节点ID
+      detailNodeRef.current = selectedNode.id;
+      
+      // 如果节点已完成生成，防止被其他逻辑切换掉
+      if (selectedNode.data?.process === 'completed') {
+        console.log(`详情节点 ${selectedNode.id} 已完成生成，设置保护锁防止自动跳转`);
+        
+        // 延迟一小段时间再设置保护，避免与其他状态更新冲突
+        const protectionTimer = setTimeout(() => {
+          // 再次检查是否还是同一个节点且已完成
+          if (detailNodeRef.current === selectedNode.id && selectedNode.data?.process === 'completed') {
+            console.log(`确认保护详情节点 ${selectedNode.id}，阻止自动跳转`);
+            // 使用标记防止其他逻辑修改selectedNode
+            window.dispatchEvent(new CustomEvent('detail-node-protection-active', {
+              detail: { nodeId: selectedNode.id }
+            }));
+          }
+        }, 100);
+        
+        return () => clearTimeout(protectionTimer);
+      }
+    } else {
+      // 如果不是详情节点，清除保护
+      detailNodeRef.current = null;
+    }
+  }, [selectedNode?.id, selectedNode?.type, selectedNode?.data?.process]);
 
   // 加载中
   if (isLoading) {

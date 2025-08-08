@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useRef } from "react";
 import { entitreeFlexLayout } from "../utils/layoutNodes";
 import { Edge, Node, useReactFlow } from "@xyflow/react";
 
@@ -13,6 +13,10 @@ const DEFAULT_FIT_VIEW_CONFIG = {
 function useFlowTools() {
 
 	const { fitView, getViewport, setViewport } = useReactFlow();
+  
+  // 性能优化：防抖机制，避免频繁调用布局
+  const layoutTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastLayoutCallRef = useRef<number>(0);
 
 	/**
    * 执行fitView操作
@@ -62,16 +66,32 @@ function useFlowTools() {
   }, [getViewport, setViewport]);
 
   const executeLayout = useCallback((nodes: Node[], edges: Edge[], updateServer: boolean = false, resetHeight: boolean = false) => {
-    // 记录开始时间
-    //const startTime = performance.now();
+    // 性能优化：防抖机制，避免在短时间内频繁调用布局
+    const now = Date.now();
+    const timeSinceLastCall = now - lastLayoutCallRef.current;
     
-    //console.log('trueNodeWidth', trueNodeWidth);
+    // 如果距离上次调用时间太短（小于100ms），延迟执行
+    if (timeSinceLastCall < 100 && !updateServer) {
+      if (layoutTimeoutRef.current) {
+        clearTimeout(layoutTimeoutRef.current);
+      }
+      
+      // 延迟执行布局
+      layoutTimeoutRef.current = setTimeout(() => {
+        lastLayoutCallRef.current = Date.now();
+        const { nodes: layoutedNodes } = entitreeFlexLayout(nodes, edges, updateServer, resetHeight);
+        return layoutedNodes;
+      }, 50);
+      
+      // 返回原节点，避免空返回
+      return nodes;
+    }
+    
+    // 立即执行布局
+    lastLayoutCallRef.current = now;
+    
     // 执行布局计算
     const { nodes: layoutedNodes } = entitreeFlexLayout(nodes, edges, updateServer, resetHeight);
-    
-    // 记录结束时间
-    //const endTime = performance.now();
-    //console.log(`布局计算耗时: ${endTime - startTime}ms`);
     
     return layoutedNodes;
   }, []);

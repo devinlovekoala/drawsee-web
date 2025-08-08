@@ -444,11 +444,13 @@ function useFlowState(convId: number, selectedNode?: Node | null, setSelectedNod
             setIsChatting(false);
           }, 300);
           
-          // 执行fitView - 聚焦到最后活跃的节点
-          if (lastFocusNodeId.current) {
-            console.log('执行fitView，聚焦最后活跃节点:', lastFocusNodeId.current);
-            executeFitView([lastFocusNodeId.current], 800);
-          }
+          // 执行fitView - 移除自动跳转到lastFocusNodeId的逻辑
+          // 详情节点生成完成后，保持在当前详情节点，不再自动跳转到父节点
+          // 这样用户可以继续查看刚完成生成的详情内容
+          console.log('流式生成完成，保持在当前节点，不自动跳转');
+          
+          // 清理lastFocusNodeId以避免后续误操作
+          lastFocusNodeId.current = null;
           break;
         }
         // 错误
