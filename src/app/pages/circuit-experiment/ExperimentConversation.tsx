@@ -1,10 +1,9 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Button, Card, Space, message } from 'antd';
 import { ExperimentOutlined, ToolOutlined } from '@ant-design/icons';
 import { createAiTask } from '@/api/methods/flow.methods';
 import { CreateAiTaskDTO, AiTaskType } from '@/api/types/flow.types';
 import { useAppContext } from '@/app/contexts/AppContext';
-import { useNavigate } from 'react-router-dom';
 import { ModelSelector } from '../../pages/blank/components/ModelSelector';
 import { ModelType } from '../flow/components/input/FlowInputPanel';
 
@@ -21,7 +20,6 @@ export default function ExperimentConversation({ fileUrl }: ExperimentConversati
   const [selectedModel, setSelectedModel] = useState<ModelType>('deepseekV3');
   
   const { handleBlankQuery, handleAiTaskCountPlus } = useAppContext();
-  const navigate = useNavigate();
 
   // 处理模型选择
   const handleModelChange = (model: ModelType) => {
@@ -33,7 +31,7 @@ export default function ExperimentConversation({ fileUrl }: ExperimentConversati
     try {
       setLoading(true);
       
-      // 构建电路实验分析任务
+      // 构建电路实验分析任务 - 第一阶段：生成分析点
       const createAiTaskDTO: CreateAiTaskDTO = {
         type: 'PDF_CIRCUIT_ANALYSIS' as AiTaskType,
         prompt: fileUrl, // 直接将fileUrl放入prompt字段

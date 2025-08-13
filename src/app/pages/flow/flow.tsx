@@ -11,6 +11,7 @@ import AnswerPointNode from "@/app/pages/flow/components/node/AnswerPointNode";
 import AnswerDetailNode from "@/app/pages/flow/components/node/AnswerDetailNode";
 import PdfDocumentNode from "./components/node/PdfDocumentNode";
 import PdfAnalysisPointNode from "./components/node/PdfAnalysisPointNode";
+import PdfAnalysisDetailNode from "./components/node/PdfAnalysisDetailNode";
 import NodeDetailPanel from "./components/NodeDetailPanel";
 import {useCallback, useState, useEffect, useRef} from "react";
 import {useLocation, useNavigate} from "react-router-dom";
@@ -50,6 +51,7 @@ const CompactCircuitDetailNode = (props: any) => <CircuitDetailNode {...props} c
 const CompactResourceNode = (props: any) => <ResourceNode {...props} compactMode={true} />;
 const CompactPdfDocumentNode = (props: any) => <PdfDocumentNode {...props} compactMode={true} />;
 const CompactPdfAnalysisPointNode = (props: any) => <PdfAnalysisPointNode {...props} compactMode={true} />;
+const CompactPdfAnalysisDetailNode = (props: any) => <PdfAnalysisDetailNode {...props} compactMode={true} />;
 
 const nodeTypes = {
   'root': CompactRootNode,
@@ -69,6 +71,7 @@ const nodeTypes = {
   // PDF相关节点类型
   'PDF_DOCUMENT': CompactPdfDocumentNode,       // PDF文档节点
   'PDF_ANALYSIS_POINT': CompactPdfAnalysisPointNode, // PDF分析点节点
+  'PDF_ANALYSIS_DETAIL': CompactPdfAnalysisDetailNode, // PDF分析详情节点
 } as const;
 
 function Flow() {
@@ -269,7 +272,7 @@ function Flow() {
           console.log(`检测到选中节点内容变化，立即同步更新: ${selectedNode.id}`);
           
           // 检查是否是受保护的详情节点
-          const detailTypes = ['answer-detail', 'ANSWER_DETAIL', 'circuit-detail', 'knowledge-detail', 'PDF_ANALYSIS_POINT'];
+          const detailTypes = ['answer-detail', 'ANSWER_DETAIL', 'circuit-detail', 'knowledge-detail', 'PDF_ANALYSIS_DETAIL'];
           if (updatedSelectedNode.type && detailTypes.includes(updatedSelectedNode.type) && 
               updatedSelectedNode.data.process === 'completed') {
             console.log(`详情节点 ${updatedSelectedNode.id} 已完成，确保保持选中状态`);
@@ -446,9 +449,19 @@ function Flow() {
           });
         }
         
+        // 处理PDF_ANALYSIS_POINT节点
+        if (node.type === 'PDF_ANALYSIS_POINT') {
+          apiNodes.forEach(apiNode => {
+            if (apiNode.parentId === node.id && apiNode.type === 'PDF_ANALYSIS_DETAIL') {
+              data.isGenerated = true;
+            }
+          });
+        }
+        
         // 对于详情节点，如果有文本内容，设置为已完成状态
         if ((node.type === 'answer-detail' || node.type === 'ANSWER_DETAIL' || 
-             node.type === 'circuit-detail' || node.type === 'knowledge-detail') && 
+             node.type === 'circuit-detail' || node.type === 'knowledge-detail' ||
+             node.type === 'PDF_ANALYSIS_DETAIL') && 
             node.data.text && typeof node.data.text === 'string' && node.data.text.length > 0) {
           console.log(`初始化详情节点 ${node.id} 状态为已完成，类型: ${node.type}`);
           data.isGenerated = true;
@@ -553,7 +566,7 @@ function Flow() {
       
       // 检查当前是否有被保护的详情节点
       if (detailNodeRef.current && selectedNode?.id === detailNodeRef.current) {
-        const detailTypes = ['answer-detail', 'ANSWER_DETAIL', 'circuit-detail', 'knowledge-detail', 'PDF_ANALYSIS_POINT'];
+        const detailTypes = ['answer-detail', 'ANSWER_DETAIL', 'circuit-detail', 'knowledge-detail', 'PDF_ANALYSIS_DETAIL'];
         if (selectedNode.type && detailTypes.includes(selectedNode.type) && 
             selectedNode.data?.process === 'completed') {
           console.log(`当前详情节点 ${selectedNode.id} 已完成且被保护，忽略自动选择事件`);
@@ -630,7 +643,7 @@ function Flow() {
   useEffect(() => {
     // 检查是否有正在生成的详情节点
     const hasGeneratingDetailNode = elements.nodes.some(node => {
-      const isDetailNode = node.type && ['answer-detail', 'ANSWER_DETAIL', 'circuit-detail', 'knowledge-detail'].includes(node.type);
+      const isDetailNode = node.type && ['answer-detail', 'ANSWER_DETAIL', 'circuit-detail', 'knowledge-detail', 'PDF_ANALYSIS_DETAIL'].includes(node.type);
       const isGenerating = node.data?.process === 'generating';
       return isDetailNode && isGenerating;
     });
@@ -728,7 +741,7 @@ function Flow() {
     if (!selectedNode) return;
     
     // 详情节点类型
-    const detailTypes = ['answer-detail', 'ANSWER_DETAIL', 'circuit-detail', 'knowledge-detail', 'PDF_ANALYSIS_POINT'];
+    const detailTypes = ['answer-detail', 'ANSWER_DETAIL', 'circuit-detail', 'knowledge-detail', 'PDF_ANALYSIS_DETAIL'];
     
     // 如果当前节点是详情节点
     if (selectedNode.type && detailTypes.includes(selectedNode.type)) {

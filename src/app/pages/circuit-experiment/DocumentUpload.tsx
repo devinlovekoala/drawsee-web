@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Upload, Button, Form, Input, message, Card, Typography, Space } from 'antd';
 import { InboxOutlined, TagOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 import { uploadUserDocument } from '@/api/methods/document.methods';
@@ -21,31 +21,72 @@ export default function DocumentUpload() {
 
   // 处理文件选择
   const handleFileChange = (info: any) => {
-    const file = info.file.originFileObj as File;
+    console.log('文件选择事件:', info);
+    
+    // 获取文件对象
+    let selectedFile: File | null = null;
+    
+    // 处理不同的文件状态
+    if (info.file) {
+      // 如果有originFileObj，优先使用（通常在选择文件时）
+      if (info.file.originFileObj) {
+        selectedFile = info.file.originFileObj;
+      } 
+      // 否则直接使用file对象（可能在某些情况下）
+      else if (info.file instanceof File) {
+        selectedFile = info.file;
+      }
+      // 如果file有name属性但不是File实例，可能需要从fileList获取
+      else if (info.fileList && info.fileList.length > 0) {
+        const latestFile = info.fileList[info.fileList.length - 1];
+        if (latestFile.originFileObj) {
+          selectedFile = latestFile.originFileObj;
+        }
+      }
+    }
+    
+    console.log('解析出的文件:', selectedFile);
+    
+    if (!selectedFile) {
+      console.warn('未能获取到文件对象');
+      return;
+    }
     
     // 检查文件类型
-    if (!isPdfFile(file)) {
+    if (!isPdfFile(selectedFile)) {
       message.error('只能上传PDF文件');
+      setFile(null);
       return;
     }
     
     // 检查文件大小 (限制为30MB)
-    if (isFileSizeExceeded(file, 30)) {
+    if (isFileSizeExceeded(selectedFile, 30)) {
       message.error('文件大小不能超过30MB');
+      setFile(null);
       return;
     }
     
-    setFile(file);
-    message.success(`${file.name} 文件选择成功`);
+    setFile(selectedFile);
+    
+    // 同时更新表单字段，确保验证通过
+    form.setFieldsValue({ file: selectedFile.name });
+    
+    message.success(`${selectedFile.name} 文件选择成功`);
   };
 
   // 处理表单提交
   const handleSubmit = async (values: any) => {
+    console.log('表单提交，当前文件状态:', file);
+    console.log('表单值:', values);
+    
     if (!file) {
       message.error('请先选择PDF文件');
+      console.error('提交时文件为空');
       return;
     }
 
+    console.log('开始上传文件:', file.name, '大小:', file.size);
+    
     setUploading(true);
     try {
       await uploadUserDocument(
@@ -101,7 +142,18 @@ export default function DocumentUpload() {
         >
           <Form.Item
             name="file"
-            rules={[{ required: true, message: '请上传PDF文件' }]}
+            rules={[
+              { 
+                required: true, 
+                message: '请上传PDF文件',
+                validator: () => {
+                  if (!file) {
+                    return Promise.reject(new Error('请先选择PDF文件'));
+                  }
+                  return Promise.resolve();
+                }
+              }
+            ]}
           >
             <Dragger
               name="file"

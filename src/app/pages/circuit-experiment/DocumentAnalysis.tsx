@@ -40,6 +40,16 @@ export default function DocumentAnalysis() {
   // 从location中获取班级ID
   const classId = location.state?.classId as string || null;
 
+  // 从对象路径中提取文件名
+  const extractFileNameFromPath = (objectPath?: string): string => {
+    if (!objectPath) return '';
+    const pathParts = objectPath.split('/');
+    const fileName = pathParts[pathParts.length - 1];
+    // 移除时间戳前缀（如果存在）
+    const cleanFileName = fileName.replace(/^\d+_/, '');
+    return decodeURIComponent(cleanFileName);
+  };
+
   // 获取文档详情
   useEffect(() => {
     const fetchDocument = async () => {
@@ -215,7 +225,7 @@ export default function DocumentAnalysis() {
           </div>
           
           <div className="text-gray-500 mb-2">
-            <Text>文件名: {document.fileName}</Text>
+            <Text>文件名: {document.fileName || extractFileNameFromPath(document.objectPath) || document.title}</Text>
             <Text className="ml-4">大小: {bytesToSize(document.fileSize)}</Text>
             <Text className="ml-4">上传时间: {new Date(document.createdAt).toLocaleString()}</Text>
           </div>

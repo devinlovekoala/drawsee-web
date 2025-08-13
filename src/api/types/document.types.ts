@@ -8,6 +8,11 @@ export interface UserDocumentVO {
   id: number;
   
   /**
+   * 文档UUID
+   */
+  uuid?: string;
+  
+  /**
    * 所属用户ID
    */
   userId: number;
@@ -28,9 +33,14 @@ export interface UserDocumentVO {
   fileUrl: string;
   
   /**
-   * 文件名称
+   * 文件名称（从 objectPath 提取或使用 title）
    */
-  fileName: string;
+  fileName?: string;
+  
+  /**
+   * 对象路径
+   */
+  objectPath?: string;
   
   /**
    * 文件大小（字节）
@@ -40,7 +50,12 @@ export interface UserDocumentVO {
   /**
    * 文件类型
    */
-  fileType: string;
+  fileType?: string;
+  
+  /**
+   * 文档类型
+   */
+  documentType?: string;
   
   /**
    * 文档标签
@@ -56,6 +71,11 @@ export interface UserDocumentVO {
    * 更新时间
    */
   updatedAt: string;
+  
+  /**
+   * 是否已删除
+   */
+  isDeleted?: boolean;
 }
 
 /**

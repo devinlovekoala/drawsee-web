@@ -1,4 +1,4 @@
-export type NodeType = "root" | "query" | "answer" | "answer-point" | "answer-detail" | "ANSWER_POINT" | "ANSWER_DETAIL" | "knowledge-head" | "knowledge-detail" | "resource" | "circuit-canvas" | "circuit-point" | "circuit-detail" | "PDF_DOCUMENT" | "PDF_ANALYSIS_POINT";
+export type NodeType = "root" | "query" | "answer" | "answer-point" | "answer-detail" | "ANSWER_POINT" | "ANSWER_DETAIL" | "knowledge-head" | "knowledge-detail" | "resource" | "circuit-canvas" | "circuit-point" | "circuit-detail" | "PDF_DOCUMENT" | "PDF_ANALYSIS_POINT" | "PDF_ANALYSIS_DETAIL";
 
 export interface ConversationVO {
   id: number;
@@ -86,6 +86,11 @@ interface PdfAnalysisPointNodeData extends BaseNodeData {
   subtype: 'pdf-analysis-point';
 }
 
+interface PdfAnalysisDetailNodeData extends BaseNodeData {
+  subtype: 'pdf-analysis-detail';
+  angle?: string; // 分析角度
+}
+
 export type NodeData = {
   root: RootNodeData;
   query: QueryNodeData;
@@ -103,6 +108,7 @@ export type NodeData = {
   'circuit-detail': CircuitDetailNodeData;
   'PDF_DOCUMENT': PdfDocumentNodeData;
   'PDF_ANALYSIS_POINT': PdfAnalysisPointNodeData;
+  'PDF_ANALYSIS_DETAIL': PdfAnalysisDetailNodeData;
 }
 
 export interface NodeVO {
@@ -142,8 +148,9 @@ export type AiTaskType =
   | "SOLVER_SUMMARY" 
   | "CIRCUIT_ANALYSIS"
   | "CIRCUIT_DETAIL"
-  | "PDF_CIRCUIT_ANALYSIS"  // 新增：PDF电路实验文档获取分析回答节点AI任务
-  | "PDF_CIRCUIT_DESIGN";   // 新增：通过电路实验pdf任务文档获取电路分析图AI任务
+  | "PDF_CIRCUIT_ANALYSIS"        // 第一阶段：PDF电路实验文档分析生成分析点
+  | "PDF_CIRCUIT_ANALYSIS_DETAIL" // 第二阶段：展开PDF电路实验分析点的详情
+  | "PDF_CIRCUIT_DESIGN";         // 保留：通过电路实验pdf任务文档获取电路分析图AI任务
 
 export interface CreateAiTaskVO {
   taskId: number;

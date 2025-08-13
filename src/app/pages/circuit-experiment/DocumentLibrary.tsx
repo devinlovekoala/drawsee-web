@@ -33,13 +33,31 @@ export default function DocumentLibrary() {
     try {
       setLoading(true);
       const response = await getUserPdfDocuments();
-      setDocuments(response);
+      
+      // 处理后端返回的数据，确保文件名字段存在
+      const processedDocuments = response.map(doc => ({
+        ...doc,
+        fileName: doc.fileName || extractFileNameFromPath(doc.objectPath) || doc.title || '未知文件名',
+        fileType: doc.fileType || doc.documentType || 'pdf'
+      }));
+      
+      setDocuments(processedDocuments);
     } catch (error) {
       console.error('获取实验文档列表失败:', error);
       message.error('获取实验文档列表失败');
     } finally {
       setLoading(false);
     }
+  };
+
+  // 从对象路径中提取文件名
+  const extractFileNameFromPath = (objectPath?: string): string => {
+    if (!objectPath) return '';
+    const pathParts = objectPath.split('/');
+    const fileName = pathParts[pathParts.length - 1];
+    // 移除时间戳前缀（如果存在）
+    const cleanFileName = fileName.replace(/^\d+_/, '');
+    return decodeURIComponent(cleanFileName);
   };
 
   // 组件加载时获取列表
@@ -124,7 +142,24 @@ export default function DocumentLibrary() {
       title: '文档名称',
       dataIndex: 'title',
       key: 'title',
-      render: (text: string, record: UserDocumentVO) => text || record.fileName,
+      render: (text: string, record: UserDocumentVO) => (
+        <div>
+          <div className="font-medium">{text || record.fileName}</div>
+          {record.fileName && record.fileName !== text && (
+            <div className="text-xs text-gray-500">文件: {record.fileName}</div>
+          )}
+        </div>
+      ),
+    },
+    {
+      title: '文档类型',
+      dataIndex: 'documentType',
+      key: 'documentType',
+      render: (type: string) => (
+        <Tag color={type === 'pdf' ? 'red' : 'blue'}>
+          {type?.toUpperCase() || 'PDF'}
+        </Tag>
+      ),
     },
     {
       title: '大小',
@@ -138,7 +173,7 @@ export default function DocumentLibrary() {
       key: 'tags',
       render: (tags: string) => tags ? tags.split(',').map((tag, index) => (
         <Tag key={index} color="blue">{tag.trim()}</Tag>
-      )) : null,
+      )) : <span className="text-gray-400">无标签</span>,
     },
     {
       title: '上传时间',

@@ -67,9 +67,8 @@ export const uploadUserDocument = async (
 
   try {
     const response = await alova.Post<UserDocumentVO>('/user/document/upload', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data'
-      }
+      // 标记为文件上传请求，避免拦截器设置错误的Content-Type
+      meta: { isFile: true }
     });
     return response;
   } catch (error) {
