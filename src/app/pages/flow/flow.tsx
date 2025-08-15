@@ -785,9 +785,17 @@ function Flow() {
       chat: flowChat,
       addChatTask
     }}>
-      <div className="flex h-full relative" style={{ pointerEvents: 'auto', position: 'relative', isolation: 'isolate' }}>
+      <div className="flex w-full overflow-hidden" style={{ height: 'calc(100vh - 80px)' }}>
         {/* 左侧React Flow区域 */}
-        <div className={`flex-1 ${showDetailPanel ? 'transition-all duration-300 ease-in-out' : ''}`} style={{ pointerEvents: 'auto', position: 'relative' }}>
+        <div 
+          className={`${showDetailPanel ? 'flex-1 transition-all duration-300 ease-in-out' : 'w-full'}`} 
+          style={{ 
+            position: 'relative', 
+            minWidth: 0,
+            maxWidth: showDetailPanel ? 'calc(100% - 384px)' : '100%',
+            height: '100%'
+          }}
+        >
           <ReactFlow 
             nodes={elements.nodes} 
             edges={elements.edges}
@@ -802,7 +810,13 @@ function Flow() {
             onError={onError} // 错误处理
             onInit={onInit} // 初始化
             nodeTypes={nodeTypes} // 节点类型
-            style={{backgroundColor: "#EEEBE8", borderRadius: '8px'}} // 背景样式
+            style={{
+              backgroundColor: "#EEEBE8", 
+              borderRadius: '8px',
+              width: '100%',
+              height: '100%',
+              position: 'relative'
+            }} // 背景样式和尺寸限制
             nodesDraggable={false} // 节点不可拖拽
             draggable={false} // 节点不可拖拽
             selectionKeyCode={null} // 取消选择快捷键
@@ -851,7 +865,7 @@ function Flow() {
               <FlowRightToolBar
                 showMiniMap={showMiniMap}
                 setShowMiniMap={setShowMiniMap}
-                onRelayout={handleRelayout} 
+                onRelayout={() => handleRelayout(true)} 
                 showDetailPanel={showDetailPanel}
                 onToggleDetailPanel={toggleDetailPanel}
               />
@@ -865,13 +879,15 @@ function Flow() {
           </ReactFlow>
         </div>
         
-        {/* 右侧详情面板 */}
+        {/* 右侧详情面板 - 确保不阻塞主应用交互 */}
         {showDetailPanel && (
-          <NodeDetailPanel
-            selectedNode={selectedNode}
-            onClose={handleCloseDetailPanel}
-            getLatestNodeData={getLatestNodeData}
-          />
+          <div className="flex-shrink-0" style={{ width: '384px' }}>
+            <NodeDetailPanel
+              selectedNode={selectedNode}
+              onClose={handleCloseDetailPanel}
+              getLatestNodeData={getLatestNodeData}
+            />
+          </div>
         )}
       </div>
     </FlowContext.Provider>

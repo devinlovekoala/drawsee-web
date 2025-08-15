@@ -73,7 +73,7 @@ export async function mrtreeLayout(nodes: Node[], edges: Edge[], shouldUpdateSer
       sources: [edge.source],
       targets: [edge.target]
     })) as ElkExtendedEdge[];
-    // 准备ELK图 - 实现极紧凑布局以最大化空间利用率
+    // 准备ELK图 - 解决重叠问题并极大压缩横向空间
     const graph = {
       id: "root",
       layoutOptions: {
@@ -82,8 +82,8 @@ export async function mrtreeLayout(nodes: Node[], edges: Edge[], shouldUpdateSer
         "elk.algorithm": "mrtree",
         "elk.nodeSize.constraints": "[]",
         "elk.interactive": "true",
-        "elk.spacing.nodeNode": "15.0", // 同级节点间距（从25进一步减少到15，更紧凑）
-        "elk.layered.spacing.nodeNodeBetweenLayers": "50.0", // 层级间距（从80大幅减少到50，显著压缩连接线）
+        "elk.spacing.nodeNode": "40.0", // 同级节点间距（从15增加到40，防止重叠）
+        "elk.layered.spacing.nodeNodeBetweenLayers": "30.0", // 层级间距（从50进一步减少到30，极大压缩横向）
         "elk.mrtree.edgeRoutingMode": "AVOID_OVERLAP",
         "elk.spacing.portPort": "4.0", // 端口间距（从6减少到4）
         "elk.margins": "8.0", // 图的边距（从10减少到8，进一步节省空间）
@@ -158,8 +158,8 @@ export async function mrtreeLayout(nodes: Node[], edges: Edge[], shouldUpdateSer
 const dagreGraph = new dagre.graphlib.Graph().setDefaultEdgeLabel(() => ({}));
 dagreGraph.setGraph({ 
   rankdir: 'LR', // 从TB（Top-Bottom）改为LR（Left-Right）
-  nodesep: 15,   // 同一层级节点间的垂直间距（从25进一步减少到15，极致紧凑）
-  ranksep: 50,   // 不同层级间的水平间距（从80大幅减少到50，显著压缩连接线长度）
+  nodesep: 40,   // 同一层级节点间的垂直间距（从15增加到40，防止重叠）
+  ranksep: 30,   // 不同层级间的水平间距（从50进一步减少到30，极大压缩横向）
   marginx: 8,    // 图的左右边距（从10减少到8）
   marginy: 8     // 图的上下边距（从10减少到8）
 });
@@ -277,6 +277,9 @@ export function entitreeFlexLayout(nodes: Node[], edges: Edge[], shouldUpdateSer
     // 性能优化：添加时间戳用于性能监控
     const startTime = performance.now();
     
+    // 调试信息：输出布局参数
+    console.log(`entitreeFlexLayout 调用参数: shouldUpdateServer=${shouldUpdateServer}, resetHeight=${resetHeight}, 节点数=${nodes.length}`);
+    
     const rootId = nodes.find(node => node.type === 'root')?.id || nodes[0].id;
     
     const childrenMap: Record<string, string[]> = {};
@@ -314,16 +317,16 @@ export function entitreeFlexLayout(nodes: Node[], edges: Edge[], shouldUpdateSer
         height = TEMP_QUERY_NODE_HEIGHT;
       } else if (node.type === 'root') {
         height = ROOT_NODE_SIZE;
-      } else if (!resetHeight && node.data.height !== undefined) {
-        // 使用已缓存的高度
-        height = node.data.height as number;
+      } else if (!resetHeight && typeof node.data.height === 'number' && node.data.height > 0) {
+        // 使用已缓存的高度（但要确保高度值有效）
+        height = node.data.height;
         cacheHitCount++;
       } else if (!resetHeight && globalHeightCache.has(cacheKey)) {
         // 使用全局缓存的高度（相同类型和文本长度的节点）
         height = globalHeightCache.get(cacheKey)!;
         cacheHitCount++;
       } else {
-        // 需要计算高度
+        // 需要计算高度 - 重新布局时强制重新计算以确保一致性
         height = calculateNodeHeight(node as Node<NodeData<NodeType>>, NODE_WIDTH);
         heightCalculationCount++;
         
@@ -351,23 +354,23 @@ export function entitreeFlexLayout(nodes: Node[], edges: Edge[], shouldUpdateSer
       };
     });
     
-    // 调整布局设置 - 增大纵向间距，减小横向间距
+    // 调整布局设置 - 增大纵向间距防止重叠，大幅压缩横向间距
     const settings = {
       clone: false,
       enableFlex: true,
-      // 横向布局的节点间距设置 - 调大纵向间距
-      firstDegreeSpacing: 35, // 相同父节点的子节点垂直间距（从15增加到35，增大纵向间隔）
-      nextAfterSpacing: 3,    // 相邻节点间距（从2微调到3）
-      nextBeforeSpacing: 3,   // 相邻节点间距（从2微调到3）
+      // 横向布局的节点间距设置 - 显著增大纵向间距防止重叠
+      firstDegreeSpacing: 80, // 相同父节点的子节点垂直间距（从35增加到80，解决重叠问题）
+      nextAfterSpacing: 8,    // 相邻节点间距（从3增加到8，增加缓冲区）
+      nextBeforeSpacing: 8,   // 相邻节点间距（从3增加到8，增加缓冲区）
       nodeHeight: 40,
       nodeWidth: 40,
       orientation: "horizontal", // 关键改变：从vertical改为horizontal
       rootX: 0,
       rootY: 0,
-      secondDegreeSpacing: 20, // 不同父节点的节点垂直间距（从8增加到20，增大纵向间隔）
+      secondDegreeSpacing: 50, // 不同父节点的节点垂直间距（从20增加到50，进一步防止重叠）
       sourcesAccessor: "parents",
-      // 父子节点之间的水平间距（横向布局的核心参数）- 继续缩小横向间距
-      sourceTargetSpacing: 35, // 从50进一步减少到35，让连接线更短，横向更紧凑
+      // 父子节点之间的水平间距（横向布局的核心参数）- 大幅压缩横向间距
+      sourceTargetSpacing: 18, // 从35进一步减少到18，极大压缩横向空间
       targetsAccessor: "children",
     } as Partial<Settings>;
     
@@ -435,6 +438,8 @@ export function entitreeFlexLayout(nodes: Node[], edges: Edge[], shouldUpdateSer
     console.log(`- 高度计算次数: ${heightCalculationCount}`);
     console.log(`- 缓存命中次数: ${cacheHitCount}`);
     console.log(`- 缓存命中率: ${nodes.length > 0 ? ((cacheHitCount / nodes.length) * 100).toFixed(1) : 0}%`);
+    console.log(`- 参数: shouldUpdateServer=${shouldUpdateServer}, resetHeight=${resetHeight}`);
+    console.log(`- 需要更新服务器的节点数: ${nodesToUpdate.length}`);
     
     return { nodes: layoutedNodes, edges };
   } catch (error) {

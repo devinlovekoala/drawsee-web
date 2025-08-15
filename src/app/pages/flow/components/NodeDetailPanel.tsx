@@ -94,46 +94,57 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
     return typeof node.data.text === 'string' ? node.data.text : String(node.data.text);
   }, []);
   
-  // 监听选中节点变化，立即更新状态
+  // 监听selectedNode变化和实时更新 - 优化防止无限循环
   useEffect(() => {
-    if (selectedNode) {
-      const currentText = getCurrentText(selectedNode);
-      const currentUpdatedAt = (selectedNode.data?.updatedAt as number) || 0;
-      const currentForceRefresh = (selectedNode.data?.forceRefresh as number) || 0;
-      
-      console.log('selectedNode变化，立即更新状态:', {
-        nodeId: selectedNode.id,
-        textLength: currentText.length,
-        updatedAt: currentUpdatedAt,
-        forceRefresh: currentForceRefresh,
-        process: selectedNode.data?.process
-      });
-      
-      // 立即更新状态
-      if (currentText !== lastTextContent) {
-        setLastTextContent(currentText);
-        setNodeContentKey(prev => prev + 1);
-      }
-      
-      if (currentUpdatedAt !== lastUpdatedAt) {
-        setLastUpdatedAt(currentUpdatedAt);
-        setForceRefresh(prev => prev + 1);
-      }
-      
-      if (currentForceRefresh && currentForceRefresh !== forceRefresh) {
-        setForceRefresh(currentForceRefresh);
-      }
-      
-      // 特别监听isGenerated状态变化
-      const currentIsGenerated = (selectedNode.data?.isGenerated as boolean) || false;
-      if (currentIsGenerated !== lastTextContent.includes('已生成')) {
-        console.log(`检测到isGenerated状态变化，节点 ${selectedNode.id}:`, currentIsGenerated);
-        setForceRefresh(prev => prev + 1);
-      }
+    if (!selectedNode) return;
+    
+    const currentText = getCurrentText(selectedNode);
+    const currentUpdatedAt = (selectedNode.data?.updatedAt as number) || 0;
+    const currentForceRefresh = (selectedNode.data?.forceRefresh as number) || 0;
+    
+    console.log('selectedNode变化，立即更新状态:', {
+      nodeId: selectedNode.id,
+      textLength: currentText.length,
+      updatedAt: currentUpdatedAt,
+      forceRefresh: currentForceRefresh,
+      process: selectedNode.data?.process
+    });
+    
+    // 批量更新状态，避免多次触发
+    let needsUpdate = false;
+    const updates: Array<() => void> = [];
+    
+    if (currentText !== lastTextContent) {
+      updates.push(() => setLastTextContent(currentText));
+      updates.push(() => setNodeContentKey(prev => prev + 1));
+      needsUpdate = true;
     }
-  }, [selectedNode, getCurrentText, lastTextContent, lastUpdatedAt, forceRefresh]);
-
-  // 额外的实时检测机制 - 针对正在生成的节点
+    
+    if (currentUpdatedAt !== lastUpdatedAt) {
+      updates.push(() => setLastUpdatedAt(currentUpdatedAt));
+      needsUpdate = true;
+    }
+    
+    if (currentForceRefresh && currentForceRefresh !== forceRefresh) {
+      updates.push(() => setForceRefresh(currentForceRefresh));
+      needsUpdate = true;
+    }
+    
+    // 批量执行更新
+    if (needsUpdate) {
+      updates.forEach(update => update());
+    }
+    
+    // 特别监听isGenerated状态变化 - 添加防抖
+    const currentIsGenerated = (selectedNode.data?.isGenerated as boolean) || false;
+    const process = selectedNode.data?.process;
+    
+    // 只在状态真正变化且不是已完成状态时才触发更新
+    if (currentIsGenerated !== lastTextContent.includes('已生成') && process !== 'completed') {
+      console.log(`检测到isGenerated状态变化，节点 ${selectedNode.id}:`, currentIsGenerated);
+      setForceRefresh(prev => prev + 1);
+    }
+  }, [selectedNode?.id, selectedNode?.data?.updatedAt, selectedNode?.data?.forceRefresh]); // 只监听关键属性变化  // 实时检测机制 - 仅针对正在生成的节点，优化性能
   useEffect(() => {
     if (!selectedNode) return;
     
@@ -142,30 +153,46 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
     const isDetailNode = nodeType === 'answer-detail' || nodeType === 'ANSWER_DETAIL' || 
                         nodeType === 'circuit-detail' || nodeType === 'knowledge-detail';
     
-    // 只对正在生成的详情节点进行高频检测
+    // 只对正在生成的详情节点进行检测，已完成的节点停止检测
     if (isDetailNode && process === 'generating') {
       console.log(`为正在生成的详情节点 ${selectedNode.id} 设置实时检测`);
+      
+      let lastCheckedText = lastTextContent;
+      let lastCheckedUpdatedAt = lastUpdatedAt;
       
       const realTimeCheck = setInterval(() => {
         // 使用getLatestNodeData获取最新的节点数据
         const latestNode = getLatestNodeData ? getLatestNodeData(selectedNode.id) : selectedNode;
+        if (!latestNode || !latestNode.data) return;
+        
         const currentText = getCurrentText(latestNode);
         const currentUpdatedAt = (latestNode?.data?.updatedAt as number) || 0;
+        const currentProcess = latestNode?.data?.process;
         
-        // 检查是否有新的文本内容
-        if (currentText !== lastTextContent || currentUpdatedAt !== lastUpdatedAt) {
+        // 如果进程已完成，停止检测
+        if (currentProcess === 'completed') {
+          console.log(`节点 ${selectedNode.id} 已完成，停止实时检测`);
+          clearInterval(realTimeCheck);
+          return;
+        }
+        
+        // 检查是否有实际变化
+        if (currentText !== lastCheckedText || currentUpdatedAt !== lastCheckedUpdatedAt) {
           console.log(`实时检测到内容变化，节点 ${selectedNode.id}，文本长度: ${currentText.length}，更新时间: ${currentUpdatedAt}`);
+          lastCheckedText = currentText;
+          lastCheckedUpdatedAt = currentUpdatedAt;
+          
           setLastTextContent(currentText);
           setLastUpdatedAt(currentUpdatedAt);
           setForceRefresh(prev => prev + 1);
         }
-      }, 100); // 100ms 间隔检测
+      }, 200); // 降低检测频率到200ms，减少性能影响
       
       return () => clearInterval(realTimeCheck);
     }
-  }, [selectedNode, nodeData, getCurrentText, lastTextContent, lastUpdatedAt, getLatestNodeData]);
+  }, [selectedNode?.id, nodeData?.process]); // 只监听关键状态变化
 
-  // 为正在生成的详情节点添加额外的高频检查
+  // 高频检查机制 - 仅对正在生成的详情节点，避免无限循环
   useEffect(() => {
     if (!selectedNode || !nodeData) return;
     
@@ -174,18 +201,33 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
     const isDetailNode = nodeType === 'answer-detail' || nodeType === 'ANSWER_DETAIL' || 
                         nodeType === 'circuit-detail' || nodeType === 'knowledge-detail';
     
-    if (isDetailNode && (process === 'generating' || !process)) {
+    // 只对正在生成的详情节点进行高频检查，已完成或未开始的节点跳过
+    if (isDetailNode && process === 'generating') {
       console.log(`为详情节点 ${selectedNode.id} 设置高频检查，当前process: ${process}`);
       
-      let lastCheckedLength = 0;
+      let lastCheckedLength = getCurrentText(selectedNode).length;
+      let intervalId: NodeJS.Timeout;
+      
       const interval = setInterval(() => {
         // 使用getLatestNodeData获取最新的节点数据
         const latestNode = getLatestNodeData ? getLatestNodeData(selectedNode.id) : selectedNode;
-        const latestText = getStringField(latestNode?.data, 'text') || '';
+        if (!latestNode || !latestNode.data) return;
         
+        const latestText = getStringField(latestNode?.data, 'text') || '';
+        const latestProcess = getStringField(latestNode?.data, 'process');
+        
+        // 如果进程已完成，停止高频检查
+        if (latestProcess === 'completed') {
+          console.log(`节点 ${selectedNode.id} 进程已完成，停止高频检查`);
+          clearInterval(interval);
+          return;
+        }
+        
+        // 只在文本长度真正变化时才更新
         if (latestText.length !== lastCheckedLength) {
           console.log(`高频检查检测到文本变化，节点ID: ${selectedNode.id}，新长度: ${latestText.length}，旧长度: ${lastCheckedLength}`);
           lastCheckedLength = latestText.length;
+          
           setLastTextContent(latestText);
           setNodeContentKey(prev => prev + 1);
           
@@ -194,13 +236,17 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
             scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
           }
         }
-      }, 50); // 减少到50ms检查一次，提高实时性
+      }, 300); // 降低频率到300ms，减少性能开销
+      
+      intervalId = interval;
       
       return () => {
-        clearInterval(interval);
+        if (intervalId) {
+          clearInterval(intervalId);
+        }
       };
     }
-  }, [selectedNode?.id, selectedNode?.type, getStringField(nodeData, 'process'), getLatestNodeData]);
+  }, [selectedNode?.id, nodeData?.process]); // 只监听关键状态
 
   // 专门监听selectedNode的文本变化，确保最实时的更新
   useEffect(() => {
@@ -243,7 +289,7 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
     return format(new Date(nodeData.createdAt), 'yyyy年MM月dd日 HH:mm');
   }, [nodeData?.createdAt]);
 
-  // 获取节点状态 - 使用最新的节点数据
+  // 获取节点状态 - 使用最新的节点数据，优化避免无限重新计算
   const nodeStatus = useMemo(() => {
     // 优先使用最新的节点数据
     const latestNode = selectedNode?.id && getLatestNodeData ? 
@@ -256,13 +302,16 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
     const process = getStringField(currentNodeData, 'process');
     const nodeType = selectedNode?.type as NodeType;
     
-    console.log('节点状态计算:', {
-      nodeId: selectedNode?.id,
-      nodeType,
-      isGenerated,
-      process,
-      timestamp: Date.now()
-    });
+    // 减少日志输出频率，避免控制台被刷屏
+    if (Math.random() < 0.1) { // 只在10%的计算中输出日志
+      console.log('节点状态计算:', {
+        nodeId: selectedNode?.id,
+        nodeType,
+        isGenerated,
+        process,
+        timestamp: Date.now()
+      });
+    }
     
     // 对于分点节点，优先检查是否已有子节点完成
     if (nodeType === 'answer-point' || nodeType === 'ANSWER_POINT' || 
@@ -332,7 +381,14 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
     }
     
     return { text: '待生成', color: 'text-gray-600 bg-gray-50' };
-  }, [selectedNode?.id, selectedNode?.type, nodeData, getLatestNodeData, forceRefresh, lastUpdatedAt]);
+  }, [
+    selectedNode?.id, 
+    selectedNode?.type, 
+    nodeData?.isGenerated, 
+    nodeData?.process, 
+    nodeData?.text, 
+    lastUpdatedAt
+  ]); // 优化依赖项，只监听真正影响状态的字段
 
   // 获取模式信息
   const modeInfo = useMemo(() => {
@@ -507,7 +563,18 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
   const { title, text, subtype, angle, objectName, urls, parentId } = nodeFields;
 
   return (
-    <div className="w-96 bg-white border-l border-gray-200 h-full flex flex-col">
+    <div 
+      className="bg-white border-l border-gray-200 h-full flex flex-col flex-shrink-0" 
+      style={{ 
+        width: '384px',
+        maxWidth: '384px',
+        minWidth: '384px',
+        zIndex: 10,
+        position: 'relative',
+        pointerEvents: 'auto'
+      }}
+      onClick={(e) => e.stopPropagation()}
+    >
       {/* 头部 */}
       <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gray-50">
         <div className="flex items-center space-x-2">
