@@ -98,10 +98,18 @@ export default function DocumentUpload() {
 
       message.success('文档上传成功');
       
-      // 延迟跳转，让用户看到成功消息
+      console.log('上传成功，跳转到文档库页面');
+      
+      // 跳转到文档库页面
+      navigate('/circuit-experiment/documents', {
+        replace: true
+      });
+      
+      // 跳转后立即刷新页面，确保显示最新数据
       setTimeout(() => {
-        navigate('/circuit-experiment/documents');
-      }, 1500);
+        console.log('上传成功，刷新页面显示最新数据');
+        window.location.reload();
+      }, 100);
     } catch (error) {
       console.error('文档上传失败:', error);
       message.error('文档上传失败');
@@ -112,7 +120,9 @@ export default function DocumentUpload() {
 
   // 返回文档库
   const handleBack = () => {
-    navigate('/circuit-experiment/documents');
+    navigate('/circuit-experiment/documents', {
+      state: { timestamp: Date.now() }
+    });
   };
 
   return (

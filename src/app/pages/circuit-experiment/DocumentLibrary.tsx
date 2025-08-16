@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Table, Button, Card, Space, message, Modal, Typography, Spin, Tag, Tooltip } from 'antd';
 import { DeleteOutlined, EyeOutlined, ExperimentOutlined, UploadOutlined } from '@ant-design/icons';
 import { getUserPdfDocuments, deleteDocument } from '@/api/methods/document.methods';
@@ -32,6 +32,7 @@ export default function DocumentLibrary() {
   const fetchDocuments = async () => {
     try {
       setLoading(true);
+      console.log('开始获取文档列表...');
       const response = await getUserPdfDocuments();
       
       // 处理后端返回的数据，确保文件名字段存在
@@ -42,6 +43,7 @@ export default function DocumentLibrary() {
       }));
       
       setDocuments(processedDocuments);
+      console.log('文档列表已更新，共 ' + processedDocuments.length + ' 个文档');
     } catch (error) {
       console.error('获取实验文档列表失败:', error);
       message.error('获取实验文档列表失败');
@@ -62,6 +64,7 @@ export default function DocumentLibrary() {
 
   // 组件加载时获取列表
   useEffect(() => {
+    console.log('DocumentLibrary 组件加载');
     fetchDocuments();
   }, []);
 
@@ -76,14 +79,21 @@ export default function DocumentLibrary() {
       onOk: async () => {
         try {
           setDeleteLoading(true);
+          console.log('开始删除文档，ID:', id);
+          
+          // 调用API删除
           await deleteDocument(id);
+          console.log('API删除成功');
+          
           message.success('删除成功');
-          // 重新获取列表
-          fetchDocuments();
+          
+          // 简单粗暴：直接刷新页面
+          console.log('删除成功，刷新页面');
+          window.location.reload();
+          
         } catch (error) {
           console.error('删除实验文档失败:', error);
           message.error('删除实验文档失败');
-        } finally {
           setDeleteLoading(false);
         }
       }
