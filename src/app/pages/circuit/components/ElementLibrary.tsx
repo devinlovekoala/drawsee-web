@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { CircuitElementType } from '@/api/types/circuit.types';
 import { Tabs, Tooltip } from 'antd';
 import { 
@@ -176,6 +176,21 @@ interface ElementLibraryProps {
 
 const ElementLibrary: React.FC<ElementLibraryProps> = ({ onSelectElement }) => {
   const [activeKey, setActiveKey] = useState('passive');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showTutorial, setShowTutorial] = useState(true);
+  
+  // 过滤元件
+  const filteredCategories = useMemo(() => {
+    if (!searchTerm) return elementCategories;
+    
+    return elementCategories.map(category => ({
+      ...category,
+      elements: category.elements.filter(element => 
+        element.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        element.shortcut.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    })).filter(category => category.elements.length > 0);
+  }, [searchTerm]);
   
   // 渲染元件项
   const renderElement = (element: { type: CircuitElementType, name: string, shortcut: string }) => {
@@ -186,15 +201,15 @@ const ElementLibrary: React.FC<ElementLibraryProps> = ({ onSelectElement }) => {
         placement="right"
       >
         <div 
-          className="element-item py-2 px-3 mb-2 flex items-center cursor-pointer hover:bg-gray-100 rounded-md transition-colors"
+          className="element-item group py-3 px-3 mb-2 flex items-center cursor-pointer hover:bg-blue-50 rounded-lg transition-all duration-200 border border-transparent hover:border-blue-200 hover:shadow-sm transform hover:-translate-y-0.5"
           onClick={() => onSelectElement(element.type)}
         >
-          <div className="element-icon mr-3 text-blue-600 flex-shrink-0">
+          <div className="element-icon mr-3 text-blue-600 flex-shrink-0 bg-blue-100 p-2 rounded-lg group-hover:bg-blue-200 group-hover:scale-110 transition-all duration-200">
             {getElementIcon(element.type)}
           </div>
           <div className="element-info">
-            <div className="element-name text-sm font-medium text-gray-700">{element.name}</div>
-            <div className="element-shortcut text-xs text-gray-500">快捷键: {element.shortcut}</div>
+            <div className="element-name text-sm font-medium text-gray-800 group-hover:text-blue-700">{element.name}</div>
+            <div className="element-shortcut text-xs text-blue-600 font-medium group-hover:text-blue-800">快捷键: {element.shortcut}</div>
           </div>
         </div>
       </Tooltip>
@@ -205,33 +220,81 @@ const ElementLibrary: React.FC<ElementLibraryProps> = ({ onSelectElement }) => {
   const renderTabContent = (category: any) => {
     return (
       <div className="element-category-content p-2">
-        {category.elements.map(renderElement)}
+        {category.elements.length === 0 ? (
+          <div className="text-center py-8 text-gray-400">
+            <div className="w-12 h-12 mx-auto mb-2 text-gray-300">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
+            <p className="text-sm">未找到匹配的元件</p>
+          </div>
+        ) : (
+          category.elements.map(renderElement)
+        )}
       </div>
     );
   };
 
   return (
-    <div className="element-library-container h-full bg-white border-r border-gray-200 overflow-y-auto">
-      <div className="element-library-header border-b border-gray-200 py-3 px-4">
-        <h3 className="text-base font-semibold text-gray-800">电路元件库</h3>
-        <p className="text-xs text-gray-500 mt-1">点击添加元件或使用快捷键</p>
+    <div className="element-library-container h-full bg-gradient-to-b from-gray-50 to-white border-r border-gray-200 overflow-y-auto shadow-sm">
+      <div className="element-library-header border-b border-gray-200 py-4 px-4 bg-white">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-base font-semibold text-gray-800 flex items-center gap-2">
+            <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+            智能电路元件库
+          </h3>
+          <button
+            onClick={() => setShowTutorial(!showTutorial)}
+            className="text-gray-400 hover:text-blue-600 transition-colors"
+            title={showTutorial ? "隐藏引导" : "显示引导"}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </button>
+        </div>
+        
+        {/* 搜索框 */}
+        <div className="relative mb-2">
+          <input
+            type="text"
+            placeholder="搜索元件..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-8 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+          />
+          <svg className="absolute left-2 top-2.5 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+        </div>
+        
+        {showTutorial && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-2 mt-2">
+            <p className="text-xs text-blue-700">
+              💡 <strong>新手提示：</strong>点击元件添加到画布，使用快捷键快速操作
+            </p>
+          </div>
+        )}
       </div>
       
       <Tabs
         activeKey={activeKey}
         onChange={setActiveKey}
         tabPosition="left"
-        items={elementCategories.map(category => ({
+        items={filteredCategories.map(category => ({
           key: category.key,
           label: (
-            <div className="flex flex-col items-center">
-              {category.icon}
-              <span className="text-xs mt-1">{category.label}</span>
+            <div className="flex flex-col items-center py-2 px-1">
+              <div className="text-blue-600">{category.icon}</div>
+              <span className="text-xs mt-1 text-gray-700 font-medium">{category.label}</span>
             </div>
           ),
           children: renderTabContent(category)
         }))}
-        style={{ height: 'calc(100% - 60px)' }}
+        style={{ height: 'calc(100% - 140px)' }}
         className="element-tabs"
       />
     </div>

@@ -1,0 +1,185 @@
+/* 增强的电路连接体验样式 */
+
+/* 连接点悬停动画 */
+.circuit-port-handle:hover {
+  animation: portPulse 1s infinite alternate;
+}
+
+@keyframes portPulse {
+  from {
+    box-shadow: 0 0 5px rgba(59, 130, 246, 0.5);
+  }
+  to {
+    box-shadow: 0 0 15px rgba(59, 130, 246, 0.8), 0 0 25px rgba(59, 130, 246, 0.4);
+  }
+}
+
+/* 连接预览线动画 */
+.connection-preview-path {
+  animation: dashMove 2s linear infinite;
+}
+
+@keyframes dashMove {
+  0% {
+    stroke-dashoffset: 0;
+  }
+  100% {
+    stroke-dashoffset: 20;
+  }
+}
+
+/* 连接线选中状态增强 */
+.react-flow__edge.selected path {
+  filter: drop-shadow(0px 0px 8px rgba(245, 158, 11, 0.6));
+  animation: selectedEdgePulse 2s ease-in-out infinite;
+}
+
+@keyframes selectedEdgePulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+/* 连接线悬停效果 */
+.react-flow__edge:hover path {
+  cursor: pointer;
+  filter: drop-shadow(0px 0px 6px rgba(59, 130, 246, 0.5));
+  transition: filter 0.2s ease;
+}
+
+/* 专业级连接点样式 */
+.professional-circuit-node .react-flow__handle {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.professional-circuit-node .react-flow__handle:hover {
+  transform: scale(1.4);
+  box-shadow: 0 0 20px rgba(59, 130, 246, 0.7);
+}
+
+/* 连接状态指示器 */
+.connection-status-indicator {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  animation: statusPulse 1.5s ease-in-out infinite;
+}
+
+.connection-status-indicator.connected {
+  background-color: #10b981;
+}
+
+.connection-status-indicator.connecting {
+  background-color: #f59e0b;
+}
+
+.connection-status-indicator.error {
+  background-color: #ef4444;
+}
+
+@keyframes statusPulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.3);
+    opacity: 0.7;
+  }
+}
+
+/* 连接线类型视觉区分 */
+.react-flow__edge[data-connection-type="power"] path {
+  filter: drop-shadow(0px 0px 3px rgba(37, 99, 235, 0.4));
+}
+
+.react-flow__edge[data-connection-type="signal"] path {
+  filter: drop-shadow(0px 0px 3px rgba(16, 185, 129, 0.4));
+}
+
+.react-flow__edge[data-connection-type="ground"] path {
+  filter: drop-shadow(0px 0px 2px rgba(75, 85, 99, 0.4));
+}
+
+/* 连接拖拽时的视觉反馈 */
+.react-flow__connection-line {
+  stroke-width: 3px !important;
+  filter: drop-shadow(0px 0px 8px rgba(59, 130, 246, 0.6));
+}
+
+/* 元件高亮状态 */
+.circuit-node.highlighted {
+  outline: 3px solid #3b82f6;
+  outline-offset: 2px;
+  border-radius: 8px;
+  animation: nodeHighlight 2s ease-in-out infinite;
+}
+
+@keyframes nodeHighlight {
+  0%, 100% {
+    outline-color: #3b82f6;
+  }
+  50% {
+    outline-color: #60a5fa;
+  }
+}
+
+/* 连接点分组视觉效果 */
+.port-group {
+  position: relative;
+}
+
+.port-group::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  border: 1px dashed rgba(59, 130, 246, 0.3);
+  border-radius: 8px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.port-group:hover::before {
+  opacity: 1;
+}
+
+/* 响应式连接点大小 */
+@media (max-width: 768px) {
+  .circuit-port-handle {
+    width: 20px !important;
+    height: 20px !important;
+  }
+  
+  .circuit-port-marker {
+    width: 12px !important;
+    height: 12px !important;
+  }
+}
+
+/* 无障碍访问增强 */
+.react-flow__handle:focus {
+  outline: 3px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* 连接线标签样式增强 */
+.react-flow__edge-label {
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #374151;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}

@@ -17,8 +17,9 @@ import ReactFlow, {
 } from 'reactflow';
 import { message, Modal, Spin } from 'antd';
 import 'reactflow/dist/style.css';
-import { CircuitNode } from './CircuitNode';
-import ConnectionEdge, { ConnectionPreview } from './ConnectionEdge';
+import './enhanced-connection.css';
+import { EnhancedCircuitNode } from './EnhancedCircuitNode';
+import { EnhancedConnectionEdge as ConnectionEdge, EnhancedConnectionPreview as ConnectionPreview } from './EnhancedConnectionEdge';
 import ComponentConfig from './ComponentConfig';
 import { 
   CircuitElementType,
@@ -42,7 +43,7 @@ const getNewNodeId = () => `node-${nodeIdCounter++}`;
 
 // 定义节点类型
 const nodeTypes = {
-  circuitNode: CircuitNode,
+  circuitNode: EnhancedCircuitNode,
 };
 
 // 定义边类型
@@ -354,7 +355,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
     [selectedEdgeId]
   );
 
-  // 处理连接创建
+  // 处理连接创建 - 增强用户反馈
   const onConnect = useCallback(
     (connection: Connection) => {
       // 检查连接是否有效
@@ -362,6 +363,9 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
         message.warning('无效的连接，请确保正确连接两个端口');
         return;
       }
+
+      // 显示连接中状态
+      const connectingMessage = message.loading('正在建立连接...', 0.5);
 
       // 清除之前选中的边缘
       setSelectedEdgeId(null);
@@ -376,6 +380,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
       );
 
       if (connectionExists) {
+        message.destroy(connectingMessage);
         message.warning('此连接已存在');
         return;
       }
@@ -386,18 +391,36 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
         console.log('同一节点上的端口相连:', connection);
       }
 
-      // 创建新的边对象
+      // 创建新的边对象 - 增强视觉效果
       const newEdge = {
         ...connection,
         id: `edge-${connection.source}-${connection.sourceHandle}-${connection.target}-${connection.targetHandle}`,
         type: 'default',
-        animated: false,
-        style: { stroke: '#3B82F6', strokeWidth: 2 },
-        data: {}
+        animated: true, // 启用动画效果
+        style: { 
+          stroke: '#3B82F6', 
+          strokeWidth: 2,
+          filter: 'drop-shadow(0px 0px 4px rgba(59, 130, 246, 0.3))'
+        },
+        data: {
+          status: 'connected',
+          timestamp: Date.now()
+        }
       };
       
       setEdges((eds) => addEdge(newEdge, eds));
-      message.success('连接成功', 0.5);
+      
+      // 延迟显示成功消息，让用户看到连接动画
+      setTimeout(() => {
+        message.destroy(connectingMessage);
+        message.success({
+          content: '连接建立成功！',
+          duration: 1,
+          style: {
+            marginTop: '10vh',
+          },
+        });
+      }, 300);
     },
     [edges]
   );
@@ -1235,19 +1258,20 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
             defaultViewport={{ x: 0, y: 0, zoom: 1 }}
             fitView
             attributionPosition="bottom-left"
-            // @ts-ignore
             connectionMode="loose"
             defaultMarkerColor="#3B82F6"
             connectOnClick={!isReadOnly}
-            connectionRadius={20}
-            isValidConnection={() => !isReadOnly}
+            connectionRadius={25} // 增加连接半径
+            isValidConnection={(connection) => {
+              if (isReadOnly) return false;
+              // 允许所有连接，让ReactFlow自然处理
+              return true;
+            }}
             onNodeClick={isReadOnly ? undefined : handleNodeClick}
             onNodeDoubleClick={isReadOnly ? undefined : (event, node) => {
-              // 阻止事件传播，避免与ReactFlow内置行为冲突
               event.preventDefault();
               event.stopPropagation();
               
-              // 触发自定义事件
               const doubleClickEvent = new CustomEvent('circuit-node-double-clicked', {
                 detail: { nodeId: node.id }
               });
@@ -1264,7 +1288,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
             zoomOnScroll={true}
             panOnScroll={false}
             zoomOnDoubleClick={false}
-            disableKeyboardA11y={true}
+            disableKeyboardA11y={false}
             className="circuit-flow-canvas"
           >
             <Background />

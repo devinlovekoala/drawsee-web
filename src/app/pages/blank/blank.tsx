@@ -50,7 +50,11 @@ function Blank() {
         'solver-first': 'SOLVER_FIRST',
         'solver-continue': 'SOLVER_CONTINUE',
         'solver-summary': 'SOLVER_SUMMARY',
-        'circuit-analyze': 'CIRCUIT_ANALYSIS'
+        'circuit-analyze': 'CIRCUIT_ANALYSIS',
+        'circuit-pdf-analyze': 'PDF_CIRCUIT_ANALYSIS',
+        'pdf-circuit-analysis': 'PDF_CIRCUIT_ANALYSIS',
+        'pdf-circuit-analysis-detail': 'PDF_CIRCUIT_ANALYSIS_DETAIL',
+        'pdf-circuit-design': 'PDF_CIRCUIT_DESIGN'
       };
       
       // 检查是否需要进行类型转换（只有当类型是字符串且为小写格式时）
@@ -156,7 +160,8 @@ function Blank() {
     try {
       // 确保任务类型是有效的
       const validTaskTypes = ['GENERAL', 'KNOWLEDGE', 'KNOWLEDGE_DETAIL', 'ANIMATION', 
-        'SOLVER_FIRST', 'SOLVER_CONTINUE', 'SOLVER_SUMMARY', 'PLANNER', 'HTML_MAKER', 'CIRCUIT_ANALYSIS'];
+        'SOLVER_FIRST', 'SOLVER_CONTINUE', 'SOLVER_SUMMARY', 'CIRCUIT_ANALYSIS',
+        'PDF_CIRCUIT_ANALYSIS', 'PDF_CIRCUIT_ANALYSIS_DETAIL', 'PDF_CIRCUIT_DESIGN'];
       
       if (!validTaskTypes.includes(queryForm.type)) {
         throw new Error(`不支持的任务类型: ${queryForm.type}`);
@@ -179,7 +184,7 @@ function Blank() {
         promptParams: promptParams,
         convId: null,
         parentId: null,
-        model: ["GENERAL", "KNOWLEDGE", "ANIMATION", "SOLVER_FIRST", "CIRCUIT_ANALYSIS"].includes(queryForm.type) ? queryForm.model : null,
+        model: ["GENERAL", "KNOWLEDGE", "ANIMATION", "SOLVER_FIRST", "CIRCUIT_ANALYSIS", "PDF_CIRCUIT_ANALYSIS", "PDF_CIRCUIT_ANALYSIS_DETAIL", "PDF_CIRCUIT_DESIGN"].includes(queryForm.type) ? queryForm.model : null,
         classId: classId // 添加班级ID
       };
 
@@ -318,8 +323,17 @@ function Blank() {
         title: "实验任务分析",
         description: "已自动发起实验任务分析，您可继续追问或查看分析结果"
       };
-    }
-    if (queryForm.type === "SOLVER_FIRST") {
+    } else if (queryForm.type === "PDF_CIRCUIT_ANALYSIS_DETAIL") {
+      return {
+        title: "实验任务详细分析",
+        description: "对实验任务分析点进行详细展开"
+      };
+    } else if (queryForm.type === "PDF_CIRCUIT_DESIGN") {
+      return {
+        title: "PDF电路设计分析",
+        description: "基于PDF文档进行电路设计和分析"
+      };
+    } else if (queryForm.type === "SOLVER_FIRST") {
       return {
         title: "AI推理解题",
         description: "上传题目图片或输入题目，让AI为您提供详细解题过程"
@@ -377,6 +391,68 @@ function Blank() {
     );
   };
 
+  // 渲染PDF分析模式指南
+  const renderPdfAnalysisGuide = () => {
+    if (!["PDF_CIRCUIT_ANALYSIS", "PDF_CIRCUIT_ANALYSIS_DETAIL", "PDF_CIRCUIT_DESIGN"].includes(queryForm.type)) {
+      return null;
+    }
+    
+    return (
+      <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+        <div className="flex items-start">
+          <div className="flex-shrink-0 pt-0.5">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-green-500">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14,2 14,8 20,8"/>
+              <line x1="16" y1="13" x2="8" y2="13"/>
+              <line x1="16" y1="17" x2="8" y2="17"/>
+              <polyline points="10,9 9,9 8,9"/>
+            </svg>
+          </div>
+          <div className="ml-3">
+            <h3 className="text-sm font-medium text-green-800">
+              {queryForm.type === "PDF_CIRCUIT_ANALYSIS" ? "PDF实验任务分析" :
+               queryForm.type === "PDF_CIRCUIT_ANALYSIS_DETAIL" ? "PDF任务详细分析" :
+               "PDF电路设计分析"}
+            </h3>
+            <div className="mt-2 text-sm text-green-700">
+              {queryForm.type === "PDF_CIRCUIT_ANALYSIS" && (
+                <>
+                  <p>系统正在分析您上传的PDF实验文档，您可以：</p>
+                  <ol className="mt-1 list-decimal list-inside">
+                    <li><strong>等待自动分析：</strong> AI将自动识别实验任务并生成分析点</li>
+                    <li><strong>主动提问：</strong> 对实验内容提出具体问题</li>
+                    <li><strong>查看分析点：</strong> 分析完成后可点击分析点查看详情</li>
+                  </ol>
+                </>
+              )}
+              {queryForm.type === "PDF_CIRCUIT_ANALYSIS_DETAIL" && (
+                <>
+                  <p>正在展开分析点的详细内容，您可以：</p>
+                  <ol className="mt-1 list-decimal list-inside">
+                    <li><strong>深入了解：</strong> 对当前分析点提出更详细的问题</li>
+                    <li><strong>关联分析：</strong> 询问与其他知识点的关联</li>
+                    <li><strong>实践指导：</strong> 询问具体的实验操作步骤</li>
+                  </ol>
+                </>
+              )}
+              {queryForm.type === "PDF_CIRCUIT_DESIGN" && (
+                <>
+                  <p>基于PDF文档进行电路设计，您可以：</p>
+                  <ol className="mt-1 list-decimal list-inside">
+                    <li><strong>设计要求：</strong> 描述需要设计的电路功能</li>
+                    <li><strong>参数指定：</strong> 指定电路的技术参数要求</li>
+                    <li><strong>优化建议：</strong> 询问电路优化的方案</li>
+                  </ol>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="flex flex-col h-screen bg-white overflow-hidden">
       {/* 顶部导航 */}
@@ -388,6 +464,9 @@ function Blank() {
              queryForm.type === 'ANIMATION' ? '动画生成' :
              queryForm.type === 'SOLVER_FIRST' ? '解题推理' :
              queryForm.type === 'CIRCUIT_ANALYSIS' ? '电路分析' :
+             queryForm.type === 'PDF_CIRCUIT_ANALYSIS' ? '实验任务分析' :
+             queryForm.type === 'PDF_CIRCUIT_ANALYSIS_DETAIL' ? '实验任务详细分析' :
+             queryForm.type === 'PDF_CIRCUIT_DESIGN' ? 'PDF电路设计' :
              agentName || '智能助手'}
           </h1>
         </div>
@@ -476,6 +555,9 @@ function Blank() {
                           queryForm.type === "ANIMATION" ? "请输入你想制作动画的问题..." :
                           queryForm.type === "SOLVER_FIRST" ? "请输入需要解答的题目（可通过图片上传）..." :
                           queryForm.type === "CIRCUIT_ANALYSIS" ? "请上传电路图或描述电路问题..." :
+                          queryForm.type === "PDF_CIRCUIT_ANALYSIS" ? "请对实验任务提出问题或等待自动分析..." :
+                          queryForm.type === "PDF_CIRCUIT_ANALYSIS_DETAIL" ? "请对分析点提出进一步的问题..." :
+                          queryForm.type === "PDF_CIRCUIT_DESIGN" ? "请描述需要设计的电路要求..." :
                           "请输入问题"
                         }
                         className="w-full p-4 h-32 pr-0 text-xl bg-transparent outline-none resize-none scrollbar-hide"
@@ -688,8 +770,8 @@ function Blank() {
                     <div className="items-center justify-between block w-full md:flex">
                       <div className="mb-4 whitespace-nowrap md:mb-0">
                         <div className="flex gap-3">
-                          {/* 在通用、知识、解题、动画和电路分析模式下显示模型选择器 */}
-                          {['GENERAL', 'ANIMATION', 'SOLVER_FIRST', 'CIRCUIT_ANALYSIS'].includes(queryForm.type) && (
+                          {/* 在通用、知识、解题、动画、电路分析和PDF分析模式下显示模型选择器 */}
+                          {['GENERAL', 'ANIMATION', 'SOLVER_FIRST', 'CIRCUIT_ANALYSIS', 'PDF_CIRCUIT_ANALYSIS', 'PDF_CIRCUIT_ANALYSIS_DETAIL', 'PDF_CIRCUIT_DESIGN'].includes(queryForm.type) && (
                             <ModelSelector 
                               selectedModel={queryForm.model} 
                               onModelChange={handleModelChange} 
@@ -707,6 +789,9 @@ function Blank() {
 
         {/* 电路分析模式指南 */}
         {renderCircuitAnalysisGuide()}
+        
+        {/* PDF分析模式指南 */}
+        {renderPdfAnalysisGuide()}
       </div>
     </div>
   );

@@ -10,6 +10,7 @@ import { createAiTask } from '@/api/methods/flow.methods';
 import { CreateAiTaskDTO } from '@/api/types/flow.types';
 import { ModelSelector } from '../../pages/blank/components/ModelSelector';
 import { ModelType } from '../flow/components/input/FlowInputPanel';
+import { useAppContext } from '@/app/contexts/AppContext';
 
 const { Title } = Typography;
 
@@ -24,6 +25,7 @@ export default function DocumentLibrary() {
   const navigate = useNavigate();
   const location = useLocation();
   const [selectedModel, setSelectedModel] = useState<ModelType>('deepseekV3');
+  const { handleBlankQuery, handleAiTaskCountPlus } = useAppContext();
   
   // 从location中获取班级ID
   const classId = location.state?.classId as string || null;
@@ -108,36 +110,68 @@ export default function DocumentLibrary() {
   // 跳转到 flow 智能体会话页面并自动分析（实验任务分析agentType）
   const handleAnalyze = async (document: UserDocumentVO) => {
     try {
-      // 构造AI任务参数，按照新的要求设置
+      console.log('========== 开始PDF电路分析任务 ==========');
+      console.log('文档信息:', {
+        id: document.id,
+        title: document.title,
+        fileUrl: document.fileUrl,
+        fileSize: document.fileSize
+      });
+      console.log('选择的模型:', selectedModel);
+      console.log('班级ID:', classId);
+      
+      // 根据API文档，构造标准的AI任务参数
       const taskDto: CreateAiTaskDTO = {
         type: "PDF_CIRCUIT_ANALYSIS",
-        prompt: document.fileUrl, // 直接将fileUrl放入prompt字段
-        promptParams: {}, // 清空promptParams对象
-        convId: null,
-        parentId: null,
-        model: selectedModel, // 使用用户选择的模型
-        classId: classId // 传递班级ID
+        prompt: document.fileUrl, // PDF文件URL
+        promptParams: {}, // 空对象，非null
+        convId: null, // 新会话
+        parentId: null, // 无父节点
+        model: selectedModel, // 模型选择
+        classId: classId // 班级ID
       };
       
-      // 将taskDto作为请求体参数传递
+      console.log('发送的任务数据:', JSON.stringify(taskDto, null, 2));
+      console.log('准备发送POST请求到:', '/flow/tasks');
+      console.log('请求头包含Authorization:', !!localStorage.getItem('Auth:Token'));
+      
+      // 创建AI任务
       const res = await createAiTask(taskDto);
       
-      // 创建新的对话并导航到对话流页面
-      if (res && res.conversation && res.taskId) {
-        navigate('/flow', {
-          state: {
-            convId: res.conversation.id,
-            taskId: res.taskId,
-            classId: classId // 传递班级ID到flow页面
-          }
-        });
-        message.success('实验分析已开始');
-      } else {
-        message.error('AI任务创建失败，未返回会话ID');
+      console.log('任务创建API响应:', JSON.stringify(res, null, 2));
+      console.log('返回的taskId类型:', typeof res.taskId, '值:', res.taskId);
+      console.log('返回的conversation:', res.conversation);
+      
+      // 验证响应数据
+      if (!res || !res.taskId || !res.conversation) {
+        console.error('任务创建失败，响应数据不完整:', res);
+        message.error('AI任务创建失败，请重试');
+        return;
       }
+      
+      // 验证taskId是否为有效数字
+      if (isNaN(Number(res.taskId))) {
+        console.error('无效的taskId:', res.taskId);
+        message.error('任务创建失败：返回了无效的任务ID');
+        return;
+      }
+      
+      console.log('✅ 任务创建成功，准备建立SSE连接');
+      
+      // 增加AI任务计数
+      handleAiTaskCountPlus();
+      
+      // 成功提示
+      message.success('PDF分析任务已创建，正在建立连接...');
+      
+      // 使用统一的handleBlankQuery方法导航到flow页面
+      handleBlankQuery(res);
+      
     } catch (error) {
-      console.error('分析实验失败:', error);
-      message.error('分析实验失败');
+      console.error('========== 分析实验失败 ==========');
+      console.error('错误详情:', error);
+      console.error('错误堆栈:', error instanceof Error ? error.stack : 'N/A');
+      message.error(`分析实验失败: ${error instanceof Error ? error.message : '未知错误'}`);
     }
   };
 

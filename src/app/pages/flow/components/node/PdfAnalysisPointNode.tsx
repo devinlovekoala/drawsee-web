@@ -49,7 +49,7 @@ export default function PdfAnalysisPointNode(props: ExtendedNodeProps<'PDF_ANALY
       const dto: CreateAiTaskDTO = {
         type: 'PDF_CIRCUIT_ANALYSIS_DETAIL',
         prompt: data.text,
-        promptParams: null,
+        promptParams: {},
         convId: typeof convId === 'number' ? convId : null,
         parentId: Number(id),
         model: selectedModel,

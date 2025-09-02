@@ -1,9 +1,11 @@
 "use client";
 
 import CircuitList from '@/app/pages/circuit/components/CircuitList';
-import { ArrowLeft, CircuitBoard } from 'lucide-react';
+import { ArrowLeft, CircuitBoard, Plus, Search, Filter, ArrowUpDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { Button } from 'antd';
+import { Button, Input, Select, Space, Card } from 'antd';
+
+const { Search: SearchInput } = Input;
 
 /**
  * 电路设计列表页面
@@ -31,12 +33,59 @@ export default function CircuitListPage() {
             </div>
           </div>
           
-          <Button
-            type="primary"
-            onClick={() => navigate('/circuit')}
-          >
-            创建新电路
-          </Button>
+          <div className="flex items-center space-x-2">
+            <Button
+              type="primary"
+              icon={<Plus size={16} />}
+              onClick={() => navigate('/circuit/create')}
+            >
+              创建新电路
+            </Button>
+          </div>
+        </div>
+      </div>
+      
+      {/* 搜索和筛选栏 */}
+      <div className="bg-white border-b border-gray-200 px-6 py-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4 flex-1">
+            <SearchInput
+              placeholder="搜索电路设计..."
+              allowClear
+              style={{ width: 300 }}
+              prefix={<Search size={16} />}
+            />
+            
+            <Select
+              placeholder="筛选类型"
+              style={{ width: 150 }}
+              allowClear
+              prefix={<Filter size={16} />}
+            >
+              <Select.Option value="recent">最近创建</Select.Option>
+              <Select.Option value="updated">最近更新</Select.Option>
+              <Select.Option value="complex">复杂电路</Select.Option>
+              <Select.Option value="simple">简单电路</Select.Option>
+            </Select>
+            
+            <Select
+              placeholder="排序方式"
+              style={{ width: 150 }}
+              defaultValue="updated"
+              prefix={<ArrowUpDown size={16} />}
+            >
+              <Select.Option value="updated">更新时间</Select.Option>
+              <Select.Option value="created">创建时间</Select.Option>
+              <Select.Option value="name">名称</Select.Option>
+              <Select.Option value="complexity">复杂度</Select.Option>
+            </Select>
+          </div>
+          
+          <div className="flex items-center space-x-2">
+            <Button icon={<Filter size={16} />}>
+              高级筛选
+            </Button>
+          </div>
         </div>
       </div>
       

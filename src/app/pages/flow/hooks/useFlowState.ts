@@ -74,7 +74,8 @@ function useFlowState(convId: number, selectedNode?: Node | null, setSelectedNod
           
           // 如果是详情节点，也添加到活跃节点列表，并准备自动选中
           if (nodeVO.type === 'answer-detail' || nodeVO.type === 'ANSWER_DETAIL' || 
-              nodeVO.type === 'circuit-detail' || nodeVO.type === 'knowledge-detail') {
+              nodeVO.type === 'circuit-detail' || nodeVO.type === 'knowledge-detail' ||
+              nodeVO.type === 'PDF_ANALYSIS_DETAIL') {
             console.log(`创建详情节点 ${nodeVO.id}，准备自动选中并开始流式显示`);
             lastFocusNodeId.current = nodeVO.id.toString();
             activeNodeIds.current.add(nodeVO.id.toString());
@@ -171,10 +172,23 @@ function useFlowState(convId: number, selectedNode?: Node | null, setSelectedNod
                 circuitPointNode.data.isGenerated = true;
               }
             }
+            
+            // 如果节点类型是PDF_ANALYSIS_DETAIL，则修改其父节点(PDF_ANALYSIS_POINT)的isGenerated为true
+            if (nodeVO.type === 'PDF_ANALYSIS_DETAIL') {
+              const pdfAnalysisPointNode = layoutedNodes.find(node => 
+                node.type === 'PDF_ANALYSIS_POINT' && 
+                nodeVO.parentId && 
+                node.id === nodeVO.parentId.toString()
+              );
+              if (pdfAnalysisPointNode) {
+                pdfAnalysisPointNode.data.isGenerated = true;
+              }
+            }
 
             // 如果是详情节点，自动选中该节点以便在右侧面板显示
             if ((nodeVO.type === 'answer-detail' || nodeVO.type === 'ANSWER_DETAIL' || 
-                 nodeVO.type === 'circuit-detail' || nodeVO.type === 'knowledge-detail') && 
+                 nodeVO.type === 'circuit-detail' || nodeVO.type === 'knowledge-detail' ||
+                 nodeVO.type === 'PDF_ANALYSIS_DETAIL') && 
                 setSelectedNode) {
               const newDetailNode = layoutedNodes.find(node => node.id === newNode.id);
               if (newDetailNode) {
