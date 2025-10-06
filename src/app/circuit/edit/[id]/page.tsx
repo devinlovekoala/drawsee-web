@@ -1,12 +1,11 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { getCircuitDesignById, saveCircuitDesign } from '@/api/methods/circuit.methods';
-import { EnhancedCircuitCanvasWithProvider } from '@/app/pages/circuit/components/EnhancedCircuitCanvas';
-import { Button, Spin, Result, Card, Modal, message, Input, Form } from 'antd';
+import { getCircuitDesignById } from '@/api/methods/circuit.methods';
+import { CircuitFlowWithProvider } from '@/app/pages/circuit/components/CircuitFlow';
+import { Button, Spin, Result, Card, Modal } from 'antd';
 import { CircuitDesign } from '@/api/types/circuit.types';
-import { useParams, useNavigate } from 'react-router-dom';
-import { Save, ArrowLeft, Eye, EyeOff, Settings, Download, Share2 } from 'lucide-react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 
 // 导航事件类型定义
 interface NavigationEvent {
@@ -23,6 +22,7 @@ export default function CircuitEditPage() {
   const params = useParams();
   const id = params.id as string;
   const navigate = useNavigate();
+  const location = useLocation();
   
   const [circuitDesign, setCircuitDesign] = useState<CircuitDesign | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -32,11 +32,7 @@ export default function CircuitEditPage() {
   const [navigationState, setNavigationState] = useState<any>(null);
   const [navigationCallback, setNavigationCallback] = useState<((canProceed: boolean) => void) | null>(null);
   const [showConfirmModal, setShowConfirmModal] = useState<boolean>(false);
-  const [showSaveModal, setShowSaveModal] = useState<boolean>(false);
-  const [saving, setSaving] = useState<boolean>(false);
-  const [showElementLibrary, setShowElementLibrary] = useState<boolean>(true);
   const originalDesignRef = useRef<CircuitDesign | null>(null);
-  const [form] = Form.useForm();
 
   useEffect(() => {
     const fetchCircuitDesign = async () => {
@@ -69,84 +65,10 @@ export default function CircuitEditPage() {
     
     // 如果原始设计已加载，则判断是否有未保存的更改
     if (originalDesignRef.current) {
-      const hasChanges = JSON.stringify(updatedDesign.elements) !== JSON.stringify(originalDesignRef.current.elements) ||
-                        JSON.stringify(updatedDesign.connections) !== JSON.stringify(originalDesignRef.current.connections);
+      const hasChanges = JSON.stringify(updatedDesign.elements) !== JSON.stringify(originalDesignRef.current.elements);
       setHasUnsavedChanges(hasChanges);
     }
   }, []);
-
-  // 处理保存电路设计
-  const handleSaveCircuit = async (values: { title: string; description: string }) => {
-    if (!circuitDesign) {
-      message.error('没有可保存的电路设计');
-      return;
-    }
-
-    try {
-      setSaving(true);
-      const updatedDesign = {
-        ...circuitDesign,
-        metadata: {
-          ...circuitDesign.metadata,
-          title: values.title,
-          description: values.description,
-          updatedAt: new Date().toISOString()
-        }
-      };
-
-      const result = await saveCircuitDesign(
-        updatedDesign,
-        values.title,
-        values.description
-      );
-      
-      if (result.success) {
-        message.success('电路设计保存成功');
-        setShowSaveModal(false);
-        setHasUnsavedChanges(false);
-        // 更新原始设计引用
-        originalDesignRef.current = JSON.parse(JSON.stringify(updatedDesign));
-      } else {
-        message.error('保存失败');
-      }
-    } catch (error) {
-      console.error('保存电路设计失败:', error);
-      message.error('保存失败，请重试');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  // 处理快速保存
-  const handleQuickSave = async () => {
-    if (!circuitDesign) {
-      message.error('没有可保存的电路设计');
-      return;
-    }
-
-    try {
-      setSaving(true);
-      const result = await saveCircuitDesign(
-        circuitDesign,
-        circuitDesign.metadata.title,
-        circuitDesign.metadata.description
-      );
-      
-      if (result.success) {
-        message.success('电路设计已保存');
-        setHasUnsavedChanges(false);
-        // 更新原始设计引用
-        originalDesignRef.current = JSON.parse(JSON.stringify(circuitDesign));
-      } else {
-        message.error('保存失败');
-      }
-    } catch (error) {
-      console.error('保存电路设计失败:', error);
-      message.error('保存失败，请重试');
-    } finally {
-      setSaving(false);
-    }
-  };
 
   // 拦截导航请求，如果有未保存的更改则显示确认对话框
   const handleNavigation = useCallback((path: string, state?: any, callback?: (canProceed: boolean) => void) => {
@@ -258,78 +180,43 @@ export default function CircuitEditPage() {
 
   return (
     <div className="w-full h-full flex flex-col">
-      {/* 顶部工具栏 */}
-      <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <Button
-            icon={<ArrowLeft size={16} />}
-            onClick={() => handleNavigation('/circuit/list')}
-          >
-            返回列表
-          </Button>
-          <div className="h-6 w-px bg-gray-300"></div>
-          <h1 className="text-lg font-semibold text-gray-800">
-            编辑: {circuitDesign.metadata.title || '电路设计'}
-            {hasUnsavedChanges && <span className="text-orange-500 ml-2">*</span>}
-          </h1>
+      <Card 
+        title={`编辑: ${circuitDesign.metadata.title || '电路设计'}`} 
+        className="flex-grow flex flex-col overflow-hidden"
+        bodyStyle={{ 
+          height: 'calc(100vh - 170px)', 
+          padding: '12px',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden'
+        }}
+        style={{ 
+          zIndex: 10,
+          position: 'relative'
+        }}
+        extra={
+          <div className="flex gap-2">
+            <Button
+              onClick={() => handleNavigation('/circuit/list')}
+            >
+              返回列表
+            </Button>
+            <Button
+              onClick={() => handleNavigation(`/circuit/view/${id}`)}
+            >
+              查看模式
+            </Button>
+          </div>
+        }
+      >
+        <div className="flex-grow h-full">
+          <CircuitFlowWithProvider 
+            initialCircuitDesign={circuitDesign}
+            isReadOnly={false}
+            onCircuitDesignChange={handleCircuitDesignChange}
+          />
         </div>
-        
-        <div className="flex items-center space-x-2">
-          <Button
-            icon={showElementLibrary ? <Eye size={16} /> : <EyeOff size={16} />}
-            onClick={() => setShowElementLibrary(!showElementLibrary)}
-            title={showElementLibrary ? "隐藏元件库" : "显示元件库"}
-          >
-            {showElementLibrary ? "隐藏库" : "显示库"}
-          </Button>
-          
-          <Button
-            icon={<Settings size={16} />}
-            title="设置"
-          >
-            设置
-          </Button>
-          
-          <Button
-            icon={<Download size={16} />}
-            title="导出"
-          >
-            导出
-          </Button>
-          
-          <Button
-            icon={<Share2 size={16} />}
-            title="分享"
-          >
-            分享
-          </Button>
-          
-          <Button
-            onClick={handleQuickSave}
-            icon={<Save size={16} />}
-            loading={saving}
-            disabled={!hasUnsavedChanges}
-          >
-            保存
-          </Button>
-          
-          <Button
-            onClick={() => setShowSaveModal(true)}
-            icon={<Save size={16} />}
-            type="primary"
-            loading={saving}
-          >
-            另存为
-          </Button>
-        </div>
-      </div>
-
-      {/* 主要内容区域 */}
-      <div className="flex-1 overflow-hidden">
-        <EnhancedCircuitCanvasWithProvider 
-          onCircuitDesignChange={handleCircuitDesignChange}
-        />
-      </div>
+      </Card>
 
       {/* 未保存更改确认对话框 */}
       <Modal
@@ -342,50 +229,6 @@ export default function CircuitEditPage() {
       >
         <p>您有未保存的电路更改，确定要离开此页面吗？</p>
         <p>离开后未保存的更改将会丢失。</p>
-      </Modal>
-
-      {/* 保存对话框 */}
-      <Modal
-        title="保存电路设计"
-        open={showSaveModal}
-        onCancel={() => setShowSaveModal(false)}
-        footer={[
-          <Button key="cancel" onClick={() => setShowSaveModal(false)}>
-            取消
-          </Button>,
-          <Button key="save" type="primary" form="saveForm" htmlType="submit" loading={saving}>
-            保存
-          </Button>,
-        ]}
-      >
-        <Form
-          id="saveForm"
-          form={form}
-          layout="vertical"
-          onFinish={handleSaveCircuit}
-          initialValues={{
-            title: circuitDesign.metadata.title,
-            description: circuitDesign.metadata.description
-          }}
-        >
-          <Form.Item
-            label="设计名称"
-            name="title"
-            rules={[{ required: true, message: '请输入设计名称' }]}
-          >
-            <Input placeholder="请输入电路设计名称" />
-          </Form.Item>
-          
-          <Form.Item
-            label="设计描述"
-            name="description"
-          >
-            <Input.TextArea 
-              placeholder="请输入电路设计描述（可选）"
-              rows={3}
-            />
-          </Form.Item>
-        </Form>
       </Modal>
     </div>
   );

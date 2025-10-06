@@ -15,24 +15,24 @@ import ReactFlow, {
   useReactFlow,
   ReactFlowProvider,
 } from 'reactflow';
-import { message, Modal, Spin } from 'antd';
+import { Button, Dropdown, message, Space, Modal, Spin } from 'antd';
 import 'reactflow/dist/style.css';
-import './enhanced-connection.css';
-import { EnhancedCircuitNode } from './EnhancedCircuitNode';
-import { EnhancedConnectionEdge as ConnectionEdge, EnhancedConnectionPreview as ConnectionPreview } from './EnhancedConnectionEdge';
+import { CircuitNode } from './CircuitNode';
+import ConnectionEdge, { ConnectionPreview } from './ConnectionEdge';
 import ComponentConfig from './ComponentConfig';
 import { 
-  CircuitElementType,
-  CircuitDesign,
+  CircuitElementType, 
+  CircuitDesign, 
   Port,
   CircuitElement
 } from '@/api/types/circuit.types';
 import { createAiTask } from '@/api/methods/flow.methods';
 import { saveCircuitDesign } from '@/api/methods/circuit.methods';
-import { CircuitNodeData } from '../types';
+import { CircuitNodeData, ModelType } from '../types';
 import { useAppContext } from '@/app/contexts/AppContext';
 import { CreateAiTaskDTO } from '@/api/types/flow.types';
 import { useHotkeys } from 'react-hotkeys-hook';
+import { ModelSelector } from '@/app/pages/blank/components/ModelSelector';
 import { ModelType as FlowModelType } from '@/app/pages/flow/components/input/FlowInputPanel';
 import ElementLibrary from './ElementLibrary';
 import CircuitToolbar from './CircuitToolbar';
@@ -43,7 +43,7 @@ const getNewNodeId = () => `node-${nodeIdCounter++}`;
 
 // 定义节点类型
 const nodeTypes = {
-  circuitNode: EnhancedCircuitNode,
+  circuitNode: CircuitNode,
 };
 
 // 定义边类型
@@ -355,7 +355,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
     [selectedEdgeId]
   );
 
-  // 处理连接创建 - 简化版本
+  // 处理连接创建
   const onConnect = useCallback(
     (connection: Connection) => {
       // 检查连接是否有效
@@ -387,31 +387,51 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
         console.log('同一节点上的端口相连:', connection);
       }
 
-      // 创建新的边对象 - 简化视觉效果
+      // 创建新的边对象
       const newEdge = {
         ...connection,
         id: `edge-${connection.source}-${connection.sourceHandle}-${connection.target}-${connection.targetHandle}`,
         type: 'default',
-        animated: false, // 简化动画
-        style: { 
-          stroke: '#3B82F6', 
-          strokeWidth: 2
-        },
-        data: {
-          status: 'connected',
-          timestamp: Date.now()
-        }
+        animated: false,
+        style: { stroke: '#3B82F6', strokeWidth: 2 },
+        data: {}
       };
       
       setEdges((eds) => addEdge(newEdge, eds));
-      
-      // 显示成功消息
-      message.success('连接建立成功！', 1);
+      message.success('连接成功', 0.5);
     },
     [edges]
   );
 
-  // 移除未使用的双击处理函数
+  // 添加一个函数来处理元件双击事件
+  const handleNodeDoubleClick = useCallback((nodeId: string) => {
+    console.log('CircuitFlow.handleNodeDoubleClick 被调用，nodeId:', nodeId);
+    console.log('当前所有节点:', nodes);
+    
+    const node = nodes.find(n => n.id === nodeId);
+    if (node) {
+      console.log('找到节点数据:', node.data);
+      
+      // 创建一个完整的数据对象，只包含 CircuitNodeData 支持的属性
+      const nodeData = {
+        id: node.id,
+        label: node.data.label || '',
+        value: node.data.value || '',
+        element: node.data.element,
+        description: '',
+        ports: node.data.ports || [],
+      };
+      
+      console.log('设置 selectedElement:', nodeData);
+      setSelectedElement(nodeData);
+      
+      console.log('设置 configVisible = true');
+      setConfigVisible(true);
+    } else {
+      console.warn('未找到节点数据 id:', nodeId);
+      console.warn('请确认节点ID是否正确，所有节点ID:', nodes.map(n => n.id));
+    }
+  }, [nodes]);
 
   // 创建新节点
   const addNewNode = useCallback(
@@ -1216,25 +1236,19 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
             defaultViewport={{ x: 0, y: 0, zoom: 1 }}
             fitView
             attributionPosition="bottom-left"
-            connectionMode={undefined}
+            // @ts-ignore
+            connectionMode="loose"
             defaultMarkerColor="#3B82F6"
             connectOnClick={!isReadOnly}
-            connectionRadius={30} // 增加连接半径，提高连接成功率
-            isValidConnection={() => {
-              if (isReadOnly) return false;
-              // 允许所有连接，让ReactFlow自然处理
-              return true;
-            }}
-            connectionLineStyle={{
-              strokeWidth: 2,
-              stroke: '#3B82F6',
-              strokeDasharray: '5 5'
-            }}
+            connectionRadius={20}
+            isValidConnection={() => !isReadOnly}
             onNodeClick={isReadOnly ? undefined : handleNodeClick}
             onNodeDoubleClick={isReadOnly ? undefined : (event, node) => {
+              // 阻止事件传播，避免与ReactFlow内置行为冲突
               event.preventDefault();
               event.stopPropagation();
               
+              // 触发自定义事件
               const doubleClickEvent = new CustomEvent('circuit-node-double-clicked', {
                 detail: { nodeId: node.id }
               });
@@ -1251,7 +1265,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
             zoomOnScroll={true}
             panOnScroll={false}
             zoomOnDoubleClick={false}
-            disableKeyboardA11y={false}
+            disableKeyboardA11y={true}
             className="circuit-flow-canvas"
           >
             <Background />

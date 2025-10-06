@@ -1,11 +1,10 @@
 import { useState, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { CircuitDesign } from '@/api/types/circuit.types';
-import { EnhancedCircuitCanvasWithProvider } from './components/EnhancedCircuitCanvas';
+import { CircuitFlowWithProvider } from './components/CircuitFlow';
 import { ModelType } from '../flow/components/input/FlowInputPanel';
 import { Button, Tooltip } from 'antd';
 import { BrainCircuit, InfoIcon, Save } from 'lucide-react';
-import { SettingOutlined } from '@ant-design/icons';
 
 // 电路分析页面 - 提供电路设计可视化界面
 function Circuit() {
@@ -36,30 +35,21 @@ function Circuit() {
           <div className="flex items-center">
             <BrainCircuit size={24} className="text-blue-600 mr-2" />
             <div>
-              <h1 className="text-xl font-semibold text-gray-800">增强电路设计平台</h1>
+              <h1 className="text-xl font-semibold text-gray-800">电路智能分析</h1>
               <p className="text-sm text-gray-500">
                 {classId ? '班级电路分析学习 - ' : ''}
-                点对点连接的专业电路搭建、仿真与分析系统
+                设计电路并获取AI智能分析
               </p>
             </div>
           </div>
           
           <div className="flex items-center gap-3">
-            <Tooltip title="电路设计指南">
+            <Tooltip title="保存的电路设计会显示在电路库中，您可以随时查看和编辑">
               <Button 
                 icon={<InfoIcon size={16} />} 
                 type="text"
               >
-                指南
-              </Button>
-            </Tooltip>
-            
-            <Tooltip title="系统设置">
-              <Button 
-                icon={<SettingOutlined />} 
-                type="text"
-              >
-                设置
+                帮助
               </Button>
             </Tooltip>
             
@@ -74,14 +64,32 @@ function Circuit() {
         </div>
       </div>
       
-      {/* 专业级电路设计画布 */}
+      {/* 主要内容区域 */}
       <div className="flex-1 overflow-hidden">
-        <EnhancedCircuitCanvasWithProvider 
+        <CircuitFlowWithProvider 
           onCircuitDesignChange={handleCircuitDesignChange}
           selectedModel={selectedModel}
           classId={classId}
           onModelChange={handleModelChange}
         />
+      </div>
+      
+      {/* 底部提示 */}
+      <div className="bg-blue-50 border-t border-blue-100 p-2 text-blue-700 text-xs flex justify-between items-center">
+        <div>
+          <span className="font-medium">提示：</span> 
+          保存电路设计后可以在电路库中查看。电路分析结果将在AI分析完成后显示。
+        </div>
+        <div>
+          <Button 
+            size="small" 
+            type="link" 
+            className="text-blue-600 hover:text-blue-800"
+            onClick={() => navigate('/circuit/list')}
+          >
+            查看电路库
+          </Button>
+        </div>
       </div>
     </div>
   );

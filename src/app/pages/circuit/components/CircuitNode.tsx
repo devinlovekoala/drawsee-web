@@ -1,0 +1,591 @@
+'use client';
+
+import React, { memo, useMemo, useEffect, useState, useCallback } from 'react';
+import { Handle, Position, NodeProps } from 'reactflow';
+import { CircuitElement, CircuitElementType, ComponentVisualConfig } from '@/api/types/circuit.types';
+
+// 端口类型定义
+export type PortType = 'input' | 'output' | 'bidirectional';
+
+// 端口位置定义
+interface PortPosition {
+  side: 'left' | 'right' | 'top' | 'bottom';
+  x: number;  // 相对于元件边界的百分比位置 (0-100)
+  y: number;  // 相对于元件边界的百分比位置 (0-100)
+  align?: 'start' | 'center' | 'end'; // 可选的对齐方式
+  rotatedOffset?: {  // 添加旋转后的位置偏移
+    '90'?: { top?: string; bottom?: string; left?: string; right?: string };
+    '180'?: { top?: string; bottom?: string; left?: string; right?: string };
+    '270'?: { top?: string; bottom?: string; left?: string; right?: string };
+  };
+}
+
+// 端口定义
+interface Port {
+  id: string;
+  name: string;
+  type: PortType;
+  position: PortPosition;
+}
+
+// 节点数据接口
+interface CircuitNodeData {
+  id?: string;     // 添加id字段
+  type: CircuitElementType;
+  label: string;
+  value: string;
+  element?: CircuitElement; // 添加完整的元件数据
+  onNodeClick?: (id: string) => void;
+  description?: string;    // 添加description字段
+  ports?: Port[];          // 添加ports字段
+}
+
+// 为每种元件类型定义默认端口
+const defaultPorts: Record<string, Port[]> = {
+  [CircuitElementType.RESISTOR]: [
+    { id: 'port1', name: '左端口', type: 'bidirectional', position: { side: 'left', x: 10, y: 50 } },
+    { id: 'port2', name: '右端口', type: 'bidirectional', position: { side: 'right', x: 100, y: 50 } }
+  ],
+  [CircuitElementType.CAPACITOR]: [
+    { id: 'port1', name: '左端口', type: 'bidirectional', position: { side: 'left', x: 20, y: 50 } },
+    { id: 'port2', name: '右端口', type: 'bidirectional', position: { side: 'right', x: 100, y: 50 } }
+  ],
+  [CircuitElementType.INDUCTOR]: [
+    { id: 'port1', name: '左端口', type: 'bidirectional', position: { side: 'left', x: 0, y: 50 } },
+    { id: 'port2', name: '右端口', type: 'bidirectional', position: { side: 'right', x: 100, y: 50 } }
+  ],
+  [CircuitElementType.VOLTAGE_SOURCE]: [
+    { id: 'positive', name: '正极', type: 'output', position: { side: 'left', x: 0, y: 50 } },
+    { id: 'negative', name: '负极', type: 'input', position: { side: 'right', x: 120, y: 50 } }
+  ],
+  [CircuitElementType.CURRENT_SOURCE]: [
+    { id: 'positive', name: '正极', type: 'output', position: { side: 'left', x: 0, y: 50 } },
+    { id: 'negative', name: '负极', type: 'input', position: { side: 'right', x: 120, y: 50 } }
+  ],
+  [CircuitElementType.DIODE]: [
+    { id: 'anode', name: '阳极', type: 'input', position: { side: 'left', x: 0, y: 50 } },
+    { id: 'cathode', name: '阴极', type: 'output', position: { side: 'right', x: 120, y: 50 } }
+  ],
+  [CircuitElementType.TRANSISTOR_NPN]: [
+    { id: 'base', name: '基极', type: 'input', position: { side: 'left', x: 5, y: 50 } },
+    { id: 'collector', name: '集电极', type: 'input', position: { side: 'right', x: 95, y: 10 } },
+    { id: 'emitter', name: '发射极', type: 'output', position: { side: 'right', x: 95, y: 90 } }
+  ],
+  [CircuitElementType.TRANSISTOR_PNP]: [
+    { id: 'base', name: '基极', type: 'input', position: { side: 'left', x: 0, y: 50 } },
+    { id: 'emitter', name: '发射极', type: 'input', position: { side: 'left', x: 80, y: 0 } },
+    { id: 'collector', name: '集电极', type: 'output', position: { side: 'right', x: 100, y: 100 } }
+  ],
+  [CircuitElementType.GROUND]: [
+    { id: 'ground', name: '接地点', type: 'input', position: { side: 'top', x: 50, y: 10 } }
+  ],
+  [CircuitElementType.OPAMP]: [
+    { id: 'input1', name: '输入1', type: 'input', position: { side: 'left', x: 0, y: 40 } },
+    { id: 'input2', name: '输入2', type: 'input', position: { side: 'left', x: 0, y: 65 } },
+    { id: 'output', name: '输出', type: 'output', position: { side: 'right', x: 110, y: 50 } }
+  ],
+};
+
+// 为每种元件类型定义默认端口配置函数
+const getDefaultPorts = (elementType: string): Port[] => {
+  return defaultPorts[elementType] || defaultPorts[CircuitElementType.RESISTOR] || [];
+};
+
+// 为了解决没有SVG组件问题，直接内嵌SVG组件
+const SVGComponents: Record<CircuitElementType, React.FC<React.SVGProps<SVGSVGElement>>> = {
+  [CircuitElementType.RESISTOR]: (props: React.SVGProps<SVGSVGElement>) => (
+    <svg {...props} viewBox="0 0 60 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M5,10 H15 M45,10 H55" stroke="currentColor" strokeWidth="2" />
+      <rect x="15" y="5" width="30" height="10" fill="#F0F9FF" rx="2" stroke="currentColor" strokeWidth="2" />
+      <path d="M20,5 L20,15 M25,5 L25,15 M30,5 L30,15 M35,5 L35,15 M40,5 L40,15" stroke="currentColor" strokeWidth="1.5" strokeOpacity="0.7" />
+    </svg>
+  ),
+  [CircuitElementType.CAPACITOR]: (props: React.SVGProps<SVGSVGElement>) => (
+    <svg {...props} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M5,20 L15,20" stroke="currentColor" strokeWidth="2" />
+      <path d="M25,20 L35,20" stroke="currentColor" strokeWidth="2" />
+      <path d="M15,5 L15,35" stroke="currentColor" strokeWidth="2" />
+      <path d="M25,5 L25,35" stroke="currentColor" strokeWidth="2" />
+      <path d="M15,5 L15,35" fill="none" />
+      <path d="M16,5 L24,5 L24,35 L16,35 Z" fill="#F0F9FF" fillOpacity="0.5" />
+    </svg>
+  ),
+  [CircuitElementType.INDUCTOR]: (props: React.SVGProps<SVGSVGElement>) => (
+    <svg {...props} viewBox="0 0 60 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M5,15 L13,15" stroke="currentColor" strokeWidth="2" />
+      <path d="M47,15 L55,15" stroke="currentColor" strokeWidth="2" />
+      <path d="M13,15 C13,8 17,15 20,8 S27,22 30,15 S37,8 40,15 S47,22 47,15" 
+        stroke="currentColor" strokeWidth="2" fill="none" />
+      <path d="M20,8 C17,15 24,22 30,15 C37,8 40,15 47,22" 
+        stroke="currentColor" strokeWidth="0.7" strokeOpacity="0.3" fill="none" />
+    </svg>
+  ),
+  [CircuitElementType.VOLTAGE_SOURCE]: (props: React.SVGProps<SVGSVGElement>) => (
+    <svg {...props} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="20" cy="20" r="15" stroke="currentColor" strokeWidth="2" fill="#F0F9FF" fillOpacity="0.7" />
+      <path d="M13,20 L27,20" stroke="currentColor" strokeWidth="2" />
+      <path d="M20,13 L20,27" stroke="currentColor" strokeWidth="2" />
+      <text x="28" y="15" fontSize="8" fill="currentColor">+</text>
+      <text x="12" y="15" fontSize="8" fill="currentColor">-</text>
+    </svg>
+  ),
+  [CircuitElementType.CURRENT_SOURCE]: (props: React.SVGProps<SVGSVGElement>) => (
+    <svg {...props} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="20" cy="20" r="15" stroke="currentColor" strokeWidth="2" fill="#F0F9FF" fillOpacity="0.7" />
+      <path d="M12,20 L28,20" stroke="currentColor" strokeWidth="2" />
+      <path d="M25,15 L28,20 L25,25" stroke="currentColor" strokeWidth="2" fill="none" />
+      <text x="12" y="16" fontSize="7" fill="currentColor">I</text>
+    </svg>
+  ),
+  [CircuitElementType.DIODE]: (props: React.SVGProps<SVGSVGElement>) => (
+    <svg {...props} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M5,20 L15,20" stroke="currentColor" strokeWidth="2" />
+      <path d="M15,10 L15,30 L25,20 Z" stroke="currentColor" strokeWidth="2" fill="#F0F9FF" />
+      <path d="M25,10 L25,30" stroke="currentColor" strokeWidth="2" />
+      <path d="M25,20 L35,20" stroke="currentColor" strokeWidth="2" />
+    </svg>
+  ),
+  [CircuitElementType.TRANSISTOR_NPN]: (props: React.SVGProps<SVGSVGElement>) => (
+    <svg {...props} viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="30" cy="30" r="15" stroke="currentColor" strokeWidth="2" fill="#F0F9FF" fillOpacity="0.5" />
+      <path d="M30,15 L30,45" stroke="currentColor" strokeWidth="2" />
+      <path d="M5,30 L15,30" stroke="currentColor" strokeWidth="2" />
+      <path d="M30,20 L45,5" stroke="currentColor" strokeWidth="2" />
+      <path d="M30,40 L45,55" stroke="currentColor" strokeWidth="2" />
+      <text x="10" y="28" fontSize="7" fill="currentColor">B</text>
+      <text x="40" y="8" fontSize="7" fill="currentColor">C</text>
+      <text x="40" y="55" fontSize="7" fill="currentColor">E</text>
+    </svg>
+  ),
+  [CircuitElementType.TRANSISTOR_PNP]: (props: React.SVGProps<SVGSVGElement>) => (
+    <svg {...props} viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="30" cy="30" r="15" stroke="currentColor" strokeWidth="2" fill="#F0F9FF" fillOpacity="0.5" />
+      <path d="M30,15 L30,45" stroke="currentColor" strokeWidth="2" />
+      <path d="M5,30 L15,30" stroke="currentColor" strokeWidth="2" />
+      <path d="M30,20 L45,5" stroke="currentColor" strokeWidth="2" />
+      <path d="M30,40 L45,55" stroke="currentColor" strokeWidth="2" />
+      <path d="M30,20 L26,18" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M30,40 L26,42" stroke="currentColor" strokeWidth="1.5" />
+      <text x="10" y="28" fontSize="7" fill="currentColor">B</text>
+      <text x="40" y="8" fontSize="7" fill="currentColor">C</text>
+      <text x="40" y="55" fontSize="7" fill="currentColor">E</text>
+    </svg>
+  ),
+  [CircuitElementType.GROUND]: (props: React.SVGProps<SVGSVGElement>) => (
+    <svg {...props} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M20,5 L20,20" stroke="currentColor" strokeWidth="2" />
+      <path d="M10,20 L30,20" stroke="currentColor" strokeWidth="2" />
+      <path d="M13,25 L27,25" stroke="currentColor" strokeWidth="2" />
+      <path d="M16,30 L24,30" stroke="currentColor" strokeWidth="2" />
+    </svg>
+  ),
+  [CircuitElementType.OPAMP]: (props: React.SVGProps<SVGSVGElement>) => (
+    <svg {...props} viewBox="0 0 60 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M10,5 L10,35 L50,20 Z" stroke="currentColor" strokeWidth="2" fill="#F0F9FF" fillOpacity="0.5" />
+      <path d="M5,15 L10,15" stroke="currentColor" strokeWidth="2" />
+      <path d="M5,25 L10,25" stroke="currentColor" strokeWidth="2" />
+      <path d="M50,20 L55,20" stroke="currentColor" strokeWidth="2" />
+      <text x="8" y="17" fontSize="8" fill="currentColor">+</text>
+      <text x="8" y="27" fontSize="8" fill="currentColor">-</text>
+    </svg>
+  ),
+  [CircuitElementType.WIRE]: (props: React.SVGProps<SVGSVGElement>) => (
+    <svg {...props} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M5,20 L35,20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  ),
+  [CircuitElementType.JUNCTION]: (props: React.SVGProps<SVGSVGElement>) => (
+    <svg {...props} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="20" cy="20" r="5" fill="currentColor" />
+      <circle cx="20" cy="20" r="8" stroke="currentColor" strokeWidth="1" strokeDasharray="2 2" fill="none" />
+    </svg>
+  )
+};
+
+// 使用React.memo包裹电路节点组件，避免不必要的重渲染
+export const CircuitNode = memo(({ data, selected, id }: NodeProps<CircuitNodeData>) => {
+  const [rotation, setRotation] = useState<number>(0);
+  const [hovered, setHovered] = useState<boolean>(false);
+  const [lastValues, setLastValues] = useState({
+    label: data.label || "",
+    value: data.value || ""
+  });
+  
+  // 使用useCallback减少函数重新创建
+  const handleRotateClick = useCallback(() => {
+    const newRotation = (rotation + 90) % 360;
+    setRotation(newRotation);
+    
+    // 分发自定义事件，通知流程图组件更新连接线
+    const rotationEvent = new CustomEvent('circuit-node-rotated', { 
+      detail: { nodeId: id, rotation: newRotation }
+    });
+    document.dispatchEvent(rotationEvent);
+  }, [id, rotation]);
+  
+  // 获取元件中的初始值，使用useMemo避免重复计算
+  useEffect(() => {
+    // 只有当元件的基本属性变化时才更新状态
+    if (data.element && (
+        data.label !== lastValues.label || 
+        data.value !== lastValues.value
+      )) {
+      // 更新最后一次的值
+      setLastValues({
+        label: data.label || "",
+        value: data.value || ""
+      });
+      
+      // 设置初始旋转值
+      if (data.element.rotation !== undefined) {
+        setRotation(data.element.rotation);
+      }
+    }
+  }, [data.element, data.label, data.value, lastValues]);
+  
+  // 使用useMemo缓存端口列表，避免每次渲染都重新计算
+  const ports = useMemo(() => {
+    if (data.ports && data.ports.length > 0) {
+      return data.ports;
+    } else if (data.element && data.element.ports && data.element.ports.length > 0) {
+      return data.element.ports;
+    } else {
+      return getDefaultPorts(data.type);
+    }
+  }, [data.ports, data.element, data.type]);
+  
+  // 使用useMemo缓存SVG组件
+  const SvgComponent = useMemo(() => {
+    const validType = data.type || CircuitElementType.RESISTOR;
+    return SVGComponents[validType] || SVGComponents[CircuitElementType.RESISTOR];
+  }, [data.type]);
+  
+  // 获取端口的位置样式
+  const getPortStyle = useCallback((port: Port): React.CSSProperties => {
+    const baseStyle: React.CSSProperties = {
+      position: 'absolute',
+      width: 8,
+      height: 8,
+      background: '#fff',
+      border: '2px solid #3B82F6',
+      borderRadius: '50%',
+      zIndex: 10,
+      transform: 'translate(-50%, -50%)',
+    };
+
+    // 处理初始位置（未旋转时）
+    const { x, y, side } = port.position;
+    const style = { ...baseStyle };
+    
+    // 根据端口所在的边设置位置
+    switch(side) {
+      case 'left':
+        style.left = `${x}%`;
+        style.top = `${y}%`;
+        break;
+      case 'right':
+        style.left = `${x}%`;
+        style.top = `${y}%`;
+        break;
+      case 'top':
+        style.left = `${x}%`;
+        style.top = '0%';
+        break;
+      case 'bottom':
+        style.left = `${x}%`;
+        style.top = '100%';
+        break;
+    }
+    
+    return style;
+  }, []);
+  
+  // 特定元件的端口映射修正
+  const getFixedPortStyle = useCallback((port: Port, portStyle: React.CSSProperties): React.CSSProperties => {
+    const type = data.type;
+    
+    // 根据元件类型和旋转角度进行特殊的位置调整
+    if (type === CircuitElementType.RESISTOR) {
+      // 电阻器的端口位置修正
+      if (rotation === 90 || rotation === 270) {
+        // 90度和270度时，保持水平距离不变
+        if (port.id === 'port1' || port.id === 'port2') {
+          return {
+            ...portStyle,
+            // 微调定位，确保端点与SVG图形上的连接点对齐
+            left: rotation === 90 ? 
+              (port.id === 'port1' ? '50%' : '50%') :
+              (port.id === 'port1' ? '50%' : '50%'),
+            top: rotation === 90 ?
+              (port.id === 'port1' ? '100%' : '0%') : 
+              (port.id === 'port1' ? '0%' : '100%'),
+          };
+        }
+      }
+    } else if (type === CircuitElementType.CAPACITOR || type === CircuitElementType.INDUCTOR) {
+      // 电容器和电感器端口位置修正
+      if (rotation === 90 || rotation === 270) {
+        return {
+          ...portStyle,
+          // 确保端口垂直对齐
+          left: '50%', 
+          top: port.id === 'port1' ? 
+            (rotation === 90 ? '100%' : '0%') : 
+            (rotation === 90 ? '0%' : '100%')
+        };
+      }
+    } else if (type === CircuitElementType.VOLTAGE_SOURCE || type === CircuitElementType.CURRENT_SOURCE) {
+      // 电源端口位置修正
+      if (rotation === 90 || rotation === 270) {
+        return {
+          ...portStyle,
+          // 确保端口垂直对齐
+          left: '50%',
+          top: port.id === 'positive' ? 
+            (rotation === 90 ? '100%' : '0%') : 
+            (rotation === 90 ? '0%' : '100%')
+        };
+      }
+    } else if (type === CircuitElementType.DIODE) {
+      // 二极管端口位置修正
+      if (rotation === 90 || rotation === 270) {
+        return {
+          ...portStyle,
+          // 确保端口垂直对齐
+          left: '50%',
+          top: port.id === 'anode' ? 
+            (rotation === 90 ? '100%' : '0%') : 
+            (rotation === 90 ? '0%' : '100%')
+        };
+      }
+    }
+    
+    // 其他元件或旋转角度，使用默认位置
+    return portStyle;
+  }, [data.type, rotation]);
+  
+  // 优化双击处理函数的性能
+  const handleDoubleClick = useCallback((event: React.MouseEvent) => {
+    // 阻止冒泡，确保事件不向上传播
+    event.stopPropagation();
+    
+    // 自定义双击事件
+    const doubleClickEvent = new CustomEvent('circuit-node-double-clicked', {
+      detail: { nodeId: id }
+    });
+    document.dispatchEvent(doubleClickEvent);
+  }, [id]);
+  
+  // 获取元件主题样式，使用useMemo优化
+  const elementTheme = useMemo(() => {
+    const themes = {
+      default: { bg: '#F0F9FF', border: '#3B82F6', text: '#1F2937' },
+      warning: { bg: '#FEF3C7', border: '#F59E0B', text: '#92400E' },
+      danger: { bg: '#FEE2E2', border: '#EF4444', text: '#B91C1C' },
+      success: { bg: '#D1FAE5', border: '#10B981', text: '#065F46' },
+    };
+    return themes.default;
+  }, []);
+  
+  // 获取元件类型名称，使用useMemo优化
+  const elementTypeName = useMemo(() => {
+    const typeNames = {
+      [CircuitElementType.RESISTOR]: '电阻',
+      [CircuitElementType.CAPACITOR]: '电容',
+      [CircuitElementType.INDUCTOR]: '电感',
+      [CircuitElementType.VOLTAGE_SOURCE]: '电压源',
+      [CircuitElementType.CURRENT_SOURCE]: '电流源',
+      [CircuitElementType.DIODE]: '二极管',
+      [CircuitElementType.TRANSISTOR_NPN]: 'NPN晶体管',
+      [CircuitElementType.TRANSISTOR_PNP]: 'PNP晶体管',
+      [CircuitElementType.GROUND]: '接地',
+      [CircuitElementType.OPAMP]: '运放',
+      [CircuitElementType.WIRE]: '导线',
+      [CircuitElementType.JUNCTION]: '节点',
+    };
+    return typeNames[data.type] || '元件';
+  }, [data.type]);
+
+  // 考虑到元件的旋转，处理端口位置
+  const getPortPosition = useCallback((side: 'left' | 'right' | 'top' | 'bottom', rotation: number): Position => {
+    // 根据旋转角度确定端口的位置
+    if (rotation === 0) {
+      if (side === 'left') return Position.Left;
+      if (side === 'right') return Position.Right;
+      if (side === 'top') return Position.Top;
+      if (side === 'bottom') return Position.Bottom;
+    } else if (rotation === 90) {
+      if (side === 'left') return Position.Top;
+      if (side === 'right') return Position.Bottom;
+      if (side === 'top') return Position.Right;
+      if (side === 'bottom') return Position.Left;
+    } else if (rotation === 180) {
+      if (side === 'left') return Position.Right;
+      if (side === 'right') return Position.Left;
+      if (side === 'top') return Position.Bottom;
+      if (side === 'bottom') return Position.Top;
+    } else if (rotation === 270) {
+      if (side === 'left') return Position.Bottom;
+      if (side === 'right') return Position.Top;
+      if (side === 'top') return Position.Left;
+      if (side === 'bottom') return Position.Right;
+    }
+    return Position.Left; // 默认值
+  }, []);
+  
+  // 渲染组件
+  return (
+    <div
+      className={`relative p-2 ${
+        selected ? 'outline outline-2 outline-blue-500' : 'outline-none'
+      }`}
+      style={{
+        width: 'fit-content',
+        height: 'fit-content',
+        minWidth: '60px',
+        minHeight: '60px',
+        cursor: 'grab',
+        transform: `rotate(${rotation}deg)`,
+        transformOrigin: 'center center',
+        transition: 'transform 0.2s ease',
+        backgroundColor: hovered ? 'rgba(240, 249, 255, 0.9)' : 'rgba(240, 249, 255, 0.5)',
+        borderRadius: '6px'
+      }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onDoubleClick={handleDoubleClick}
+    >
+      {/* 元件SVG */}
+      <div 
+        className="element-svg-container"
+        style={{ 
+          width: '100%',
+          height: '100%',
+          position: 'relative',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: '#1F2937',
+          padding: '4px'
+        }}
+      >
+        <div 
+          style={{ 
+            width: '100%',
+            height: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <SvgComponent width="40" height="40" style={{color: '#1F2937'}} />
+        </div>
+      </div>
+      
+      {/* 渲染所有端口 */}
+      {ports.map((port: Port) => {
+        // 获取基础端口样式
+        const basePortStyle = getPortStyle(port);
+        // 应用特定元件的端口位置修正
+        const portStyle = getFixedPortStyle(port, basePortStyle);
+        const portPosition = getPortPosition(port.position.side, rotation);
+        const isInput = port.type === 'input' || port.type === 'bidirectional';
+        const isOutput = port.type === 'output' || port.type === 'bidirectional';
+        
+        // 获取端口颜色 - 根据端口类型
+        const getPortColor = () => {
+          if (port.type === 'input') return '#3B82F6'; // 蓝色
+          if (port.type === 'output') return '#10B981'; // 绿色
+          return '#8B5CF6'; // 紫色 (双向)
+        };
+        
+        return (
+          <React.Fragment key={port.id}>
+            {/* 渲染物理可见的端口标记点 */}
+            <div
+              className="circuit-port-marker"
+              style={{
+                ...portStyle,
+                pointerEvents: 'none', // 不接收鼠标事件，避免干扰连线
+                border: `2px solid ${getPortColor()}`,
+                background: '#fff',
+                transition: 'all 0.15s ease, transform 0.3s ease',
+                width: 6, // 稍微减小端口尺寸
+                height: 6,
+              }}
+              data-port-id={port.id}
+              data-port-type={port.type}
+              data-rotation={rotation}
+            />
+            
+            {/* 输入端口句柄 */}
+            {isInput && (
+              <Handle
+                type="target"
+                position={portPosition}
+                id={port.id}
+                style={{
+                  ...portStyle,
+                  background: 'transparent', // 透明背景
+                  width: 14, // 适当尺寸的点击区域
+                  height: 14,
+                  zIndex: 5,
+                  border: '2px solid transparent',
+                }}
+                isConnectable={true}
+                data-port-name={port.name}
+                data-port-type={port.type}
+              />
+            )}
+            
+            {/* 输出端口句柄 */}
+            {isOutput && (
+              <Handle
+                type="source"
+                position={portPosition}
+                id={port.id}
+                style={{
+                  ...portStyle,
+                  background: 'transparent', // 透明背景
+                  width: 14, // 适当尺寸的点击区域
+                  height: 14,
+                  zIndex: 5,
+                  border: '2px solid transparent',
+                }}
+                isConnectable={true}
+                data-port-name={port.name}
+                data-port-type={port.type}
+              />
+            )}
+          </React.Fragment>
+        );
+      })}
+      
+      {/* 元件标签 - 始终显示但根据选中状态调整样式 */}
+      <div 
+        className={`absolute transform -translate-x-1/2 px-1.5 py-0.5 rounded transition-all duration-200 bg-white border shadow-sm ${selected ? '-top-7' : '-top-6'}`}
+        style={{
+          left: '50%',
+          borderColor: selected ? elementTheme.border : elementTheme.border,
+          color: selected ? elementTheme.text : elementTheme.text,
+          fontSize: selected ? '11px' : '10px',
+          opacity: selected ? 1 : 0.85,
+          pointerEvents: 'none', // 不阻止点击事件
+          zIndex: 5,
+          scale: selected ? '1.05' : '1',
+          fontWeight: selected ? 500 : 400,
+          letterSpacing: '0.01em',
+          maxWidth: '120px',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis'
+        }}
+      >
+        {data.label}
+        {lastValues.value && <span style={{marginLeft: '3px', opacity: 0.8}}>({lastValues.value})</span>}
+      </div>
+    </div>
+  );
+});
+
+CircuitNode.displayName = 'CircuitNode';
