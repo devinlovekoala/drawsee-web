@@ -6,11 +6,12 @@ import { UserDocumentVO } from '@/api/types/document.types';
 import { useNavigate, useLocation } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { bytesToSize } from '@/utils/file';
-import { createAiTask } from '@/api/methods/flow.methods';
+import { createAiTask, getResourceUrl } from '@/api/methods/flow.methods';
 import { CreateAiTaskDTO } from '@/api/types/flow.types';
 import { ModelSelector } from '../../pages/blank/components/ModelSelector';
 import { ModelType } from '../flow/components/input/FlowInputPanel';
 import { useAppContext } from '@/app/contexts/AppContext';
+import { BASE_URL } from '@/api';
 
 const { Title } = Typography;
 
@@ -62,6 +63,48 @@ export default function DocumentLibrary() {
     // 移除时间戳前缀（如果存在）
     const cleanFileName = fileName.replace(/^\d+_/, '');
     return decodeURIComponent(cleanFileName);
+  };
+
+  // 从 objectPath 或已存在的 fileUrl 中提取对象名（用于向后端换取最新签名URL）
+  const extractObjectName = (doc: UserDocumentVO): string | null => {
+    if (doc.objectPath) {
+      // 后端一般以 bucket 根为前缀，这里只要对象名部分
+      const obj = doc.objectPath.replace(/^\/*(drawsee\/)*/i, '').replace(/^\//, '');
+      return obj || null;
+    }
+    if (doc.fileUrl) {
+      try {
+        const url = new URL(buildFullDocumentUrl(doc.fileUrl));
+        // 常见风格：/drawsee/user-documents/14/xxx.pdf 或 /user-documents/14/xxx.pdf
+        const pathname = url.pathname.replace(/^\/+/, '');
+        const afterBucket = pathname.startsWith('drawsee/') ? pathname.replace(/^drawsee\//, '') : pathname;
+        // 兜底：尝试从已知目录前缀截取
+        const userDocIdx = afterBucket.indexOf('user-documents/');
+        if (userDocIdx >= 0) {
+          return afterBucket.slice(userDocIdx);
+        }
+        return afterBucket || null;
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  };
+
+  // 构建完整的文档URL
+  const buildFullDocumentUrl = (fileUrl: string): string => {
+    if (!fileUrl) return '';
+    
+    // 如果已经是完整URL，直接返回
+    if (fileUrl.startsWith('http://') || fileUrl.startsWith('https://')) {
+      return fileUrl;
+    }
+    
+    // 如果是相对路径，构建完整URL
+    const baseUrl = BASE_URL.replace(/\/+$/, ''); // 移除末尾的斜杠
+    const path = fileUrl.startsWith('/') ? fileUrl : `/${fileUrl}`;
+    
+    return `${baseUrl}${path}`;
   };
 
   // 组件加载时获取列表
@@ -120,10 +163,22 @@ export default function DocumentLibrary() {
       console.log('选择的模型:', selectedModel);
       console.log('班级ID:', classId);
       
+      // 为保证 AI 任务可读取文件，这里优先换取最新的临时访问URL
+      let promptUrl = buildFullDocumentUrl(document.fileUrl);
+      const objectName = extractObjectName(document);
+      if (objectName) {
+        try {
+          const { url } = await getResourceUrl(objectName).send();
+          if (url) promptUrl = url;
+        } catch (e) {
+          console.warn('获取最新签名URL失败，回退使用原始URL: ', e);
+        }
+      }
+
       // 根据API文档，构造标准的AI任务参数
       const taskDto: CreateAiTaskDTO = {
         type: "PDF_CIRCUIT_ANALYSIS",
-        prompt: document.fileUrl, // PDF文件URL
+        prompt: promptUrl, // PDF文件URL（尽量使用新签名）
         promptParams: {}, // 空对象，非null
         convId: null, // 新会话
         parentId: null, // 无父节点
@@ -172,6 +227,56 @@ export default function DocumentLibrary() {
       console.error('错误详情:', error);
       console.error('错误堆栈:', error instanceof Error ? error.stack : 'N/A');
       message.error(`分析实验失败: ${error instanceof Error ? error.message : '未知错误'}`);
+    }
+  };
+
+  // 预览PDF文档
+  const handlePreview = async (document: UserDocumentVO) => {
+    console.log('=== PDF预览调试信息 ===');
+    console.log('文档对象:', document);
+    console.log('原始fileUrl:', document.fileUrl);
+    console.log('objectPath:', document.objectPath);
+    
+    // 检查URL是否有效
+    if (!document.fileUrl) {
+      console.error('fileUrl为空:', document.fileUrl);
+      message.error('文档URL无效，无法预览');
+      return;
+    }
+    
+    // 优先通过 objectPath/对象名换取最新签名URL，避免过期
+    const hide = message.loading('正在获取预览链接...', 0);
+    try {
+      let previewUrl = buildFullDocumentUrl(document.fileUrl);
+      const objectName = extractObjectName(document);
+      if (objectName) {
+        try {
+          const { url } = await getResourceUrl(objectName).send();
+          if (url) previewUrl = url;
+        } catch (e) {
+          console.warn('获取最新签名URL失败，回退使用原始URL: ', e);
+        }
+      }
+
+      console.log('最终用于预览的URL:', previewUrl);
+
+      // 检查URL格式
+      const url = new URL(previewUrl);
+      console.log('解析的URL:', url);
+      console.log('协议:', url.protocol);
+      console.log('主机:', url.host);
+      console.log('路径:', url.pathname);
+
+      const newWindow = window.open(previewUrl, '_blank');
+      if (!newWindow) {
+        console.error('无法打开新窗口，可能被浏览器拦截');
+        message.warning('无法打开新窗口，请检查浏览器弹窗设置');
+      }
+    } catch (error) {
+      console.error('获取预览链接或打开失败:', error);
+      message.error('无法获取有效的预览链接');
+    } finally {
+      hide();
     }
   };
 
@@ -243,7 +348,7 @@ export default function DocumentLibrary() {
               type="default" 
               icon={<EyeOutlined />} 
               disabled={deleteLoading}
-              onClick={() => window.open(record.fileUrl, '_blank')}
+              onClick={() => handlePreview(record)}
             />
           </Tooltip>
           <Tooltip title="删除文档">

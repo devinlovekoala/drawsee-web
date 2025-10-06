@@ -5,16 +5,10 @@
 
 'use client';
 
-import React, { memo, useMemo, useEffect, useState, useCallback, useRef } from 'react';
+import React, { memo, useMemo, useState, useCallback, useRef, Fragment } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
 import { CircuitElement, CircuitElementType } from '@/api/types/circuit.types';
-import { ConnectionPointComponent } from './ConnectionPointComponent';
-import { 
-  ConnectionPoint, 
-  ConnectionPointFactory, 
-  ConnectionManager, 
-  ConnectionPointState 
-} from './EnhancedConnectionSystem';
+// 移除复杂的连接点系统，使用简化的连接点
 
 // 节点数据接口
 interface EnhancedCircuitNodeData {
@@ -25,8 +19,12 @@ interface EnhancedCircuitNodeData {
   element?: CircuitElement;
   onNodeClick?: (id: string) => void;
   description?: string;
-  connectionManager?: ConnectionManager;
-  onConnectionEvent?: (event: string, data: unknown) => void;
+  ports?: Array<{
+    id: string;
+    name: string;
+    type: 'input' | 'output' | 'bidirectional';
+    position: { side: 'left' | 'right' | 'top' | 'bottom'; x: number; y: number; align: 'center' };
+  }>;
 }
 
 // SVG组件定义（保持原有的SVG组件）
@@ -141,29 +139,61 @@ const SVGComponents: Record<CircuitElementType, React.FC<React.SVGProps<SVGSVGEl
 export const EnhancedCircuitNode = memo(({ data, selected, id }: NodeProps<EnhancedCircuitNodeData>) => {
   const [rotation, setRotation] = useState<number>(0);
   const [hovered, setHovered] = useState<boolean>(false);
-  const [connectionPoints, setConnectionPoints] = useState<ConnectionPoint[]>([]);
-  const [connectionManager] = useState(() => data.connectionManager || new ConnectionManager());
   const nodeRef = useRef<HTMLDivElement>(null);
 
-  // 初始化连接点
-  useEffect(() => {
-    if (id && data.type) {
-      const points = ConnectionPointFactory.createDefaultConnectionPoints(id, data.type);
-      setConnectionPoints(points);
-      
-      // 将连接点添加到连接管理器
-      points.forEach(point => {
-        connectionManager.addConnectionPoint(point);
-      });
-    }
+  // 获取默认端口配置
+  const defaultPorts = useMemo(() => {
+    const ports = data.ports || [];
+    if (ports.length > 0) return ports;
     
-    return () => {
-      // 清理连接点 - 使用当前连接点状态
-      connectionPoints.forEach(point => {
-        connectionManager.removeConnectionPoint(point.id);
-      });
+    // 如果没有提供端口，使用默认配置
+    const defaultPortConfigs = {
+      [CircuitElementType.RESISTOR]: [
+        { id: 'port1', name: '端口1', type: 'bidirectional' as const, position: { side: 'left' as const, x: 0, y: 50, align: 'center' as const } },
+        { id: 'port2', name: '端口2', type: 'bidirectional' as const, position: { side: 'right' as const, x: 100, y: 50, align: 'center' as const } }
+      ],
+      [CircuitElementType.CAPACITOR]: [
+        { id: 'port1', name: '端口1', type: 'bidirectional' as const, position: { side: 'left' as const, x: 0, y: 50, align: 'center' as const } },
+        { id: 'port2', name: '端口2', type: 'bidirectional' as const, position: { side: 'right' as const, x: 100, y: 50, align: 'center' as const } }
+      ],
+      [CircuitElementType.INDUCTOR]: [
+        { id: 'port1', name: '端口1', type: 'bidirectional' as const, position: { side: 'left' as const, x: 0, y: 50, align: 'center' as const } },
+        { id: 'port2', name: '端口2', type: 'bidirectional' as const, position: { side: 'right' as const, x: 100, y: 50, align: 'center' as const } }
+      ],
+      [CircuitElementType.VOLTAGE_SOURCE]: [
+        { id: 'positive', name: '正极', type: 'output' as const, position: { side: 'right' as const, x: 100, y: 50, align: 'center' as const } },
+        { id: 'negative', name: '负极', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 50, align: 'center' as const } }
+      ],
+      [CircuitElementType.CURRENT_SOURCE]: [
+        { id: 'positive', name: '正极', type: 'output' as const, position: { side: 'right' as const, x: 100, y: 50, align: 'center' as const } },
+        { id: 'negative', name: '负极', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 50, align: 'center' as const } }
+      ],
+      [CircuitElementType.DIODE]: [
+        { id: 'anode', name: '阳极', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 50, align: 'center' as const } },
+        { id: 'cathode', name: '阴极', type: 'output' as const, position: { side: 'right' as const, x: 100, y: 50, align: 'center' as const } }
+      ],
+      [CircuitElementType.TRANSISTOR_NPN]: [
+        { id: 'base', name: '基极', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 50, align: 'center' as const } },
+        { id: 'collector', name: '集电极', type: 'input' as const, position: { side: 'right' as const, x: 100, y: 15, align: 'center' as const } },
+        { id: 'emitter', name: '发射极', type: 'output' as const, position: { side: 'right' as const, x: 100, y: 85, align: 'center' as const } }
+      ],
+      [CircuitElementType.TRANSISTOR_PNP]: [
+        { id: 'base', name: '基极', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 50, align: 'center' as const } },
+        { id: 'collector', name: '集电极', type: 'output' as const, position: { side: 'right' as const, x: 100, y: 15, align: 'center' as const } },
+        { id: 'emitter', name: '发射极', type: 'input' as const, position: { side: 'right' as const, x: 100, y: 85, align: 'center' as const } }
+      ],
+      [CircuitElementType.GROUND]: [
+        { id: 'ground', name: '接地点', type: 'input' as const, position: { side: 'top' as const, x: 50, y: 0, align: 'center' as const } }
+      ],
+      [CircuitElementType.OPAMP]: [
+        { id: 'input1', name: '输入1', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 30, align: 'center' as const } },
+        { id: 'input2', name: '输入2', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 70, align: 'center' as const } },
+        { id: 'output', name: '输出', type: 'output' as const, position: { side: 'right' as const, x: 100, y: 50, align: 'center' as const } }
+      ],
     };
-  }, [id, data.type, connectionManager]); // 移除 connectionPoints 依赖
+    
+    return defaultPortConfigs[data.type as keyof typeof defaultPortConfigs] || [];
+  }, [data.ports, data.type]);
 
   // 处理旋转
   const handleRotateClick = useCallback(() => {
@@ -177,82 +207,7 @@ export const EnhancedCircuitNode = memo(({ data, selected, id }: NodeProps<Enhan
     document.dispatchEvent(rotationEvent);
   }, [id, rotation]);
 
-  // 处理连接开始 - 优化连接逻辑
-  const handleConnectionStart = useCallback((pointId: string) => {
-    console.log('开始连接:', { pointId, nodeId: id });
-    
-    const success = connectionManager.startConnection(pointId);
-    if (success) {
-      data.onConnectionEvent?.('connectionStart', { pointId, nodeId: id });
-      
-      // 全局更新连接点状态
-      setConnectionPoints(prev => prev.map(point => ({
-        ...point,
-        state: connectionManager.getConnectionPoint(point.id)?.state || point.state
-      })));
-      
-      // 通知其他节点更新状态
-      const connectionStartEvent = new CustomEvent('circuit-connection-started', {
-        detail: { sourcePointId: pointId, sourceNodeId: id }
-      });
-      document.dispatchEvent(connectionStartEvent);
-      
-      return true;
-    }
-    
-    console.warn('连接开始失败:', pointId);
-    return false;
-  }, [connectionManager, data, id]);
-
-  // 处理连接完成
-  const handleConnectionComplete = useCallback((pointId: string) => {
-    const result = connectionManager.completeConnection(pointId);
-    if (result.success && result.edge) {
-      data.onConnectionEvent?.('connectionComplete', { 
-        pointId, 
-        nodeId: id, 
-        edge: result.edge 
-      });
-    } else {
-      data.onConnectionEvent?.('connectionError', { 
-        pointId, 
-        nodeId: id, 
-        error: result.error 
-      });
-    }
-    
-    // 更新连接点状态
-    setConnectionPoints(prev => prev.map(point => ({
-      ...point,
-      state: connectionManager.getConnectionPoint(point.id)?.state || point.state
-    })));
-  }, [connectionManager, data, id]);
-
-  // 处理连接取消
-  const handleConnectionCancel = useCallback(() => {
-    connectionManager.cancelConnection();
-    data.onConnectionEvent?.('connectionCancel', { nodeId: id });
-    
-    // 更新连接点状态
-    setConnectionPoints(prev => prev.map(point => ({
-      ...point,
-      state: connectionManager.getConnectionPoint(point.id)?.state || point.state
-    })));
-  }, [connectionManager, data, id]);
-
-  // 处理连接点悬停
-  const handleConnectionPointHover = useCallback((pointId: string, isHovered: boolean) => {
-    connectionManager.updateConnectionPointState(
-      pointId, 
-      isHovered ? ConnectionPointState.HOVER : ConnectionPointState.IDLE
-    );
-    
-    setConnectionPoints(prev => prev.map(point => 
-      point.id === pointId 
-        ? { ...point, state: isHovered ? ConnectionPointState.HOVER : ConnectionPointState.IDLE }
-        : point
-    ));
-  }, [connectionManager]);
+  // 简化的连接处理 - 使用ReactFlow原生系统
 
   // 获取SVG组件
   const SvgComponent = useMemo(() => {
@@ -276,48 +231,7 @@ export const EnhancedCircuitNode = memo(({ data, selected, id }: NodeProps<Enhan
     document.dispatchEvent(doubleClickEvent);
   }, [id]);
 
-  // 监听连接状态更新事件
-  useEffect(() => {
-    const handleConnectionStateUpdate = (event: CustomEvent) => {
-      console.log('节点接收到连接状态更新:', event.type, event.detail);
-      
-      // 更新连接点状态
-      setConnectionPoints(prev => prev.map(point => ({
-        ...point,
-        state: connectionManager.getConnectionPoint(point.id)?.state || point.state
-      })));
-    };
-    
-    document.addEventListener('circuit-connection-started', handleConnectionStateUpdate as EventListener);
-    document.addEventListener('circuit-connection-completed', handleConnectionStateUpdate as EventListener);
-    document.addEventListener('circuit-connection-cancelled', handleConnectionStateUpdate as EventListener);
-    
-    return () => {
-      document.removeEventListener('circuit-connection-started', handleConnectionStateUpdate as EventListener);
-      document.removeEventListener('circuit-connection-completed', handleConnectionStateUpdate as EventListener);
-      document.removeEventListener('circuit-connection-cancelled', handleConnectionStateUpdate as EventListener);
-    };
-  }, [connectionManager]);
-
-  // 定期同步连接点状态的Effect
-  useEffect(() => {
-    const syncConnectionStates = () => {
-      setConnectionPoints(prev => prev.map(point => {
-        const managerPoint = connectionManager.getConnectionPoint(point.id);
-        return managerPoint ? { ...point, state: managerPoint.state, connectedTo: managerPoint.connectedTo } : point;
-      }));
-    };
-    
-    // 初始同步
-    syncConnectionStates();
-    
-    // 设置定时同步（作为备用机制）
-    const syncInterval = setInterval(syncConnectionStates, 100);
-    
-    return () => {
-      clearInterval(syncInterval);
-    };
-  }, [connectionManager]);
+  // 移除复杂的连接状态监听
 
   return (
     <div
@@ -362,26 +276,11 @@ export const EnhancedCircuitNode = memo(({ data, selected, id }: NodeProps<Enhan
         <SvgComponent width="50" height="50" style={{color: '#1F2937'}} />
       </div>
 
-      {/* 渲染增强的连接点 */}
-      {connectionPoints.map((point) => (
-        <ConnectionPointComponent
-          key={point.id}
-          connectionPoint={point}
-          rotation={rotation}
-          onConnectionStart={handleConnectionStart}
-          onConnectionComplete={handleConnectionComplete}
-          onConnectionCancel={handleConnectionCancel}
-          onHover={handleConnectionPointHover}
-          showLabels={selected || hovered}
-          scale={selected ? 1.2 : 1}
-        />
-      ))}
-
-      {/* ReactFlow Handle组件 - 用于连接管理 */}
-      {connectionPoints.map((point) => {
+      {/* ReactFlow Handle组件 - 简化的连接点系统 */}
+      {defaultPorts.map((port: any) => {
         // 根据旋转角度计算正确的Handle位置
         let handlePosition = Position.Left;
-        const { side } = point.position;
+        const { side } = port.position;
         
         // 根据旋转调整Handle位置
         if (rotation === 0) {
@@ -406,20 +305,63 @@ export const EnhancedCircuitNode = memo(({ data, selected, id }: NodeProps<Enhan
           if (side === 'bottom') handlePosition = Position.Right;
         }
 
+        // 为双向端口创建两个Handle，确保可以作为source或target
+        const isBidirectional = port.type === 'bidirectional';
+
+        if (isBidirectional) {
+          return (
+            <React.Fragment key={`handle-${port.id}`}>
+              {/* Source handle */}
+              <Handle
+                type="source"
+                position={handlePosition}
+                id={port.id}
+                style={{
+                  opacity: (selected || hovered) ? 0.8 : 0.3,
+                  width: 12,
+                  height: 12,
+                  border: '2px solid #3B82F6',
+                  background: '#fff',
+                  borderRadius: '50%',
+                  transition: 'all 0.2s ease'
+                }}
+                isConnectable={true}
+                title={port.name}
+              />
+              {/* Target handle - 叠加在同一位置 */}
+              <Handle
+                type="target"
+                position={handlePosition}
+                id={`${port.id}-target`}
+                style={{
+                  opacity: 0, // 隐藏，但保持功能
+                  width: 12,
+                  height: 12,
+                  pointerEvents: 'all'
+                }}
+                isConnectable={true}
+              />
+            </React.Fragment>
+          );
+        }
+
         return (
           <Handle
-            key={`handle-${point.id}`}
-            type={point.type === 'output' ? 'source' : 'target'}
+            key={`handle-${port.id}`}
+            type={port.type === 'output' ? 'source' : 'target'}
             position={handlePosition}
-            id={point.id}
-            style={{ 
-              opacity: 0,
-              width: 16,
-              height: 16,
-              border: 'none',
-              background: 'transparent'
+            id={port.id}
+            style={{
+              opacity: (selected || hovered) ? 0.8 : 0.3,
+              width: 12,
+              height: 12,
+              border: '2px solid #3B82F6',
+              background: '#fff',
+              borderRadius: '50%',
+              transition: 'all 0.2s ease'
             }}
             isConnectable={true}
+            title={port.name}
           />
         );
       })}
@@ -462,14 +404,14 @@ export const EnhancedCircuitNode = memo(({ data, selected, id }: NodeProps<Enhan
         </button>
       )}
 
-      {/* 连接状态指示器 */}
-      {connectionPoints.some(p => p.connectedTo && p.connectedTo.length > 0) && (
+      {/* 连接状态指示器 - 简化版本 */}
+      {(selected || hovered) && defaultPorts.length > 0 && (
         <div 
-          className="absolute top-1 left-1 w-4 h-4 bg-green-500 text-white rounded-full flex items-center justify-center text-xs"
+          className="absolute top-1 left-1 w-4 h-4 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs"
           style={{ zIndex: 30 }}
-          title="已连接"
+          title={`${defaultPorts.length} 个连接点`}
         >
-          ●
+          {defaultPorts.length}
         </div>
       )}
     </div>

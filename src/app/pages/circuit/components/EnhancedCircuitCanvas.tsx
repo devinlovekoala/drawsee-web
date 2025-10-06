@@ -5,7 +5,7 @@
 
 'use client';
 
-import { useState, useCallback, useMemo, useRef } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import ReactFlow, {
   Node,
   Edge,
@@ -23,20 +23,11 @@ import ReactFlow, {
   EdgeTypes,
   ConnectionMode,
 } from 'reactflow';
-// import { toast } from 'react-toastify';
-
-// 临时toast实现
-const toast = {
-  info: (message: string) => console.log('INFO:', message),
-  success: (message: string) => console.log('SUCCESS:', message),
-  error: (message: string) => console.log('ERROR:', message),
-  warning: (message: string) => console.log('WARNING:', message),
-};
+import { message } from 'antd';
 
 import { CircuitElementType } from '@/api/types/circuit.types';
 import { EnhancedCircuitNode } from './EnhancedCircuitNode';
 import { EnhancedConnectionEdge, EnhancedConnectionPreview } from './EnhancedConnectionEdge';
-import { ConnectionManager } from './EnhancedConnectionSystem';
 import ElementLibrary from './ElementLibrary';
 
 import 'reactflow/dist/style.css';
@@ -51,46 +42,8 @@ const edgeTypes: EdgeTypes = {
   default: EnhancedConnectionEdge,
 };
 
-// 定义有效的边类型
-type EnhancedEdgeType = 'default';
-
-
-// 初始节点数据
-const initialNodes: Node[] = [
-  {
-    id: 'demo-resistor-1',
-    type: 'enhancedCircuitNode',
-    position: { x: 200, y: 100 },
-    data: {
-      id: 'demo-resistor-1',
-      type: CircuitElementType.RESISTOR,
-      label: 'R1',
-      value: '10kΩ',
-    },
-  },
-  {
-    id: 'demo-voltage-source-1',
-    type: 'enhancedCircuitNode',
-    position: { x: 50, y: 100 },
-    data: {
-      id: 'demo-voltage-source-1',
-      type: CircuitElementType.VOLTAGE_SOURCE,
-      label: 'V1',
-      value: '5V',
-    },
-  },
-  {
-    id: 'demo-ground-1',
-    type: 'enhancedCircuitNode',
-    position: { x: 350, y: 200 },
-    data: {
-      id: 'demo-ground-1',
-      type: CircuitElementType.GROUND,
-      label: 'GND',
-      value: '0V',
-    },
-  },
-];
+// 初始节点数据 - 空画布，不预置任何元件
+const initialNodes: Node[] = [];
 
 const initialEdges: Edge[] = [];
 
@@ -100,18 +53,7 @@ function EnhancedCircuitCanvasComponent() {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
-  // 连接管理器
-  const [connectionManager] = useState(() => new ConnectionManager({
-    allowMultipleConnections: true,
-    autoValidateConnections: true,
-    showConnectionHints: true,
-    animateConnections: true,
-    snapToGrid: true,
-    gridSize: 20,
-  }));
-
   // 画布状态
-  const [isConnecting, setIsConnecting] = useState(false);
   const [showGrid, setShowGrid] = useState(true);
   const [snapToGrid, setSnapToGrid] = useState(true);
   const [selectedElements, setSelectedElements] = useState<string[]>([]);
@@ -119,61 +61,6 @@ function EnhancedCircuitCanvasComponent() {
 
   // 引用
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
-
-  // 处理连接事件
-  const handleConnectionEvent = useCallback((event: string, data: unknown) => {
-    console.log('连接事件:', event, data);
-
-    switch (event) {
-      case 'connectionStart':
-        setIsConnecting(true);
-        toast.info('开始连接，请点击目标连接点');
-        break;
-
-      case 'connectionComplete':
-        if ((data as { edge?: Edge }).edge) {
-          setEdges(eds => addEdge({
-            ...(data as { edge: Edge }).edge,
-            type: 'default' as EnhancedEdgeType,
-            animated: true,
-            markerEnd: {
-              type: MarkerType.ArrowClosed,
-              width: 20,
-              height: 20,
-              color: '#3B82F6',
-            },
-          }, eds));
-          toast.success('连接创建成功');
-        }
-        setIsConnecting(false);
-        break;
-
-      case 'connectionCancel':
-        setIsConnecting(false);
-        toast.info('连接已取消');
-        break;
-
-      case 'connectionError':
-        toast.error(`连接失败: ${(data as { error: string }).error}`);
-        setIsConnecting(false);
-        break;
-
-      default:
-        console.log('未处理的连接事件:', event);
-    }
-  }, [setEdges]);
-
-  // 更新节点数据以包含连接管理器
-  const enhancedNodes = useMemo(() => {
-    return nodes.map(node => ({
-      ...node,
-      data: {
-        ...node.data,
-        connectionManager,
-        onConnectionEvent: handleConnectionEvent,
-      },
-    }));
-  }, [nodes, connectionManager, handleConnectionEvent]);
 
   // 处理元件添加
   const handleAddElement = useCallback((elementType: CircuitElementType) => {
@@ -210,40 +97,30 @@ function EnhancedCircuitCanvasComponent() {
         type: elementType,
         label: `${elementInfo.label}${elementCount}`,
         value: elementInfo.value,
-        connectionManager,
-        onConnectionEvent: handleConnectionEvent,
       },
     };
 
     setNodes(nds => [...nds, newNode]);
-    toast.success(`添加了 ${elementInfo.label}${elementCount}`);
-  }, [nodes, setNodes, connectionManager, handleConnectionEvent]);
+    message.success(`添加了 ${elementInfo.label}${elementCount}`);
+  }, [nodes, setNodes]);
 
   // 处理元件删除
   const handleDeleteSelected = useCallback(() => {
     if (selectedElements.length === 0) {
-      toast.warning('请先选择要删除的元件');
+      message.warning('请先选择要删除的元件');
       return;
     }
 
     // 删除选中的节点和相关边
     setNodes(nds => nds.filter(node => !selectedElements.includes(node.id)));
-    setEdges(eds => eds.filter(edge => 
-      !selectedElements.includes(edge.source) && 
+    setEdges(eds => eds.filter(edge =>
+      !selectedElements.includes(edge.source) &&
       !selectedElements.includes(edge.target)
     ));
 
-    // 从连接管理器中移除连接点
-    selectedElements.forEach(elementId => {
-      const connectionPoints = connectionManager.getNodeConnectionPoints(elementId);
-      connectionPoints.forEach(point => {
-        connectionManager.removeConnectionPoint(point.id);
-      });
-    });
-
     setSelectedElements([]);
-    toast.success(`删除了 ${selectedElements.length} 个元件`);
-  }, [selectedElements, setNodes, setEdges, connectionManager]);
+    message.success(`删除了 ${selectedElements.length} 个元件`);
+  }, [selectedElements, setNodes, setEdges]);
 
   // 处理选择变化
   const handleSelectionChange = useCallback(({ nodes, edges }: { nodes: Node[]; edges: Edge[] }) => {
@@ -251,47 +128,64 @@ function EnhancedCircuitCanvasComponent() {
     setSelectedElements(selectedIds);
   }, []);
 
-  // 处理连接创建（ReactFlow原生）- 修复点击连接功能
+  // 处理连接创建 - 简化版本，使用ReactFlow原生连接
   const onConnect = useCallback((params: Connection) => {
     console.log('ReactFlow onConnect called:', params);
-    
+
     if (!params.source || !params.target || !params.sourceHandle || !params.targetHandle) {
       console.warn('连接参数不完整:', params);
       return;
     }
-    
-    // 检查是否连接到自身
-    if (params.source === params.target) {
-      toast.error('不能连接到自身');
+
+    // 清理targetHandle的-target后缀（如果存在）
+    let cleanSourceHandle = params.sourceHandle.replace('-target', '');
+    let cleanTargetHandle = params.targetHandle.replace('-target', '');
+
+    // 检查是否连接到自身的同一个端口
+    if (params.source === params.target && cleanSourceHandle === cleanTargetHandle) {
+      message.warning('不能连接到自身的同一个端口');
       return;
     }
-    
-    // 使用增强连接系统创建连接
-    const result = connectionManager.createConnection(params.sourceHandle, params.targetHandle);
-    
-    if (result.success && result.edge) {
-      // 更新边状态
-      setEdges(eds => addEdge({
-        ...result.edge,
-        type: 'default' as EnhancedEdgeType,
-        animated: true,
-        markerEnd: {
-          type: MarkerType.ArrowClosed,
-          width: 20,
-          height: 20,
-          color: '#3B82F6',
-        },
-      }, eds));
-      
-      toast.success('连接创建成功');
-      
-      // 触发连接事件
-      handleConnectionEvent('connectionComplete', { edge: result.edge });
-    } else {
-      toast.error(`连接失败: ${result.error}`);
-      handleConnectionEvent('connectionError', { error: result.error });
+
+    // 检查连接是否已存在
+    const connectionExists = edges.some(edge =>
+      (edge.source === params.source && edge.target === params.target &&
+       edge.sourceHandle?.replace('-target', '') === cleanSourceHandle &&
+       edge.targetHandle?.replace('-target', '') === cleanTargetHandle) ||
+      (edge.source === params.target && edge.target === params.source &&
+       edge.sourceHandle?.replace('-target', '') === cleanTargetHandle &&
+       edge.targetHandle?.replace('-target', '') === cleanSourceHandle)
+    );
+
+    if (connectionExists) {
+      message.warning('此连接已存在');
+      return;
     }
-  }, [connectionManager, setEdges, handleConnectionEvent]);
+
+    // 创建新的边
+    const newEdge: Edge = {
+      id: `edge-${params.source}-${cleanSourceHandle}-${params.target}-${cleanTargetHandle}-${Date.now()}`,
+      source: params.source,
+      target: params.target,
+      sourceHandle: params.sourceHandle,
+      targetHandle: params.targetHandle,
+      type: 'default',
+      animated: false,
+      style: {
+        stroke: '#3B82F6',
+        strokeWidth: 2.5
+      },
+      markerEnd: {
+        type: MarkerType.ArrowClosed,
+        width: 20,
+        height: 20,
+        color: '#3B82F6',
+      },
+    };
+
+    setEdges(eds => addEdge(newEdge, eds));
+    message.success('连接创建成功');
+  }, [edges, setEdges]);
 
   // 工具栏组件 - 优化的元件库样式
   const ElementToolbar = () => {
@@ -496,260 +390,6 @@ function EnhancedCircuitCanvasComponent() {
     );
   };
 
-  // 状态面板 - 优化样式
-  const StatusPanel = () => {
-    const stats = connectionManager.getConnectionStats();
-    
-    return (
-      <Panel position="bottom-right" className="m-2">
-        <div className="bg-white rounded-xl shadow-xl border border-gray-100 p-4 min-w-48">
-          <div className="flex items-center gap-2 mb-3">
-            <div className={`w-2 h-2 rounded-full ${isConnecting ? 'bg-orange-500 animate-pulse' : 'bg-green-500'}`}></div>
-            <span className="text-sm font-semibold text-gray-800">电路状态</span>
-            {isConnecting && (
-              <span className="text-xs text-orange-600 animate-pulse font-medium">连接中...</span>
-            )}
-          </div>
-          
-          <div className="space-y-2">
-            <div className="flex justify-between items-center py-1">
-              <span className="text-xs text-gray-500">元件数量</span>
-              <span className="text-sm font-mono text-blue-600 bg-blue-50 px-2 py-0.5 rounded">{nodes.length}</span>
-            </div>
-            <div className="flex justify-between items-center py-1">
-              <span className="text-xs text-gray-500">连接点数</span>
-              <span className="text-sm font-mono text-purple-600 bg-purple-50 px-2 py-0.5 rounded">{stats.totalPoints}</span>
-            </div>
-            <div className="flex justify-between items-center py-1">
-              <span className="text-xs text-gray-500">连接数</span>
-              <span className="text-sm font-mono text-green-600 bg-green-50 px-2 py-0.5 rounded">{stats.totalConnections}</span>
-            </div>
-            <div className="flex justify-between items-center py-1">
-              <span className="text-xs text-gray-500">已选择</span>
-              <span className="text-sm font-mono text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">{selectedElements.length}</span>
-            </div>
-            
-            {/* 连接质量指示 */}
-            <div className="border-t border-gray-100 pt-2 mt-2">
-              <div className="flex justify-between items-center">
-                <span className="text-xs text-gray-500">连接质量</span>
-                <div className="flex items-center gap-1">
-                  {Array.from({ length: 5 }).map((_, i) => {
-                    const quality = Math.min(5, Math.max(1, Math.round((stats.totalConnections / Math.max(1, nodes.length)) * 2)));
-                    return (
-                      <div
-                        key={i}
-                        className={`w-2 h-2 rounded-full ${
-                          i < quality ? 'bg-green-400' : 'bg-gray-200'
-                        }`}
-                      />
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-            
-            {/* 新手提示 */}
-            {nodes.length === 0 && (
-              <div className="border-t border-gray-100 pt-2 mt-2">
-                <div className="text-xs text-gray-500">
-                  💡 <strong>提示：</strong>从左侧元件库拖放元件开始设计
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </Panel>
-    );
-  };
-
-  // 控制面板 - 增加缩放控制功能
-  const ControlPanel = () => {
-    const [currentZoom, setCurrentZoom] = useState(0.8);
-    
-    const handleZoomChange = useCallback((newZoom: number) => {
-      setCurrentZoom(newZoom);
-      // 使用ReactFlow的zoomTo方法而不是直接操作DOM
-      const viewport = reactFlowWrapper.current?.querySelector('.react-flow__viewport') as HTMLElement;
-      if (viewport) {
-        viewport.style.transform = `translate(0px, 0px) scale(${newZoom})`;
-      }
-    }, []);
-    
-    // 处理画布居中
-    const handleFitView = useCallback(() => {
-      const viewport = reactFlowWrapper.current?.querySelector('.react-flow__viewport') as HTMLElement;
-      if (viewport) {
-        viewport.style.transform = 'translate(0px, 0px) scale(1)';
-        setCurrentZoom(1);
-      }
-    }, []);
-    
-    return (
-      <Panel position="top-right" className="m-2">
-        <div className="bg-white rounded-xl shadow-xl border border-gray-100 p-4 min-w-64">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-2 h-2 bg-indigo-500 rounded-full"></div>
-            <h3 className="text-sm font-semibold text-gray-800">控制面板</h3>
-          </div>
-          
-          {/* 缩放控制 */}
-          <div className="space-y-3 mb-4">
-            <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">视图控制</h4>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">缩放比例</span>
-                <span className="text-sm font-mono text-indigo-600">{Math.round(currentZoom * 100)}%</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => handleZoomChange(Math.max(0.2, currentZoom - 0.1))}
-                  className="w-8 h-8 bg-gray-100 hover:bg-gray-200 rounded-lg flex items-center justify-center text-gray-600 hover:text-gray-800 transition-all duration-200"
-                  title="缩小"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
-                  </svg>
-                </button>
-                <div className="flex-1">
-                  <input
-                    type="range"
-                    min="0.2"
-                    max="3"
-                    step="0.1"
-                    value={currentZoom}
-                    onChange={(e) => handleZoomChange(parseFloat(e.target.value))}
-                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
-                  />
-                </div>
-                <button
-                  onClick={() => handleZoomChange(Math.min(3, currentZoom + 0.1))}
-                  className="w-8 h-8 bg-gray-100 hover:bg-gray-200 rounded-lg flex items-center justify-center text-gray-600 hover:text-gray-800 transition-all duration-200"
-                  title="放大"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                  </svg>
-                </button>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => handleZoomChange(1)}
-                  className="flex-1 px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded transition-colors"
-                >
-                  重置(100%)
-                </button>
-                <button
-                  onClick={() => handleZoomChange(0.5)}
-                  className="flex-1 px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded transition-colors"
-                >
-                  适中(50%)
-                </button>
-                <button
-                  onClick={handleFitView}
-                  className="flex-1 px-2 py-1 text-xs bg-blue-100 hover:bg-blue-200 text-blue-700 rounded transition-colors"
-                >
-                  居中
-                </button>
-              </div>
-            </div>
-          </div>
-          
-          {/* 网格控制 */}
-          <div className="space-y-3 mb-4">
-            <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">网格设置</h4>
-            <div className="space-y-2">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={showGrid}
-                  onChange={(e) => setShowGrid(e.target.checked)}
-                  className="w-4 h-4 text-indigo-600 bg-gray-100 border-gray-300 rounded focus:ring-indigo-500 focus:ring-2"
-                />
-                <span className="text-sm text-gray-700">显示网格</span>
-              </label>
-              
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={snapToGrid}
-                  onChange={(e) => setSnapToGrid(e.target.checked)}
-                  className="w-4 h-4 text-indigo-600 bg-gray-100 border-gray-300 rounded focus:ring-indigo-500 focus:ring-2"
-                />
-                <span className="text-sm text-gray-700">网格吸附</span>
-              </label>
-            </div>
-          </div>
-          
-          {/* 操作按钮 */}
-          <div className="space-y-2">
-            <button
-              onClick={handleDeleteSelected}
-              disabled={selectedElements.length === 0}
-              className="w-full px-3 py-2 bg-red-500 hover:bg-red-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-sm rounded-lg transition-all duration-200 font-medium shadow-sm hover:shadow"
-            >
-              删除选中 ({selectedElements.length})
-            </button>
-            
-            <button
-              onClick={() => {
-                setNodes([]);
-                setEdges([]);
-                setSelectedElements([]);
-                toast.success('电路已清空');
-              }}
-              className="w-full px-3 py-2 bg-gray-500 hover:bg-gray-600 text-white text-sm rounded-lg transition-all duration-200 font-medium shadow-sm hover:shadow"
-            >
-              清空电路
-            </button>
-            
-            <button
-              onClick={() => {
-                // 自动布局功能
-                const updatedNodes = nodes.map((node, index) => ({
-                  ...node,
-                  position: { 
-                    x: 100 + (index % 3) * 200, 
-                    y: 100 + Math.floor(index / 3) * 150 
-                  }
-                }));
-                setNodes(updatedNodes);
-                toast.success('电路已自动布局');
-              }}
-              className="w-full px-3 py-2 bg-green-500 hover:bg-green-600 text-white text-sm rounded-lg transition-all duration-200 font-medium shadow-sm hover:shadow"
-            >
-              自动布局
-            </button>
-          </div>
-        </div>
-        
-        {/* 样式 */}
-        <style>
-          {`
-            .slider::-webkit-slider-thumb {
-              appearance: none;
-              width: 16px;
-              height: 16px;
-              border-radius: 50%;
-              background: #4f46e5;
-              cursor: pointer;
-              box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-            }
-            .slider::-moz-range-thumb {
-              width: 16px;
-              height: 16px;
-              border-radius: 50%;
-              background: #4f46e5;
-              cursor: pointer;
-              border: none;
-              box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-            }
-          `}
-        </style>
-      </Panel>
-    );
-  };
-
   return (
     <div className="w-full h-full flex" ref={reactFlowWrapper}>
       {/* 左侧元件库 */}
@@ -762,7 +402,7 @@ function EnhancedCircuitCanvasComponent() {
       {/* 主画布区域 */}
       <div className="flex-1 h-full relative">
         <ReactFlow
-          nodes={enhancedNodes}
+          nodes={nodes}
           edges={edges}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
@@ -790,33 +430,23 @@ function EnhancedCircuitCanvasComponent() {
         >
           {/* 背景 */}
           {showGrid && <Background color="#f0f0f0" gap={20} />}
-          
+
           {/* 控制器 */}
           <Controls showInteractive={false} position="top-left" />
-          
+
           {/* 小地图 */}
-          <MiniMap 
+          <MiniMap
             nodeColor="#3B82F6"
             maskColor="rgba(255, 255, 255, 0.7)"
             position="bottom-left"
             style={{ left: '16px', bottom: '16px' }}
           />
 
-          {/* 状态面板 */}
-          <div style={{ position: 'absolute', right: '16px', bottom: '16px', zIndex: 1000 }}>
-            <StatusPanel />
-          </div>
-          
-          {/* 控制面板 */}
-          <div style={{ position: 'absolute', right: '16px', top: '320px', zIndex: 1000 }}>
-            <ControlPanel />
-          </div>
-          
           {/* 元件工具栏 - 移动到右侧 */}
           <div style={{ position: 'absolute', right: '16px', top: '16px', zIndex: 1000 }}>
             <ElementToolbar />
           </div>
-          
+
           {/* 元件库切换按钮 */}
           <div style={{ position: 'absolute', left: '16px', top: '16px', zIndex: 1000 }}>
             <button

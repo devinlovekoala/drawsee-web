@@ -30,10 +30,11 @@ function Blank() {
   const initialType = location.state?.aiTaskType === 'circuit-pdf-analyze' ? 'PDF_CIRCUIT_ANALYSIS' : (location.state?.agentType as AiTaskType || 'GENERAL');
   const agentName = location.state?.agentName as string;
   const classId = location.state?.classId as string || null;
+  const pdfUrl = location.state?.pdfUrl as string || null; // 获取传递的PDF URL
 
   const [queryForm, setQueryForm] = useState<QueryForm>({
     type: initialType,
-    prompt: "",
+    prompt: pdfUrl || "", // 如果有PDF URL，则使用它作为prompt
     promptParams: {},
     model: "deepseekV3"
   });
@@ -69,11 +70,14 @@ function Blank() {
   // 当location变化时，更新queryForm的type字段
   useEffect(() => {
     if (location.state?.agentType) {
+      // 获取新的PDF URL（如果有的话）
+      const newPdfUrl = location.state?.pdfUrl as string || null;
+      
       // 直接使用提供的类型，无需转换，因为AgentMenu组件已经提供了正确的大写格式
       setQueryForm(prev => ({
         ...prev,
         type: location.state.agentType as AiTaskType,
-        prompt: "",
+        prompt: newPdfUrl || "", // 如果有新的PDF URL，使用它；否则清空
         promptParams: {}
       }));
       
@@ -122,7 +126,11 @@ function Blank() {
   const handleQuery = useCallback(() => {
     if (isProcessing) return;
     
-    if (queryForm.prompt.trim() === "") {
+    // 检查是否为PDF分析任务且有PDF URL
+    const isPdfAnalysisWithUrl = ['PDF_CIRCUIT_ANALYSIS', 'PDF_CIRCUIT_ANALYSIS_DETAIL', 'PDF_CIRCUIT_DESIGN'].includes(queryForm.type) && 
+                                 pdfUrl && pdfUrl.trim() !== '';
+    
+    if (queryForm.prompt.trim() === "" && !isPdfAnalysisWithUrl) {
       // 对于电路分析模式，如果没有输入，用户可能想直接设计电路
       if (queryForm.type === "CIRCUIT_ANALYSIS") {
         const goToCircuitPage = window.confirm('您是否要跳转到电路设计页面？');
@@ -178,9 +186,24 @@ function Blank() {
       }
 
       // 为不同模式准备相应的参数 - 确保格式一致
+      // 对于PDF分析任务，如果有PDF URL，使用PDF URL作为prompt；否则使用用户输入
+      let finalPrompt = queryForm.prompt.trim();
+      if (['PDF_CIRCUIT_ANALYSIS', 'PDF_CIRCUIT_ANALYSIS_DETAIL', 'PDF_CIRCUIT_DESIGN'].includes(queryForm.type)) {
+        if (pdfUrl && pdfUrl.trim() !== '') {
+          // 如果用户有额外的输入，将其添加到promptParams中
+          if (queryForm.prompt.trim() && queryForm.prompt.trim() !== pdfUrl) {
+            promptParams = {
+              ...promptParams,
+              userQuery: queryForm.prompt.trim()
+            };
+          }
+          finalPrompt = pdfUrl;
+        }
+      }
+      
       const createAiTaskDTO: CreateAiTaskDTO = {
         type: queryForm.type,
-        prompt: queryForm.prompt.trim(),
+        prompt: finalPrompt,
         promptParams: promptParams,
         convId: null,
         parentId: null,
@@ -212,7 +235,7 @@ function Blank() {
     } finally {
       setIsProcessing(false);
     }
-  }, [isProcessing, queryForm.prompt, queryForm.type, queryForm.promptParams, queryForm.model, selectedWay, customWay, handleAiTaskCountPlus, handleBlankQuery, navigate, classId]);
+  }, [isProcessing, queryForm.prompt, queryForm.type, queryForm.promptParams, queryForm.model, selectedWay, customWay, handleAiTaskCountPlus, handleBlankQuery, navigate, classId, pdfUrl]);
 
   // 处理模型变更
   const handleModelChange = (model: ModelType) => {
@@ -541,6 +564,20 @@ function Blank() {
                 </div>
 
                 <div className="py-6 relative p-2 backdrop-blur-sm bg-white/50 border border-neutral-200/50 rounded-2xl transition-all duration-200 hover:border-neutral-300 group">
+                  {/* PDF分析任务的URL显示 */}
+                  {pdfUrl && ['PDF_CIRCUIT_ANALYSIS', 'PDF_CIRCUIT_ANALYSIS_DETAIL', 'PDF_CIRCUIT_DESIGN'].includes(queryForm.type) && (
+                    <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <div className="flex items-center text-sm text-blue-700">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
+                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                          <polyline points="14,2 14,8 20,8"/>
+                        </svg>
+                        <span className="font-medium">正在分析PDF文档：</span>
+                        <span className="ml-1 text-blue-600 truncate max-w-md">{pdfUrl}</span>
+                      </div>
+                    </div>
+                  )}
+                  
                   {/* 输入区域 */}
                   <div className="relative flex min-h-32 items-stretch justify-between w-full overflow-hidden border rounded-t-lg rounded-xl border-neutral-300/50 bg-gradient-to-tr from-neutral-50 to-neutral-200">
                     <div className="flex-1">

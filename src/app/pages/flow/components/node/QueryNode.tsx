@@ -7,7 +7,11 @@ const chatTypeMap: Record<string, string> = {
   'animation': '动画生成',
   'solver-first': '解题模式',
   'planner': '目标解析',
-  'html-maker': '网页生成'
+  'html-maker': '网页生成',
+  // 追加PDF电路相关模式的显示名称（来自后端AiTaskType）
+  'PDF_CIRCUIT_ANALYSIS': 'PDF实验分析',
+  'PDF_CIRCUIT_ANALYSIS_DETAIL': 'PDF分析详情',
+  'PDF_CIRCUIT_DESIGN': '电路方案设计'
 };
 
 /**
@@ -77,11 +81,16 @@ const QueryNode = React.memo(function QueryNode({
   }, [data.text]);
 
   // 使用useMemo缓存footerContent
-  const footerContent = useMemo(() => (
-    data.mode ? <span className="inline-flex items-center px-5 py-1 rounded-full font-medium bg-blue-100 text-blue-800">
-      {chatTypeMap[data.mode]}
-    </span> : <></>
-  ), [data.mode]);
+  const footerContent = useMemo(() => {
+    if (!data.mode) return <></>;
+    const key = String(data.mode);
+    const label = chatTypeMap[key] || chatTypeMap[key.toUpperCase()] || chatTypeMap[key.toLowerCase()];
+    return (
+      <span className="inline-flex items-center px-5 py-1 rounded-full font-medium bg-blue-100 text-blue-800">
+        {label || key}
+      </span>
+    );
+  }, [data.mode]);
 
   return (
     <BaseNode

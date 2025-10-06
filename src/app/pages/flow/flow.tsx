@@ -18,7 +18,6 @@ import {useLocation, useNavigate} from "react-router-dom";
 import {useWatcher} from "alova/client";
 import {getNodesByConvId} from "@/api/methods/flow.methods.ts";
 import type { NodeVO as ApiNodeVO } from '@/api/types/flow.types';
-import type { NodeData } from './components/node/types/node.types';
 import { LoadingSpinner } from './components/loading/LoadingSpinner';
 import useFlowState from './hooks/useFlowState';
 import { FlowInputPanel } from './components/input/FlowInputPanel';
@@ -73,6 +72,30 @@ const nodeTypes = {
   'PDF_ANALYSIS_POINT': CompactPdfAnalysisPointNode, // PDF分析点节点
   'PDF_ANALYSIS_DETAIL': CompactPdfAnalysisDetailNode, // PDF分析详情节点
 } as const;
+
+// 将后端节点类型归一化为前端已支持的类型
+function normalizeNodeType(apiType: string | undefined | null): string {
+  if (!apiType) return 'query';
+  const t = String(apiType).toUpperCase();
+  switch (t) {
+    case 'QUERY':
+      return 'query';
+    case 'PDF_CIRCUIT_POINT':
+      return 'PDF_ANALYSIS_POINT';
+    case 'PDF_CIRCUIT_DETAIL':
+      return 'PDF_ANALYSIS_DETAIL';
+    case 'PDF_CIRCUIT_DOCUMENT':
+    case 'PDF_DOCUMENT':
+      return 'PDF_DOCUMENT';
+    case 'PDF_ANALYSIS_POINT':
+      return 'PDF_ANALYSIS_POINT';
+    case 'PDF_ANALYSIS_DETAIL':
+      return 'PDF_ANALYSIS_DETAIL';
+    default:
+      // 对于已是前端支持的小写类型，原样返回，例如 answer / answer-point / knowledge-detail 等
+      return String(apiType);
+  }
+}
 
 function Flow() {
   const navigate = useNavigate();
@@ -412,6 +435,7 @@ function Flow() {
       }
       // 将apiNodes转换为flowNodes
       const flowNodes = apiNodes.map((node) => {
+        const normalizedType = normalizeNodeType(node.type as unknown as string);
         const data = {
           parentId: node.parentId,
           convId: node.convId,
@@ -420,50 +444,51 @@ function Flow() {
           updatedAt: node.updatedAt,
           // 如果节点有height属性，将其添加到data中
           ...(node.height !== null ? { height: node.height } : {}),
-          ...(node.type !== 'root' ? node.data : {})
-        } as NodeData<typeof node.type>;
+          ...(normalizedType !== 'root' ? node.data : {})
+        } as any;
   
         // 如果节点是knowledge-head或者solver-first或者solver-continue，则判断是否已经生成
-        if (node.type === 'knowledge-head') {
+        if (normalizedType === 'knowledge-head') {
           apiNodes.forEach(apiNode => {
-            if (apiNode.parentId === node.id && apiNode.type === 'knowledge-detail') {
+            if (apiNode.parentId === node.id && normalizeNodeType(apiNode.type as unknown as string) === 'knowledge-detail') {
               data.isGenerated = true;
             }
           });
         }
         // 处理answer-point节点
-        if (node.type === 'answer-point' || node.type === 'ANSWER_POINT') {
+        if (normalizedType === 'answer-point' || normalizedType === 'ANSWER_POINT') {
           apiNodes.forEach(apiNode => {
-            if (apiNode.parentId === node.id && (apiNode.type === 'answer-detail' || apiNode.type === 'ANSWER_DETAIL')) {
+            const t = normalizeNodeType(apiNode.type as unknown as string);
+            if (apiNode.parentId === node.id && (t === 'answer-detail' || t === 'ANSWER_DETAIL')) {
               data.isGenerated = true;
             }
           });
         }
         
         // 处理circuit-point节点
-        if (node.type === 'circuit-point') {
+        if (normalizedType === 'circuit-point') {
           apiNodes.forEach(apiNode => {
-            if (apiNode.parentId === node.id && apiNode.type === 'circuit-detail') {
+            if (apiNode.parentId === node.id && normalizeNodeType(apiNode.type as unknown as string) === 'circuit-detail') {
               data.isGenerated = true;
             }
           });
         }
         
         // 处理PDF_ANALYSIS_POINT节点
-        if (node.type === 'PDF_ANALYSIS_POINT') {
+        if (normalizedType === 'PDF_ANALYSIS_POINT') {
           apiNodes.forEach(apiNode => {
-            if (apiNode.parentId === node.id && apiNode.type === 'PDF_ANALYSIS_DETAIL') {
+            if (apiNode.parentId === node.id && normalizeNodeType(apiNode.type as unknown as string) === 'PDF_ANALYSIS_DETAIL') {
               data.isGenerated = true;
             }
           });
         }
         
         // 对于详情节点，如果有文本内容，设置为已完成状态
-        if ((node.type === 'answer-detail' || node.type === 'ANSWER_DETAIL' || 
-             node.type === 'circuit-detail' || node.type === 'knowledge-detail' ||
-             node.type === 'PDF_ANALYSIS_DETAIL') && 
+        if ((normalizedType === 'answer-detail' || normalizedType === 'ANSWER_DETAIL' || 
+             normalizedType === 'circuit-detail' || normalizedType === 'knowledge-detail' ||
+             normalizedType === 'PDF_ANALYSIS_DETAIL') && 
             node.data.text && typeof node.data.text === 'string' && node.data.text.length > 0) {
-          console.log(`初始化详情节点 ${node.id} 状态为已完成，类型: ${node.type}`);
+          console.log(`初始化详情节点 ${node.id} 状态为已完成，类型: ${normalizedType}`);
           data.isGenerated = true;
           data.process = 'completed';
         }
@@ -480,13 +505,13 @@ function Flow() {
 
         return {
           id: node.id.toString(),
-          type: node.type,
+          type: normalizedType as any,
           position: node.position,
           data,
           draggable: false,
           connectable: false,
           selectable: true, // 确保节点可选择
-        } as Node<NodeData<typeof node.type>>;
+        } as any;
       });
       // 创建边
       const flowEdges = flowNodes

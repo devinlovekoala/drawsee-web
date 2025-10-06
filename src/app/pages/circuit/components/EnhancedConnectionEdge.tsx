@@ -5,9 +5,9 @@
 
 'use client';
 
-import { useMemo, useEffect, useState, useCallback } from 'react';
-import { EdgeProps, getSmoothStepPath, getBezierPath, getSimpleBezierPath } from 'reactflow';
-import { ConnectionPointType } from './EnhancedConnectionSystem';
+import { useMemo, useState, useCallback } from 'react';
+import { EdgeProps, getSimpleBezierPath } from 'reactflow';
+// 移除未使用的导入
 
 // 连接线类型定义
 export type EnhancedConnectionLineType = 'smooth' | 'straight' | 'step' | 'bezier' | 'manhattan' | 'orthogonal';
@@ -108,107 +108,9 @@ const getConnectionTypeStyle = (
   return baseStyle;
 };
 
-// 智能路径计算
-const getSmartConnectionPath = (
-  { sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition }: any,
-  lineType: EnhancedConnectionLineType = 'smooth'
-) => {
-  const distance = Math.sqrt(Math.pow(targetX - sourceX, 2) + Math.pow(targetY - sourceY, 2));
-  
-  switch (lineType) {
-    case 'straight':
-      return [`M${sourceX},${sourceY} L${targetX},${targetY}`, sourceX, sourceY, targetX, targetY];
-      
-    case 'bezier':
-      return getBezierPath({
-        sourceX, sourceY, sourcePosition,
-        targetX, targetY, targetPosition,
-        curvature: Math.min(0.5, distance / 200) // 根据距离调整曲率
-      });
-      
-    case 'step':
-      return getSmoothStepPath({
-        sourceX, sourceY, sourcePosition,
-        targetX, targetY, targetPosition,
-        borderRadius: Math.min(12, distance / 20),
-        offset: Math.min(20, distance / 10)
-      });
-      
-    case 'manhattan':
-      const midX = sourceX + (targetX - sourceX) / 2;
-      const midY = sourceY + (targetY - sourceY) / 2;
-      return [
-        `M${sourceX},${sourceY} H${midX} V${targetY} H${targetX}`,
-        midX, midY, targetX, targetY
-      ];
-      
-    case 'orthogonal':
-      // 智能正交路径，避免重叠
-      const horizontalFirst = Math.abs(targetX - sourceX) > Math.abs(targetY - sourceY);
-      if (horizontalFirst) {
-        return [
-          `M${sourceX},${sourceY} H${targetX} V${targetY}`,
-          targetX, sourceY, targetX, targetY
-        ];
-      } else {
-        return [
-          `M${sourceX},${sourceY} V${targetY} H${targetX}`,
-          sourceX, targetY, targetX, targetY
-        ];
-      }
-      
-    case 'smooth':
-    default:
-      // 默认使用智能平滑路径
-      if (distance < 100) {
-        // 短距离使用贝塞尔曲线
-        return getSimpleBezierPath({
-          sourceX, sourceY, sourcePosition,
-          targetX, targetY, targetPosition
-        });
-      } else {
-        // 长距离使用步进路径
-        return getSmoothStepPath({
-          sourceX, sourceY, sourcePosition,
-          targetX, targetY, targetPosition,
-          borderRadius: 15,
-          offset: 25
-        });
-      }
-  }
-};
+// 移除复杂的路径计算函数
 
-// 连接点指示器组件
-const ConnectionEndpoint = ({ 
-  x, 
-  y, 
-  type, 
-  style, 
-  isSource = false 
-}: { 
-  x: number; 
-  y: number; 
-  type: string; 
-  style: ConnectionLineStyle;
-  isSource?: boolean;
-}) => {
-  const endpointStyle = useMemo(() => ({
-    r: type === 'power' ? 5 : 4,
-    fill: style.stroke,
-    stroke: '#fff',
-    strokeWidth: 1.5,
-    filter: 'drop-shadow(0px 0px 2px rgba(0,0,0,0.2))',
-  }), [type, style.stroke]);
-
-  return (
-    <circle
-      cx={x}
-      cy={y}
-      {...endpointStyle}
-      className={`connection-endpoint ${isSource ? 'source' : 'target'}`}
-    />
-  );
-};
+// 移除连接点指示器组件
 
 // 连接线标签组件
 const ConnectionLabel = ({ 
@@ -253,44 +155,9 @@ const ConnectionLabel = ({
   );
 };
 
-// 连接线动画效果
-const AnimatedConnectionPath = ({ 
-  path, 
-  style, 
-  animated = false 
-}: { 
-  path: string; 
-  style: ConnectionLineStyle; 
-  animated: boolean;
-}) => {
-  const [dashOffset, setDashOffset] = useState(0);
+// 移除动画路径组件
 
-  useEffect(() => {
-    if (!animated) return;
-
-    const interval = setInterval(() => {
-      setDashOffset(prev => (prev + 1) % 24);
-    }, 50);
-
-    return () => clearInterval(interval);
-  }, [animated]);
-
-  if (!animated) {
-    return <path d={path} {...style} />;
-  }
-
-  return (
-    <path
-      d={path}
-      {...style}
-      strokeDasharray="8 4"
-      strokeDashoffset={dashOffset}
-      className="animated-connection-path"
-    />
-  );
-};
-
-// 主要的增强连接线组件
+// 简化的连接线组件
 export function EnhancedConnectionEdge({
   id,
   sourceX,
@@ -300,10 +167,8 @@ export function EnhancedConnectionEdge({
   sourcePosition,
   targetPosition,
   style = {},
-  markerEnd,
   selected,
   animated,
-  data,
   source,
   target,
   sourceHandleId,
@@ -311,50 +176,33 @@ export function EnhancedConnectionEdge({
   label,
 }: EdgeProps) {
   const [isHovered, setIsHovered] = useState(false);
-  const [pathError, setPathError] = useState<string | null>(null);
 
-  // 连接类型检测
+  // 简化的连接类型检测
   const connectionType = useMemo(() => {
-    if (data?.connectionType) return data.connectionType;
-    if (data?.sourcePointType === 'power' || data?.targetPointType === 'power') return 'power';
-    if (data?.sourcePointType === 'ground' || data?.targetPointType === 'ground') return 'ground';
-    if (sourceHandleId?.includes('data') || targetHandleId?.includes('data')) return 'data';
-    if (sourceHandleId?.includes('control') || targetHandleId?.includes('control')) return 'control';
+    if (sourceHandleId?.includes('positive') || targetHandleId?.includes('positive')) return 'power';
+    if (sourceHandleId?.includes('ground') || targetHandleId?.includes('ground')) return 'ground';
     return 'signal';
-  }, [data, sourceHandleId, targetHandleId]);
+  }, [sourceHandleId, targetHandleId]);
 
-  // 线条类型
-  const lineType: EnhancedConnectionLineType = data?.lineType || 'smooth';
-
-  // 计算路径
+  // 计算路径 - 使用简单的贝塞尔曲线
   const [edgePath, labelX, labelY] = useMemo(() => {
     try {
-      const pathData = getSmartConnectionPath(
-        { sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition },
-        lineType
-      );
+      const pathData = getSimpleBezierPath({
+        sourceX, sourceY, sourcePosition,
+        targetX, targetY, targetPosition
+      });
       
-      let path: string;
-      let midX: number;
-      let midY: number;
+      const path = pathData[0];
+      const midX = (sourceX + targetX) / 2;
+      const midY = (sourceY + targetY) / 2;
       
-      if (Array.isArray(pathData)) {
-        [path, midX, midY] = pathData;
-      } else {
-        path = pathData[0];
-        midX = (sourceX + targetX) / 2;
-        midY = (sourceY + targetY) / 2;
-      }
-      
-      setPathError(null);
       return [path, midX, midY];
     } catch (error) {
       console.error('路径计算错误:', error);
-      setPathError('路径计算失败');
       // 回退到直线
       return [`M${sourceX},${sourceY} L${targetX},${targetY}`, (sourceX + targetX) / 2, (sourceY + targetY) / 2];
     }
-  }, [sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, lineType]);
+  }, [sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition]);
 
   // 获取样式
   const connectionStyle = useMemo(() => {
@@ -376,18 +224,9 @@ export function EnhancedConnectionEdge({
     console.log('连接线双击:', { id, connectionType, sourceHandleId, targetHandleId });
   }, [id, connectionType, sourceHandleId, targetHandleId]);
 
-  // 连接质量指示器
-  const connectionQuality = useMemo(() => {
-    const distance = Math.sqrt(Math.pow(targetX - sourceX, 2) + Math.pow(targetY - sourceY, 2));
-    if (distance < 50) return 'excellent';
-    if (distance < 150) return 'good';
-    if (distance < 300) return 'fair';
-    return 'poor';
-  }, [sourceX, sourceY, targetX, targetY]);
-
   return (
     <g
-      className={`enhanced-connection-edge ${selected ? 'selected' : ''} ${isHovered ? 'hovered' : ''} quality-${connectionQuality}`}
+      className={`enhanced-connection-edge ${selected ? 'selected' : ''} ${isHovered ? 'hovered' : ''}`}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       onDoubleClick={handleDoubleClick}
@@ -397,40 +236,15 @@ export function EnhancedConnectionEdge({
       data-target={target}
     >
       {/* 主连接路径 */}
-      <AnimatedConnectionPath
-        path={edgePath}
-        style={connectionStyle}
-        animated={!!animated}
-      />
-
-      {/* 错误状态显示 */}
-      {pathError && (
-        <text
-          x={labelX}
-          y={labelY}
-          fontSize="10"
-          fill="#EF4444"
-          textAnchor="middle"
-          className="path-error-text"
-        >
-          {pathError}
-        </text>
-      )}
-
-      {/* 连接点指示器 */}
-      <ConnectionEndpoint
-        x={sourceX}
-        y={sourceY}
-        type={connectionType}
-        style={connectionStyle}
-        isSource={true}
-      />
-      <ConnectionEndpoint
-        x={targetX}
-        y={targetY}
-        type={connectionType}
-        style={connectionStyle}
-        isSource={false}
+      <path
+        d={edgePath}
+        stroke={connectionStyle.stroke}
+        strokeWidth={connectionStyle.strokeWidth}
+        fill={connectionStyle.fill}
+        strokeLinecap={connectionStyle.strokeLinecap}
+        strokeLinejoin={connectionStyle.strokeLinejoin}
+        opacity={connectionStyle.opacity}
+        className={animated ? 'animated-connection-path' : ''}
       />
 
       {/* 连接标签 */}
@@ -438,7 +252,7 @@ export function EnhancedConnectionEdge({
         <ConnectionLabel
           x={labelX}
           y={labelY}
-          label={label}
+          label={String(label)}
           style={connectionStyle}
         />
       )}
@@ -473,24 +287,6 @@ export function EnhancedConnectionEdge({
         </g>
       )}
 
-      {/* 连接质量指示器 */}
-      {(selected || isHovered) && (
-        <g className="connection-quality-indicator">
-          <circle
-            cx={labelX + 20}
-            cy={labelY - 15}
-            r="3"
-            fill={
-              connectionQuality === 'excellent' ? '#10B981' :
-              connectionQuality === 'good' ? '#3B82F6' :
-              connectionQuality === 'fair' ? '#F59E0B' : '#EF4444'
-            }
-            stroke="#fff"
-            strokeWidth="1"
-          />
-        </g>
-      )}
-
       {/* 调试信息（开发环境） */}
       {process.env.NODE_ENV === 'development' && (selected || isHovered) && (
         <text
@@ -508,7 +304,7 @@ export function EnhancedConnectionEdge({
   );
 }
 
-// 连接预览组件（拖拽连接时使用）
+// 简化的连接预览组件
 export function EnhancedConnectionPreview({
   fromX,
   fromY,
@@ -527,11 +323,10 @@ export function EnhancedConnectionPreview({
   connectionType?: string;
 }) {
   const [path] = useMemo(() => {
-    return getSmartConnectionPath(
-      { sourceX: fromX, sourceY: fromY, sourcePosition: fromPosition,
-        targetX: toX, targetY: toY, targetPosition: toPosition },
-      'smooth'
-    );
+    return getSimpleBezierPath({
+      sourceX: fromX, sourceY: fromY, sourcePosition: fromPosition,
+      targetX: toX, targetY: toY, targetPosition: toPosition
+    });
   }, [fromX, fromY, toX, toY, fromPosition, toPosition]);
 
   const previewStyle = useMemo(() => {
@@ -547,10 +342,15 @@ export function EnhancedConnectionPreview({
   return (
     <g className="enhanced-connection-preview">
       {/* 预览路径 */}
-      <AnimatedConnectionPath
-        path={path}
-        style={previewStyle}
-        animated={true}
+      <path
+        d={path}
+        stroke={previewStyle.stroke}
+        strokeWidth={previewStyle.strokeWidth}
+        fill={previewStyle.fill}
+        strokeLinecap={previewStyle.strokeLinecap}
+        strokeLinejoin={previewStyle.strokeLinejoin}
+        opacity={previewStyle.opacity}
+        className="connection-preview-path"
       />
 
       {/* 源点指示器 */}

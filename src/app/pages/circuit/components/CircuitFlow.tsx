@@ -355,7 +355,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
     [selectedEdgeId]
   );
 
-  // 处理连接创建 - 增强用户反馈
+  // 处理连接创建 - 简化版本
   const onConnect = useCallback(
     (connection: Connection) => {
       // 检查连接是否有效
@@ -363,9 +363,6 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
         message.warning('无效的连接，请确保正确连接两个端口');
         return;
       }
-
-      // 显示连接中状态
-      const connectingMessage = message.loading('正在建立连接...', 0.5);
 
       // 清除之前选中的边缘
       setSelectedEdgeId(null);
@@ -380,7 +377,6 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
       );
 
       if (connectionExists) {
-        message.destroy(connectingMessage);
         message.warning('此连接已存在');
         return;
       }
@@ -391,16 +387,15 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
         console.log('同一节点上的端口相连:', connection);
       }
 
-      // 创建新的边对象 - 增强视觉效果
+      // 创建新的边对象 - 简化视觉效果
       const newEdge = {
         ...connection,
         id: `edge-${connection.source}-${connection.sourceHandle}-${connection.target}-${connection.targetHandle}`,
         type: 'default',
-        animated: true, // 启用动画效果
+        animated: false, // 简化动画
         style: { 
           stroke: '#3B82F6', 
-          strokeWidth: 2,
-          filter: 'drop-shadow(0px 0px 4px rgba(59, 130, 246, 0.3))'
+          strokeWidth: 2
         },
         data: {
           status: 'connected',
@@ -410,50 +405,13 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
       
       setEdges((eds) => addEdge(newEdge, eds));
       
-      // 延迟显示成功消息，让用户看到连接动画
-      setTimeout(() => {
-        message.destroy(connectingMessage);
-        message.success({
-          content: '连接建立成功！',
-          duration: 1,
-          style: {
-            marginTop: '10vh',
-          },
-        });
-      }, 300);
+      // 显示成功消息
+      message.success('连接建立成功！', 1);
     },
     [edges]
   );
 
-  // 添加一个函数来处理元件双击事件
-  const handleNodeDoubleClick = useCallback((nodeId: string) => {
-    console.log('CircuitFlow.handleNodeDoubleClick 被调用，nodeId:', nodeId);
-    console.log('当前所有节点:', nodes);
-    
-    const node = nodes.find(n => n.id === nodeId);
-    if (node) {
-      console.log('找到节点数据:', node.data);
-      
-      // 创建一个完整的数据对象，只包含 CircuitNodeData 支持的属性
-      const nodeData = {
-        id: node.id,
-        label: node.data.label || '',
-        value: node.data.value || '',
-        element: node.data.element,
-        description: '',
-        ports: node.data.ports || [],
-      };
-      
-      console.log('设置 selectedElement:', nodeData);
-      setSelectedElement(nodeData);
-      
-      console.log('设置 configVisible = true');
-      setConfigVisible(true);
-    } else {
-      console.warn('未找到节点数据 id:', nodeId);
-      console.warn('请确认节点ID是否正确，所有节点ID:', nodes.map(n => n.id));
-    }
-  }, [nodes]);
+  // 移除未使用的双击处理函数
 
   // 创建新节点
   const addNewNode = useCallback(
@@ -1258,14 +1216,19 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
             defaultViewport={{ x: 0, y: 0, zoom: 1 }}
             fitView
             attributionPosition="bottom-left"
-            connectionMode="loose"
+            connectionMode={undefined}
             defaultMarkerColor="#3B82F6"
             connectOnClick={!isReadOnly}
-            connectionRadius={25} // 增加连接半径
-            isValidConnection={(connection) => {
+            connectionRadius={30} // 增加连接半径，提高连接成功率
+            isValidConnection={() => {
               if (isReadOnly) return false;
               // 允许所有连接，让ReactFlow自然处理
               return true;
+            }}
+            connectionLineStyle={{
+              strokeWidth: 2,
+              stroke: '#3B82F6',
+              strokeDasharray: '5 5'
             }}
             onNodeClick={isReadOnly ? undefined : handleNodeClick}
             onNodeDoubleClick={isReadOnly ? undefined : (event, node) => {

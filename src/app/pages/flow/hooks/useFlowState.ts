@@ -1,7 +1,6 @@
 import { NodeVO } from "@/api/types/flow.types";
 import { Edge, Node } from "@xyflow/react";
 import { useCallback, useMemo, useRef, useState } from "react";
-import { NodeData } from "../components/node/types/node.types";
 import { ChatTask, TextData } from "../types/ChatTask.types";
 import { useAppContext } from "@/app/contexts/AppContext";
 import { toast } from "sonner";
@@ -65,17 +64,42 @@ function useFlowState(convId: number, selectedNode?: Node | null, setSelectedNod
             break;
           }
           
+          // 归一化后端节点类型，确保前端认识
+          const normalizeNodeType = (apiType: string | undefined | null): string => {
+            if (!apiType) return 'query';
+            const t = String(apiType).toUpperCase();
+            switch (t) {
+              case 'QUERY':
+                return 'query';
+              case 'PDF_CIRCUIT_POINT':
+                return 'PDF_ANALYSIS_POINT';
+              case 'PDF_CIRCUIT_DETAIL':
+                return 'PDF_ANALYSIS_DETAIL';
+              case 'PDF_CIRCUIT_DOCUMENT':
+              case 'PDF_DOCUMENT':
+                return 'PDF_DOCUMENT';
+              case 'PDF_ANALYSIS_POINT':
+                return 'PDF_ANALYSIS_POINT';
+              case 'PDF_ANALYSIS_DETAIL':
+                return 'PDF_ANALYSIS_DETAIL';
+              default:
+                return String(apiType);
+            }
+          };
+
+          const normalizedType = normalizeNodeType(nodeVO.type as unknown as string);
+
           // 设置节点为正在生成状态
-          if (nodeVO.type === 'answer' || nodeVO.type === 'knowledge-detail') {
+          if (normalizedType === 'answer' || normalizedType === 'knowledge-detail') {
             lastFocusNodeId.current = nodeVO.id.toString();
             // 添加到活跃节点跟踪列表
             activeNodeIds.current.add(nodeVO.id.toString());
           }
           
           // 如果是详情节点，也添加到活跃节点列表，并准备自动选中
-          if (nodeVO.type === 'answer-detail' || nodeVO.type === 'ANSWER_DETAIL' || 
-              nodeVO.type === 'circuit-detail' || nodeVO.type === 'knowledge-detail' ||
-              nodeVO.type === 'PDF_ANALYSIS_DETAIL') {
+      if (normalizedType === 'answer-detail' || normalizedType === 'ANSWER_DETAIL' || 
+        normalizedType === 'circuit-detail' || normalizedType === 'knowledge-detail' ||
+        normalizedType === 'PDF_ANALYSIS_DETAIL') {
             console.log(`创建详情节点 ${nodeVO.id}，准备自动选中并开始流式显示`);
             lastFocusNodeId.current = nodeVO.id.toString();
             activeNodeIds.current.add(nodeVO.id.toString());
@@ -87,10 +111,10 @@ function useFlowState(convId: number, selectedNode?: Node | null, setSelectedNod
           }
           setElements(({nodes, edges}) => {
             const tempQueryNode = nodes.find(node => node.id.startsWith(TEMP_QUERY_NODE_ID_PREFIX));
-            const isUserQueryNode = nodeVO.type === 'query' && tempQueryNode;
+            const isUserQueryNode = normalizedType === 'query' && tempQueryNode;
             const newNode = {
               id: nodeVO.id.toString(),
-              type: nodeVO.type,
+              type: normalizedType as any,
               position: isUserQueryNode ? tempQueryNode.position : nodeVO.position,
               data: {
                 ...nodeVO.data,
@@ -101,7 +125,7 @@ function useFlowState(convId: number, selectedNode?: Node | null, setSelectedNod
                 updatedAt: nodeVO.updatedAt,
                 ...(nodeVO.height !== null ? { height: nodeVO.height } : {}),
               },
-            } as Node<NodeData<typeof nodeVO.type>>;
+            } as any;
             
             // 验证parentId是否存在，如果不存在则尝试使用根节点
             if (!nodeVO.parentId && nodeVO.type !== 'root') {
@@ -138,7 +162,7 @@ function useFlowState(convId: number, selectedNode?: Node | null, setSelectedNod
             executeFitView([newNode.id], 500);
 
             // 如果节点是knowledge-detail，则修改knowledge-head的isGenerated为true
-            if (nodeVO.type === 'knowledge-detail') {
+            if (normalizedType === 'knowledge-detail') {
               const knowledgeHeadNode = layoutedNodes.find(node => 
                 node.type === 'knowledge-head' && 
                 nodeVO.parentId && 
@@ -150,7 +174,7 @@ function useFlowState(convId: number, selectedNode?: Node | null, setSelectedNod
             }
             
             // 如果节点类型是answer-detail或ANSWER_DETAIL，则修改其父节点(answer-point)的isGenerated为true
-            if (nodeVO.type === 'answer-detail' || nodeVO.type === 'ANSWER_DETAIL') {
+            if (normalizedType === 'answer-detail' || normalizedType === 'ANSWER_DETAIL') {
               const answerPointNode = layoutedNodes.find(node => 
                 (node.type === 'answer-point' || node.type === 'ANSWER_POINT') && 
                 nodeVO.parentId && 
@@ -162,7 +186,7 @@ function useFlowState(convId: number, selectedNode?: Node | null, setSelectedNod
             }
             
             // 如果节点类型是circuit-detail，则修改其父节点(circuit-point)的isGenerated为true
-            if (nodeVO.type === 'circuit-detail') {
+            if (normalizedType === 'circuit-detail') {
               const circuitPointNode = layoutedNodes.find(node => 
                 node.type === 'circuit-point' && 
                 nodeVO.parentId && 
@@ -174,7 +198,7 @@ function useFlowState(convId: number, selectedNode?: Node | null, setSelectedNod
             }
             
             // 如果节点类型是PDF_ANALYSIS_DETAIL，则修改其父节点(PDF_ANALYSIS_POINT)的isGenerated为true
-            if (nodeVO.type === 'PDF_ANALYSIS_DETAIL') {
+            if (normalizedType === 'PDF_ANALYSIS_DETAIL') {
               const pdfAnalysisPointNode = layoutedNodes.find(node => 
                 node.type === 'PDF_ANALYSIS_POINT' && 
                 nodeVO.parentId && 
@@ -186,13 +210,13 @@ function useFlowState(convId: number, selectedNode?: Node | null, setSelectedNod
             }
 
             // 如果是详情节点，自动选中该节点以便在右侧面板显示
-            if ((nodeVO.type === 'answer-detail' || nodeVO.type === 'ANSWER_DETAIL' || 
-                 nodeVO.type === 'circuit-detail' || nodeVO.type === 'knowledge-detail' ||
-                 nodeVO.type === 'PDF_ANALYSIS_DETAIL') && 
+            if ((normalizedType === 'answer-detail' || normalizedType === 'ANSWER_DETAIL' || 
+                 normalizedType === 'circuit-detail' || normalizedType === 'knowledge-detail' ||
+                 normalizedType === 'PDF_ANALYSIS_DETAIL') && 
                 setSelectedNode) {
               const newDetailNode = layoutedNodes.find(node => node.id === newNode.id);
               if (newDetailNode) {
-                console.log(`立即自动选中详情节点 ${newDetailNode.id}，类型: ${nodeVO.type}`);
+                console.log(`立即自动选中详情节点 ${newDetailNode.id}，类型: ${normalizedType}`);
                 // 立即选中，并确保详情面板显示流式内容
                 setSelectedNode(newDetailNode);
                 

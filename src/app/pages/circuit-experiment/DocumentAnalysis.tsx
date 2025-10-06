@@ -19,6 +19,7 @@ import { createAiTask } from '@/api/methods/flow.methods';
 import { CreateAiTaskDTO } from '@/api/types/flow.types';
 import { ModelSelector } from '../../pages/blank/components/ModelSelector';
 import { ModelType } from '../flow/components/input/FlowInputPanel';
+import { BASE_URL } from '@/api';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -48,6 +49,22 @@ export default function DocumentAnalysis() {
     // 移除时间戳前缀（如果存在）
     const cleanFileName = fileName.replace(/^\d+_/, '');
     return decodeURIComponent(cleanFileName);
+  };
+
+  // 构建完整的文档URL
+  const buildFullDocumentUrl = (fileUrl: string): string => {
+    if (!fileUrl) return '';
+    
+    // 如果已经是完整URL，直接返回
+    if (fileUrl.startsWith('http://') || fileUrl.startsWith('https://')) {
+      return fileUrl;
+    }
+    
+    // 如果是相对路径，构建完整URL
+    const baseUrl = BASE_URL.replace(/\/+$/, ''); // 移除末尾的斜杠
+    const path = fileUrl.startsWith('/') ? fileUrl : `/${fileUrl}`;
+    
+    return `${baseUrl}${path}`;
   };
 
   // 获取文档详情
@@ -87,8 +104,56 @@ export default function DocumentAnalysis() {
 
   // 查看PDF文件
   const handleViewPdf = () => {
-    if (document?.fileUrl) {
-      window.open(document.fileUrl, '_blank');
+    console.log('=== PDF预览调试信息 (DocumentAnalysis) ===');
+    console.log('文档对象:', document);
+    console.log('原始fileUrl:', document?.fileUrl);
+    console.log('objectPath:', document?.objectPath);
+    
+    if (!document?.fileUrl) {
+      console.error('fileUrl为空:', document?.fileUrl);
+      message.error('文档URL无效，无法预览');
+      return;
+    }
+    
+    // 构建完整URL
+    const fullUrl = buildFullDocumentUrl(document.fileUrl);
+    console.log('构建的完整URL:', fullUrl);
+    
+    // 检查URL格式
+    try {
+      const url = new URL(fullUrl);
+      console.log('解析的URL:', url);
+      console.log('协议:', url.protocol);
+      console.log('主机:', url.host);
+      console.log('路径:', url.pathname);
+      
+      // 尝试打开文档
+      console.log('尝试打开URL:', fullUrl);
+      const newWindow = window.open(fullUrl, '_blank');
+      
+      if (!newWindow) {
+        console.error('无法打开新窗口，可能被浏览器拦截');
+        message.warning('无法打开新窗口，请检查浏览器弹窗设置');
+      } else {
+        console.log('成功打开新窗口');
+        // 检查新窗口是否成功加载
+        setTimeout(() => {
+          try {
+            if (newWindow.closed) {
+              console.log('新窗口已被关闭');
+            } else {
+              console.log('新窗口仍然打开');
+            }
+          } catch (e) {
+            console.log('无法检查新窗口状态（跨域限制）');
+          }
+        }, 1000);
+      }
+      
+    } catch (error) {
+      console.error('URL解析失败:', error);
+      console.error('无效的URL:', fullUrl);
+      message.error('文档URL格式无效，无法预览');
     }
   };
 
