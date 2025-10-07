@@ -16,8 +16,8 @@ import NodeDetailPanel from "./components/NodeDetailPanel";
 import {useCallback, useState, useEffect, useRef} from "react";
 import {useLocation, useNavigate} from "react-router-dom";
 import {useWatcher} from "alova/client";
-import {getNodesByConvId} from "@/api/methods/flow.methods.ts";
-import type { NodeVO as ApiNodeVO } from '@/api/types/flow.types';
+import {getNodesByConvId, updateNodesPositionAndHeight} from "@/api/methods/flow.methods.ts";
+import type { NodeVO as ApiNodeVO, NodeToUpdate, NodeType } from '@/api/types/flow.types';
 import { LoadingSpinner } from './components/loading/LoadingSpinner';
 import useFlowState from './hooks/useFlowState';
 import { FlowInputPanel } from './components/input/FlowInputPanel';
@@ -26,6 +26,8 @@ import useTempQueryNode from "./hooks/useTempQueryNode";
 import useFlowTools from "./hooks/useFlowTools";
 import { useAdaptiveZoom } from "./hooks/useAdaptiveZoom";
 import { toast } from "sonner";
+import { calculateNodeHeight } from './utils/calculateNodeHeight';
+import type { NodeData } from './components/node/types/node.types';
 // 导入优化后的CSS样式
 import './styles/index.css';
 import { TEMP_QUERY_NODE_ID_PREFIX } from "./constants";
@@ -200,6 +202,9 @@ function Flow() {
       let totalHeightChange = 0;
       let changedNodesCount = 0;
 
+      // 跟踪被拖动的节点
+      const draggedNodes: NodeToUpdate[] = [];
+
       changes.forEach((change) => {
         if (change.type === 'select') {
           selectionChanged = true;
@@ -207,6 +212,20 @@ function Flow() {
             selectedNodeId = change.id;
           } else {
             unselectedNodeId = change.id;
+          }
+        } else if (change.type === 'position') {
+          // 处理节点位置变化（拖动）
+          if (change.dragging === false && change.position) {
+            // 节点拖动结束，保存新位置
+            const node = nodes.find(n => n.id === change.id);
+            if (node && !change.id.startsWith(TEMP_QUERY_NODE_ID_PREFIX)) {
+              const nodeHeight = node.data.height as number || calculateNodeHeight(node as Node<NodeData<NodeType>>);
+              draggedNodes.push({
+                id: parseInt(change.id),
+                position: change.position,
+                height: nodeHeight
+              });
+            }
           }
         } else if (change.type === 'dimensions') {
           const node = newNodes.find(n => n.id === change.id);
@@ -316,6 +335,19 @@ function Flow() {
           significantChangeRatio
         });
         newNodes = executeLayout(newNodes, edges, true);
+      }
+
+      // 保存被拖动的节点位置到服务器
+      if (draggedNodes.length > 0) {
+        console.log(`保存${draggedNodes.length}个被拖动节点的位置`);
+        updateNodesPositionAndHeight(draggedNodes).send()
+          .then(() => {
+            console.log('节点拖动位置保存成功');
+          })
+          .catch(error => {
+            console.error('节点拖动位置保存失败', error);
+            toast.error('节点位置保存失败');
+          });
       }
 
       // 执行视图调整
@@ -508,7 +540,7 @@ function Flow() {
           type: normalizedType as any,
           position: node.position,
           data,
-          draggable: false,
+          draggable: true, // 允许节点拖动
           connectable: false,
           selectable: true, // 确保节点可选择
         } as any;
@@ -842,8 +874,8 @@ function Flow() {
               height: '100%',
               position: 'relative'
             }} // 背景样式和尺寸限制
-            nodesDraggable={false} // 节点不可拖拽
-            draggable={false} // 节点不可拖拽
+            nodesDraggable={true} // 允许节点拖拽
+            draggable={true} // 允许节点拖拽
             selectionKeyCode={null} // 取消选择快捷键
             multiSelectionKeyCode={null} // 取消多选快捷键
             deleteKeyCode={null} // 取消删除快捷键
@@ -853,7 +885,7 @@ function Flow() {
             minZoom={0.05} // 最小缩放减小，支持更大范围的概览
             defaultViewport={{ x: 0, y: 0, zoom: 0.8 }} // 默认视图，将由智能缩放覆盖
             defaultEdgeOptions={{ // 默认边样式
-              type: 'smoothstep', // 平滑曲线
+              type: 'straight', // 直线连接，避免弯折
               animated: false, // 动画
               selectable: false, // 不可选择
               style: {

@@ -16,6 +16,26 @@ const ZOOM_CHECK_INTERVAL = 200; // 检查缩放级别的间隔(ms)
 const MIN_PREVIEW_FONT_SIZE = 3.0; // 最小预览文本字体大小(rem) - 增大基础字体
 const MAX_PREVIEW_FONT_SIZE = 8; // 最大预览文本字体大小(rem) - 增大最大字体
 
+// 节点类型的视觉配置
+const NODE_TYPE_STYLES: Record<string, { bgColor: string; textColor: string; borderColor: string; label: string }> = {
+  'query': { bgColor: 'bg-purple-50', textColor: 'text-purple-700', borderColor: 'border-purple-200', label: '提问' },
+  'answer': { bgColor: 'bg-green-50', textColor: 'text-green-700', borderColor: 'border-green-200', label: 'AI回答' },
+  'answer-point': { bgColor: 'bg-blue-50', textColor: 'text-blue-700', borderColor: 'border-blue-200', label: '回答角度' },
+  'ANSWER_POINT': { bgColor: 'bg-blue-50', textColor: 'text-blue-700', borderColor: 'border-blue-200', label: '回答角度' },
+  'answer-detail': { bgColor: 'bg-cyan-50', textColor: 'text-cyan-700', borderColor: 'border-cyan-200', label: '详细解析' },
+  'ANSWER_DETAIL': { bgColor: 'bg-cyan-50', textColor: 'text-cyan-700', borderColor: 'border-cyan-200', label: '详细解析' },
+  'knowledge-head': { bgColor: 'bg-amber-50', textColor: 'text-amber-700', borderColor: 'border-amber-200', label: '知识点' },
+  'knowledge-detail': { bgColor: 'bg-orange-50', textColor: 'text-orange-700', borderColor: 'border-orange-200', label: '知识详情' },
+  'circuit-canvas': { bgColor: 'bg-pink-50', textColor: 'text-pink-700', borderColor: 'border-pink-200', label: '电路画布' },
+  'circuit-point': { bgColor: 'bg-rose-50', textColor: 'text-rose-700', borderColor: 'border-rose-200', label: '电路分点' },
+  'circuit-detail': { bgColor: 'bg-red-50', textColor: 'text-red-700', borderColor: 'border-red-200', label: '电路详情' },
+  'PDF_DOCUMENT': { bgColor: 'bg-indigo-50', textColor: 'text-indigo-700', borderColor: 'border-indigo-200', label: 'PDF文档' },
+  'PDF_ANALYSIS_POINT': { bgColor: 'bg-violet-50', textColor: 'text-violet-700', borderColor: 'border-violet-200', label: 'PDF分点' },
+  'PDF_ANALYSIS_DETAIL': { bgColor: 'bg-fuchsia-50', textColor: 'text-fuchsia-700', borderColor: 'border-fuchsia-200', label: 'PDF详情' },
+  'root': { bgColor: 'bg-gray-50', textColor: 'text-gray-700', borderColor: 'border-gray-200', label: '根节点' },
+  'resource': { bgColor: 'bg-teal-50', textColor: 'text-teal-700', borderColor: 'border-teal-200', label: '资源' },
+};
+
 // 扩展 NodeProps 的接口
 export interface ExtendedNodeProps<T extends NodeType> extends Omit<NodeProps, 'data'> {
   data: NodeData<T>;
@@ -127,6 +147,16 @@ export const BaseNode = React.memo(function BaseNode<T extends NodeType>({
   const { getViewport } = useReactFlow();
   const { nodeWidth, openDeleteNodeDialog } = useAppContext();
   const nodeRef = useRef<HTMLDivElement>(null);
+
+  // 获取节点类型的视觉样式
+  const nodeTypeStyle = useMemo(() => {
+    return NODE_TYPE_STYLES[type] || {
+      bgColor: 'bg-gray-50',
+      textColor: 'text-gray-700',
+      borderColor: 'border-gray-200',
+      label: type.replace(/-/g, ' ')
+    };
+  }, [type]);
   
   // 缩放状态
   const [currentZoom, setCurrentZoom] = useState(() => getViewport().zoom);
@@ -145,13 +175,18 @@ export const BaseNode = React.memo(function BaseNode<T extends NodeType>({
   }, [currentZoom, shouldUseSimplifiedView]);
   
   // 使用useMemo缓存计算结果
-  const { hasTitle, hasText, formattedDate, textPreview, nodeHeight } = useMemo(() => {    
+  const { hasTitle, hasText, formattedDate, textPreview, nodeHeight, displayTitle } = useMemo(() => {
+    // 智能决定显示标题：优先使用内容摘要，其次使用title
+    const contentPreview = extractPreview(nodeData?.text);
+    const shouldUseContentPreview = contentPreview && contentPreview.length > 0;
+
     return {
       hasTitle: nodeData.title !== undefined,
       hasText: nodeData.text !== undefined,
       formattedDate: format(new Date(nodeData.createdAt), 'yyyy-MM-dd HH:mm'),
-      textPreview: extractPreview(nodeData?.text),  // 使用新的提取逻辑
-      nodeHeight: nodeData.height || NODE_DEFAULT_HEIGHT
+      textPreview: contentPreview,  // 使用新的提取逻辑
+      nodeHeight: nodeData.height || NODE_DEFAULT_HEIGHT,
+      displayTitle: shouldUseContentPreview ? contentPreview : nodeData.title // 混合方案：优先内容摘要
     };
   }, [nodeData.title, nodeData.text, nodeData.createdAt, nodeData.height]);
   
@@ -216,66 +251,50 @@ export const BaseNode = React.memo(function BaseNode<T extends NodeType>({
     // 如果是紧凑模式或简化视图模式，显示简化内容 - 专注于大标题显示
     if (shouldUseSimplifiedView || compactMode) {
       return (
-        <div className="compact-node-content" style={{ 
-          height: '100%', 
-          width: '100%', 
-          display: 'flex', 
-          flexDirection: 'column', 
+        <div className="compact-node-content" style={{
+          height: '100%',
+          width: '100%',
+          display: 'flex',
+          flexDirection: 'column',
           justifyContent: 'center', // 改为居中对齐，让标题更突出
           alignItems: 'center',
           padding: '16px' // 增加padding给标题更多空间
         }}>
           {/* 主要内容：突出显示大标题 */}
           <div className="compact-node-main flex-1 flex flex-col justify-center items-center">
-            {hasTitle ? (
-              <div 
-                className="node-title text-center font-bold text-gray-900" // 增加font-bold和更深的颜色
-                style={{ 
-                  fontSize: compactMode ? '1.25rem' : `${previewFontSize * 1.2}rem`, // 大幅增加字体大小 
-                  fontWeight: '700', // 更粗的字体
-                  lineHeight: '1.4', // 适当增加行高
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  display: '-webkit-box',
-                  WebkitLineClamp: compactMode ? 3 : 4, // 增加显示行数
-                  WebkitBoxOrient: 'vertical',
-                  maxWidth: '100%',
-                  wordBreak: 'break-word' // 支持中文换行
+            {/* 使用displayTitle优先显示内容摘要 */}
+            <div
+              className="node-title text-center font-bold text-gray-900" // 增加font-bold和更深的颜色
+              style={{
+                fontSize: compactMode ? '1.25rem' : `${previewFontSize * 1.2}rem`, // 大幅增加字体大小
+                fontWeight: '700', // 更粗的字体
+                lineHeight: '1.4', // 适当增加行高
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                display: '-webkit-box',
+                WebkitLineClamp: compactMode ? 3 : 4, // 增加显示行数
+                WebkitBoxOrient: 'vertical',
+                maxWidth: '100%',
+                wordBreak: 'break-word' // 支持中文换行
+              }}
+            >
+              {displayTitle}
+            </div>
+
+            {/* 节点类型标识 - 作为副标题显示，使用视觉配置 */}
+            <div className="node-type-indicator mt-2">
+              <span
+                className={`px-3 py-1 rounded-full border ${nodeTypeStyle.bgColor} ${nodeTypeStyle.textColor} ${nodeTypeStyle.borderColor}`}
+                style={{
+                  fontSize: '0.75rem',
+                  fontWeight: '500'
                 }}
               >
-                {nodeData.title}
-              </div>
-            ) : (
-              // 如果没有标题，显示节点类型作为大标题
-              <div 
-                className="node-type-title text-center font-bold text-gray-700"
-                style={{ 
-                  fontSize: compactMode ? '1.1rem' : `${previewFontSize * 1.0}rem`,
-                  fontWeight: '600',
-                  lineHeight: '1.3',
-                  textTransform: 'capitalize' // 首字母大写
-                }}
-              >
-                {type.replace(/-/g, ' ')} {/* 将连字符替换为空格 */}
-              </div>
-            )}
-            
-            {/* 节点类型标识 - 作为副标题显示 */}
-            {compactMode && hasTitle && (
-              <div className="node-type-indicator mt-2">
-                <span 
-                  className="px-3 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200"
-                  style={{
-                    fontSize: '0.85rem',
-                    fontWeight: '500'
-                  }}
-                >
-                  {type.replace(/-/g, ' ')}
-                </span>
-              </div>
-            )}
+                {nodeTypeStyle.label}
+              </span>
+            </div>
           </div>
-          
+
           {/* 下半部分：功能按钮 */}
           {compactMode && footerContent && (
             <div className="compact-node-footer mt-2 flex justify-center">
@@ -341,9 +360,9 @@ export const BaseNode = React.memo(function BaseNode<T extends NodeType>({
     nodeContentCache[id] = content;
     return content;
   }, [
-    shouldUseSimplifiedView, compactMode, id, selected, hasTitle, nodeData.title, headerContent, 
-    customContent, hasText, nodeData.text, footerContent, formattedDate, 
-    textPreview, previewFontSize, type
+    shouldUseSimplifiedView, compactMode, id, selected, hasTitle, nodeData.title, headerContent,
+    customContent, hasText, nodeData.text, footerContent, formattedDate,
+    textPreview, previewFontSize, type, displayTitle, nodeTypeStyle
   ]);
   
   const canBeDeleted = useMemo(() => {

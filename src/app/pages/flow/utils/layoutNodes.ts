@@ -354,23 +354,23 @@ export function entitreeFlexLayout(nodes: Node[], edges: Edge[], shouldUpdateSer
       };
     });
     
-    // 调整布局设置 - 增大纵向间距防止重叠，大幅压缩横向间距
+    // 调整布局设置 - 保持稳定的间距配置
     const settings = {
       clone: false,
       enableFlex: true,
-      // 横向布局的节点间距设置 - 显著增大纵向间距防止重叠
-      firstDegreeSpacing: 80, // 相同父节点的子节点垂直间距（从35增加到80，解决重叠问题）
-      nextAfterSpacing: 8,    // 相邻节点间距（从3增加到8，增加缓冲区）
-      nextBeforeSpacing: 8,   // 相邻节点间距（从3增加到8，增加缓冲区）
+      // 横向布局的节点间距设置 - 使用平衡的间距参数
+      firstDegreeSpacing: 150, // 相同父节点的子节点垂直间距
+      nextAfterSpacing: 15,    // 相邻节点间距
+      nextBeforeSpacing: 15,   // 相邻节点间距
       nodeHeight: 40,
       nodeWidth: 40,
-      orientation: "horizontal", // 关键改变：从vertical改为horizontal
+      orientation: "horizontal", // 横向布局
       rootX: 0,
       rootY: 0,
-      secondDegreeSpacing: 50, // 不同父节点的节点垂直间距（从20增加到50，进一步防止重叠）
+      secondDegreeSpacing: 100, // 不同父节点的节点垂直间距
       sourcesAccessor: "parents",
-      // 父子节点之间的水平间距（横向布局的核心参数）- 大幅压缩横向间距
-      sourceTargetSpacing: 18, // 从35进一步减少到18，极大压缩横向空间
+      // 父子节点之间的水平间距（横向布局的核心参数）
+      sourceTargetSpacing: 100, // 层级间水平间距
       targetsAccessor: "children",
     } as Partial<Settings>;
     
