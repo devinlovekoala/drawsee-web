@@ -20,14 +20,13 @@ import 'reactflow/dist/style.css';
 import { CircuitNode } from './CircuitNode';
 import ConnectionEdge, { ConnectionPreview } from './ConnectionEdge';
 import ComponentConfig from './ComponentConfig';
-import { 
-  CircuitElementType, 
-  CircuitDesign, 
+import {
+  CircuitElementType,
+  CircuitDesign,
   Port,
   CircuitElement
 } from '@/api/types/circuit.types';
 import { createAiTask } from '@/api/methods/flow.methods';
-import { saveCircuitDesign } from '@/api/methods/circuit.methods';
 import { CircuitNodeData, ModelType } from '../types';
 import { useAppContext } from '@/app/contexts/AppContext';
 import { CreateAiTaskDTO } from '@/api/types/flow.types';
@@ -36,6 +35,7 @@ import { ModelSelector } from '@/app/pages/blank/components/ModelSelector';
 import { ModelType as FlowModelType } from '@/app/pages/flow/components/input/FlowInputPanel';
 import ElementLibrary from './ElementLibrary';
 import CircuitToolbar from './CircuitToolbar';
+import SaveCircuitModal from './SaveCircuitModal';
 
 // 唯一节点ID生成
 let nodeIdCounter = 1;
@@ -174,6 +174,9 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
   // 添加配置面板状态
   const [configVisible, setConfigVisible] = useState<boolean>(false);
   const [selectedElement, setSelectedElement] = useState<CircuitNodeData | null>(null);
+  // 添加保存弹窗状态
+  const [saveModalVisible, setSaveModalVisible] = useState<boolean>(false);
+  const [currentCircuitDesign, setCurrentCircuitDesign] = useState<CircuitDesign | null>(null);
   
   const reactFlowInstance = useReactFlow();
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
@@ -1036,32 +1039,18 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
   }, [historyState, setNodes, setEdges]);
   
   // 保存电路设计
-  const handleSaveCircuit = useCallback(async () => {
-    try {
-      const circuitDesign = convertToCircuitDesign();
-      
-      // 检查电路是否为空
-      if (circuitDesign.elements.length === 0) {
-        message.error('电路中没有元件，请先添加元件');
-        return;
-      }
-      
-      message.loading('保存电路中...', 0.5);
-      const result = await saveCircuitDesign(
-        circuitDesign,
-        circuitDesign.metadata.title || '电路设计',
-        circuitDesign.metadata.description || '使用DrawSee创建的电路'
-      );
-      
-      if (result.success) {
-        message.success('电路设计保存成功！');
-      } else {
-        message.error('电路设计保存失败');
-      }
-    } catch (error) {
-      console.error('保存电路设计失败:', error);
-      message.error('保存失败：' + (error instanceof Error ? error.message : '未知错误'));
+  const handleSaveCircuit = useCallback(() => {
+    const circuitDesign = convertToCircuitDesign();
+
+    // 检查电路是否为空
+    if (circuitDesign.elements.length === 0) {
+      message.error('电路中没有元件，请先添加元件');
+      return;
     }
+
+    // 设置当前电路设计数据并打开保存弹窗
+    setCurrentCircuitDesign(circuitDesign);
+    setSaveModalVisible(true);
   }, [convertToCircuitDesign]);
   
   // 清空电路
@@ -1296,7 +1285,17 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
       
       {/* 使用优化后的组件配置面板 */}
       {componentConfigElement}
-      
+
+      {/* 保存电路表单弹窗 */}
+      <SaveCircuitModal
+        visible={saveModalVisible}
+        circuitDesign={currentCircuitDesign}
+        onClose={() => setSaveModalVisible(false)}
+        onSuccess={() => {
+          console.log('电路保存成功');
+        }}
+      />
+
       {isAnalyzing && (
         <div style={{ 
           position: 'absolute', 
