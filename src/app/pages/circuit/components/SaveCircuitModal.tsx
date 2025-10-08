@@ -101,12 +101,13 @@ export const SaveCircuitModal: FC<SaveCircuitModalProps> = ({
           label="电路名称"
           rules={[
             { required: true, message: '请输入电路名称' },
-            { max: 100, message: '电路名称不能超过100个字符' }
+            { max: 20, message: '电路名称不能超过20个字符' }
           ]}
         >
           <Input
             placeholder="请输入电路名称（例如：RC串联电路）"
             autoFocus
+            maxLength={20}
           />
         </Form.Item>
 
@@ -114,14 +115,14 @@ export const SaveCircuitModal: FC<SaveCircuitModalProps> = ({
           name="description"
           label="电路描述"
           rules={[
-            { max: 500, message: '电路描述不能超过500个字符' }
+            { max: 100, message: '电路描述不能超过100个字符' }
           ]}
         >
           <Input.TextArea
             placeholder="请输入电路描述（选填）"
             rows={4}
             showCount
-            maxLength={500}
+            maxLength={100}
           />
         </Form.Item>
       </Form>
