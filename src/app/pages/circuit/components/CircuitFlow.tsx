@@ -51,6 +51,22 @@ const edgeTypes = {
   default: ConnectionEdge,
 };
 
+// 元件命名前缀
+const elementNamePrefixes: Record<CircuitElementType, string> = {
+  [CircuitElementType.RESISTOR]: 'R',
+  [CircuitElementType.CAPACITOR]: 'C',
+  [CircuitElementType.INDUCTOR]: 'L',
+  [CircuitElementType.VOLTAGE_SOURCE]: 'V',
+  [CircuitElementType.CURRENT_SOURCE]: 'I',
+  [CircuitElementType.DIODE]: 'D',
+  [CircuitElementType.TRANSISTOR_NPN]: 'Q',
+  [CircuitElementType.TRANSISTOR_PNP]: 'Q',
+  [CircuitElementType.GROUND]: 'GND',
+  [CircuitElementType.OPAMP]: 'U',
+  [CircuitElementType.WIRE]: 'W',
+  [CircuitElementType.JUNCTION]: 'N'
+};
+
 // 电路元件菜单配置
 const elementMenuItems = [
   {
@@ -177,10 +193,43 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
   // 添加保存弹窗状态
   const [saveModalVisible, setSaveModalVisible] = useState<boolean>(false);
   const [currentCircuitDesign, setCurrentCircuitDesign] = useState<CircuitDesign | null>(null);
+  const elementNameCountersRef = useRef<Record<string, number>>({});
   
   const reactFlowInstance = useReactFlow();
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const { handleBlankQuery, handleAiTaskCountPlus } = useAppContext();
+  
+  const getLabelPrefix = useCallback((type: CircuitElementType) => {
+    return elementNamePrefixes[type] || 'X';
+  }, []);
+  
+  const getNextElementLabel = useCallback((type: CircuitElementType) => {
+    const prefix = getLabelPrefix(type);
+    const currentValue = elementNameCountersRef.current[type] || 0;
+    const nextValue = currentValue + 1;
+    elementNameCountersRef.current[type] = nextValue;
+    return `${prefix}${nextValue}`;
+  }, [getLabelPrefix]);
+  
+  const registerExistingElementLabel = useCallback((type: CircuitElementType, label?: string) => {
+    if (!label) return;
+    const prefix = getLabelPrefix(type);
+    const normalizedLabel = label.toUpperCase();
+    const normalizedPrefix = prefix.toUpperCase();
+    if (!normalizedLabel.startsWith(normalizedPrefix)) return;
+    const suffix = normalizedLabel.slice(normalizedPrefix.length);
+    const parsedValue = parseInt(suffix, 10);
+    if (!isNaN(parsedValue)) {
+      const current = elementNameCountersRef.current[type] || 0;
+      elementNameCountersRef.current[type] = Math.max(current, parsedValue);
+    }
+  }, [getLabelPrefix]);
+  
+  const getFallbackLabelFromId = useCallback((type: CircuitElementType, nodeId: string) => {
+    const prefix = getLabelPrefix(type);
+    const numericSuffix = nodeId.replace(/\D/g, '');
+    return `${prefix}${numericSuffix || '1'}`;
+  }, [getLabelPrefix]);
   
   // 监控节点和边变化，更新历史状态和撤销/重做按钮
   useEffect(() => {
@@ -291,8 +340,16 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
       setTimeout(() => {
         reactFlowInstance.fitView({ padding: 0.2 });
       }, 100);
+      
+      // 同步命名计数器，确保后续新增元件继续编号
+      initialCircuitDesign.elements.forEach(element => {
+        registerExistingElementLabel(
+          element.type,
+          element.label || (typeof element.properties?.label === 'string' ? element.properties.label : undefined)
+        );
+      });
     }
-  }, [initialCircuitDesign, reactFlowInstance]);
+  }, [initialCircuitDesign, reactFlowInstance, registerExistingElementLabel]);
   
   // 监听节点旋转事件，更新连线
   useEffect(() => {
@@ -448,13 +505,8 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
       // 生成唯一ID
       const nodeId = getNewNodeId();
       
-      // 获取枚举键名，用于节点标签
-      const elementTypeKey = Object.keys(CircuitElementType).find(
-        key => CircuitElementType[key as keyof typeof CircuitElementType] === type
-      ) || String(type);
-      
-      // 节点标签 - 使用枚举名称作为前缀
-      const elementLabel = `${elementTypeKey}${nodeIdCounter - 1}`;
+      // 节点标签 - 使用元件类型专属前缀
+      const elementLabel = getNextElementLabel(type);
       
       // 获取节点默认值
       const defaultValues: Record<string, string> = {
@@ -526,7 +578,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
       // 添加元件后显示简短提示
       message.success(`已添加${elementMenuItems.find(item => item.key === type)?.label || type}`, 1);
     },
-    [reactFlowInstance]
+    [reactFlowInstance, getNextElementLabel]
   );
   
   // 将Flow画布数据转换为CircuitDesign格式
@@ -600,7 +652,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
         
         // 构造符合文档规范的CircuitElement对象
         const elementValue = node.data.value || defaultValues[nodeType as CircuitElementType] || '';
-        const elementLabel = node.data.label || `${nodeType}${node.id.replace('node-', '')}`;
+        const elementLabel = node.data.label || getFallbackLabelFromId(nodeType as CircuitElementType, node.id);
         
         return {
           id: node.id,
@@ -662,7 +714,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
         }
       };
     }
-  }, [nodes, edges, onCircuitDesignChange]);
+  }, [nodes, edges, onCircuitDesignChange, getFallbackLabelFromId]);
 
   // 每当节点或边发生变化时，更新电路设计
   useEffect(() => {

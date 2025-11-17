@@ -480,6 +480,34 @@ export const CircuitNode = memo(({ data, selected, id }: NodeProps<CircuitNodeDa
         >
           <SvgComponent width="40" height="40" style={{color: '#1F2937'}} />
         </div>
+        {/* 内嵌标签，减少画布占用 */}
+        <div
+          className="absolute rounded-full transition-all duration-200"
+          style={{
+            bottom: '2px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            padding: '0 4px',
+            background: selected ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.88)',
+            border: `1px solid ${elementTheme.border}`,
+            color: elementTheme.text,
+            fontSize: '9px',
+            opacity: selected ? 1 : 0.9,
+            pointerEvents: 'none',
+            zIndex: 6,
+            minWidth: '22px',
+            textAlign: 'center',
+            lineHeight: 1.1,
+            boxShadow: selected ? '0 1px 3px rgba(15, 23, 42, 0.2)' : 'none',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            maxWidth: '48px'
+          }}
+          title={lastValues.value ? `${data.label} (${lastValues.value})` : data.label}
+        >
+          {data.label}
+        </div>
       </div>
       
       {/* 渲染所有端口 */}
@@ -561,29 +589,6 @@ export const CircuitNode = memo(({ data, selected, id }: NodeProps<CircuitNodeDa
         );
       })}
       
-      {/* 元件标签 - 始终显示但根据选中状态调整样式 */}
-      <div 
-        className={`absolute transform -translate-x-1/2 px-1.5 py-0.5 rounded transition-all duration-200 bg-white border shadow-sm ${selected ? '-top-7' : '-top-6'}`}
-        style={{
-          left: '50%',
-          borderColor: selected ? elementTheme.border : elementTheme.border,
-          color: selected ? elementTheme.text : elementTheme.text,
-          fontSize: selected ? '11px' : '10px',
-          opacity: selected ? 1 : 0.85,
-          pointerEvents: 'none', // 不阻止点击事件
-          zIndex: 5,
-          scale: selected ? '1.05' : '1',
-          fontWeight: selected ? 500 : 400,
-          letterSpacing: '0.01em',
-          maxWidth: '120px',
-          whiteSpace: 'nowrap',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis'
-        }}
-      >
-        {data.label}
-        {lastValues.value && <span style={{marginLeft: '3px', opacity: 0.8}}>({lastValues.value})</span>}
-      </div>
     </div>
   );
 });

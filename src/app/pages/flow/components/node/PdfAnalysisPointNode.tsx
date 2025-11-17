@@ -76,6 +76,9 @@ export default function PdfAnalysisPointNode(props: ExtendedNodeProps<'PDF_ANALY
       setLoading(false);
     }
   };
+  // intentionally unused while feature is disabled
+  void handlePdfAnalysisDetailChat;
+  void loading;
 
   // 编辑功能
   const handleEdit = () => {
@@ -169,12 +172,13 @@ export default function PdfAnalysisPointNode(props: ExtendedNodeProps<'PDF_ANALY
           type="primary"
           size="small"
           icon={<PlayCircleOutlined />}
-          onClick={handlePdfAnalysisDetailChat}
-          loading={loading}
-          disabled={process === 'generating' || !data.text?.trim()}
+          // 已临时禁用继续解析，后端PDF详情功能未就绪
+          disabled={true}
+          loading={false}
           block
+          title="继续解析（已禁用）"
         >
-          继续解析
+          继续解析（已禁用）
         </Button>
       )}
     </div>

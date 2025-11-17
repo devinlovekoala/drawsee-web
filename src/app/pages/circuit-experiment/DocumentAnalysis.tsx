@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   Card, 
   Button, 
@@ -199,6 +199,7 @@ export default function DocumentAnalysis() {
       setAnalyzing(false);
     }
   };
+  void handleAnalyze;
 
   // 处理电路设计
   const handleDesign = async () => {
@@ -237,6 +238,7 @@ export default function DocumentAnalysis() {
       setAnalyzing(false);
     }
   };
+  void handleDesign;
 
   if (loading) {
     return (
@@ -320,19 +322,23 @@ export default function DocumentAnalysis() {
           <Space direction="vertical" style={{ width: '100%' }}>
             <Button 
               type="primary" 
-              onClick={handleAnalyze}
+              // 分析功能已临时禁用，避免触发不完整后端流程
+              disabled={true}
               loading={analyzing}
               block
+              title="实验任务分析（已禁用，后端未就绪）"
             >
-              分析实验内容
+              分析实验内容（已禁用）
             </Button>
             
             <Button 
-              onClick={handleDesign}
+              // 设计功能已临时禁用
+              disabled={true}
               loading={analyzing}
               block
+              title="电路设计（已禁用，后端未就绪）"
             >
-              根据实验要求设计电路
+              根据实验要求设计电路（已禁用）
             </Button>
           </Space>
         </div>

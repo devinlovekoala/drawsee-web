@@ -6,12 +6,9 @@ import { UserDocumentVO } from '@/api/types/document.types';
 import { useNavigate, useLocation } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { bytesToSize } from '@/utils/file';
-import { createAiTask, getResourceUrl } from '@/api/methods/flow.methods';
-import { CreateAiTaskDTO } from '@/api/types/flow.types';
+import { getResourceUrl } from '@/api/methods/flow.methods';
 import { ModelSelector } from '../../pages/blank/components/ModelSelector';
 import { ModelType } from '../flow/components/input/FlowInputPanel';
-import { useAppContext } from '@/app/contexts/AppContext';
-import { BASE_URL } from '@/api';
 
 const { Title } = Typography;
 
@@ -26,10 +23,13 @@ export default function DocumentLibrary() {
   const navigate = useNavigate();
   const location = useLocation();
   const [selectedModel, setSelectedModel] = useState<ModelType>('deepseekV3');
-  const { handleBlankQuery, handleAiTaskCountPlus } = useAppContext();
+  // 不使用handleBlankQuery/handleAiTaskCountPlus，分析功能已被前端临时禁用
+  // const { handleBlankQuery, handleAiTaskCountPlus } = useAppContext();
   
   // 从location中获取班级ID
   const classId = location.state?.classId as string || null;
+  // avoid unused variable lint (intentional):
+  void classId;
 
   // 获取文档列表
   const fetchDocuments = async () => {
@@ -65,46 +65,23 @@ export default function DocumentLibrary() {
     return decodeURIComponent(cleanFileName);
   };
 
-  // 从 objectPath 或已存在的 fileUrl 中提取对象名（用于向后端换取最新签名URL）
-  const extractObjectName = (doc: UserDocumentVO): string | null => {
-    if (doc.objectPath) {
-      // 后端一般以 bucket 根为前缀，这里只要对象名部分
-      const obj = doc.objectPath.replace(/^\/*(drawsee\/)*/i, '').replace(/^\//, '');
-      return obj || null;
-    }
-    if (doc.fileUrl) {
+  // 获取文档的最新访问URL
+  const getLatestDocumentUrl = async (document: UserDocumentVO): Promise<string> => {
+    // 优先使用 objectPath 获取最新签名URL
+    if (document.objectPath) {
       try {
-        const url = new URL(buildFullDocumentUrl(doc.fileUrl));
-        // 常见风格：/drawsee/user-documents/14/xxx.pdf 或 /user-documents/14/xxx.pdf
-        const pathname = url.pathname.replace(/^\/+/, '');
-        const afterBucket = pathname.startsWith('drawsee/') ? pathname.replace(/^drawsee\//, '') : pathname;
-        // 兜底：尝试从已知目录前缀截取
-        const userDocIdx = afterBucket.indexOf('user-documents/');
-        if (userDocIdx >= 0) {
-          return afterBucket.slice(userDocIdx);
+        const objectName = document.objectPath.replace(/^\/*(drawsee\/)*/i, '').replace(/^\//, '');
+        if (objectName) {
+          const { url } = await getResourceUrl(objectName).send();
+          if (url) return url;
         }
-        return afterBucket || null;
-      } catch {
-        return null;
+      } catch (e) {
+        console.warn('获取最新签名URL失败，使用原始fileUrl:', e);
       }
     }
-    return null;
-  };
 
-  // 构建完整的文档URL
-  const buildFullDocumentUrl = (fileUrl: string): string => {
-    if (!fileUrl) return '';
-    
-    // 如果已经是完整URL，直接返回
-    if (fileUrl.startsWith('http://') || fileUrl.startsWith('https://')) {
-      return fileUrl;
-    }
-    
-    // 如果是相对路径，构建完整URL
-    const baseUrl = BASE_URL.replace(/\/+$/, ''); // 移除末尾的斜杠
-    const path = fileUrl.startsWith('/') ? fileUrl : `/${fileUrl}`;
-    
-    return `${baseUrl}${path}`;
+    // 回退使用原始 fileUrl
+    return document.fileUrl;
   };
 
   // 组件加载时获取列表
@@ -151,132 +128,31 @@ export default function DocumentLibrary() {
   };
 
   // 跳转到 flow 智能体会话页面并自动分析（实验任务分析agentType）
+  // 已临时禁用：后端分析功能尚未完善，点击该按钮会提示不可用
   const handleAnalyze = async (document: UserDocumentVO) => {
-    try {
-      console.log('========== 开始PDF电路分析任务 ==========');
-      console.log('文档信息:', {
-        id: document.id,
-        title: document.title,
-        fileUrl: document.fileUrl,
-        fileSize: document.fileSize
-      });
-      console.log('选择的模型:', selectedModel);
-      console.log('班级ID:', classId);
-      
-      // 为保证 AI 任务可读取文件，这里优先换取最新的临时访问URL
-      let promptUrl = buildFullDocumentUrl(document.fileUrl);
-      const objectName = extractObjectName(document);
-      if (objectName) {
-        try {
-          const { url } = await getResourceUrl(objectName).send();
-          if (url) promptUrl = url;
-        } catch (e) {
-          console.warn('获取最新签名URL失败，回退使用原始URL: ', e);
-        }
-      }
-
-      // 根据API文档，构造标准的AI任务参数
-      const taskDto: CreateAiTaskDTO = {
-        type: "PDF_CIRCUIT_ANALYSIS",
-        prompt: promptUrl, // PDF文件URL（尽量使用新签名）
-        promptParams: {}, // 空对象，非null
-        convId: null, // 新会话
-        parentId: null, // 无父节点
-        model: selectedModel, // 模型选择
-        classId: classId // 班级ID
-      };
-      
-      console.log('发送的任务数据:', JSON.stringify(taskDto, null, 2));
-      console.log('准备发送POST请求到:', '/flow/tasks');
-      console.log('请求头包含Authorization:', !!localStorage.getItem('Auth:Token'));
-      
-      // 创建AI任务
-      const res = await createAiTask(taskDto);
-      
-      console.log('任务创建API响应:', JSON.stringify(res, null, 2));
-      console.log('返回的taskId类型:', typeof res.taskId, '值:', res.taskId);
-      console.log('返回的conversation:', res.conversation);
-      
-      // 验证响应数据
-      if (!res || !res.taskId || !res.conversation) {
-        console.error('任务创建失败，响应数据不完整:', res);
-        message.error('AI任务创建失败，请重试');
-        return;
-      }
-      
-      // 验证taskId是否为有效数字
-      if (isNaN(Number(res.taskId))) {
-        console.error('无效的taskId:', res.taskId);
-        message.error('任务创建失败：返回了无效的任务ID');
-        return;
-      }
-      
-      console.log('✅ 任务创建成功，准备建立SSE连接');
-      
-      // 增加AI任务计数
-      handleAiTaskCountPlus();
-      
-      // 成功提示
-      message.success('PDF分析任务已创建，正在建立连接...');
-      
-      // 使用统一的handleBlankQuery方法导航到flow页面
-      handleBlankQuery(res);
-      
-    } catch (error) {
-      console.error('========== 分析实验失败 ==========');
-      console.error('错误详情:', error);
-      console.error('错误堆栈:', error instanceof Error ? error.stack : 'N/A');
-      message.error(`分析实验失败: ${error instanceof Error ? error.message : '未知错误'}`);
-    }
+    console.log('handleAnalyze 调用已被禁用（后端未就绪）', { id: document.id, title: document.title });
+    message.info('实验任务分析功能已临时禁用，待后端完善后恢复');
+    return;
   };
+  // mark as intentionally unused
+  void handleAnalyze;
 
-  // 预览PDF文档
+  // 预览PDF文档（简化版，仅打开URL或已知签名URL）
   const handlePreview = async (document: UserDocumentVO) => {
-    console.log('=== PDF预览调试信息 ===');
-    console.log('文档对象:', document);
-    console.log('原始fileUrl:', document.fileUrl);
-    console.log('objectPath:', document.objectPath);
-    
-    // 检查URL是否有效
-    if (!document.fileUrl) {
-      console.error('fileUrl为空:', document.fileUrl);
+    if (!document?.fileUrl) {
       message.error('文档URL无效，无法预览');
       return;
     }
-    
-    // 优先通过 objectPath/对象名换取最新签名URL，避免过期
-    const hide = message.loading('正在获取预览链接...', 0);
+
     try {
-      let previewUrl = buildFullDocumentUrl(document.fileUrl);
-      const objectName = extractObjectName(document);
-      if (objectName) {
-        try {
-          const { url } = await getResourceUrl(objectName).send();
-          if (url) previewUrl = url;
-        } catch (e) {
-          console.warn('获取最新签名URL失败，回退使用原始URL: ', e);
-        }
-      }
-
-      console.log('最终用于预览的URL:', previewUrl);
-
-      // 检查URL格式
-      const url = new URL(previewUrl);
-      console.log('解析的URL:', url);
-      console.log('协议:', url.protocol);
-      console.log('主机:', url.host);
-      console.log('路径:', url.pathname);
-
+      const previewUrl = await getLatestDocumentUrl(document);
       const newWindow = window.open(previewUrl, '_blank');
       if (!newWindow) {
-        console.error('无法打开新窗口，可能被浏览器拦截');
         message.warning('无法打开新窗口，请检查浏览器弹窗设置');
       }
     } catch (error) {
-      console.error('获取预览链接或打开失败:', error);
-      message.error('无法获取有效的预览链接');
-    } finally {
-      hide();
+      console.error('打开预览失败:', error);
+      message.error('无法获取预览链接');
     }
   };
 
@@ -335,12 +211,12 @@ export default function DocumentLibrary() {
       key: 'action',
       render: (_: any, record: UserDocumentVO) => (
         <Space size="middle">
-          <Tooltip title="分析文档">
+          <Tooltip title="实验任务分析（已禁用，后端未就绪）">
             <Button 
               type="primary" 
               icon={<ExperimentOutlined />} 
-              disabled={deleteLoading}
-              onClick={() => handleAnalyze(record)}
+              disabled={true}
+              // onClick={() => handleAnalyze(record)}
             />
           </Tooltip>
           <Tooltip title="查看原文件">
