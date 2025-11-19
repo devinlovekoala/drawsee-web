@@ -13,7 +13,10 @@ export enum CircuitElementType {
   OPAMP = 'opamp',
   GROUND = 'ground',
   WIRE = 'wire',
-  JUNCTION = 'junction'
+  JUNCTION = 'junction',
+  AMMETER = 'ammeter',
+  VOLTMETER = 'voltmeter',
+  OSCILLOSCOPE = 'oscilloscope'
 }
 
 // 基础坐标类型
@@ -51,7 +54,7 @@ export interface CircuitElement {
   label?: string;
   value?: string;
   ports: Port[];
-  properties: Record<string, any>;
+  properties: Record<string, unknown>;
 }
 
 // 电路连接定义
@@ -135,6 +138,18 @@ export const ComponentVisualConfig: Record<CircuitElementType, ComponentVisualCo
   [CircuitElementType.JUNCTION]: {
     width: 40,
     height: 40
+  },
+  [CircuitElementType.AMMETER]: {
+    width: 50,
+    height: 50
+  },
+  [CircuitElementType.VOLTMETER]: {
+    width: 50,
+    height: 50
+  },
+  [CircuitElementType.OSCILLOSCOPE]: {
+    width: 60,
+    height: 45
   }
 };
 

@@ -10,7 +10,8 @@ import {
   ZoomInOutlined,
   ZoomOutOutlined,
   PlayCircleOutlined,
-  ClearOutlined
+  ClearOutlined,
+  PoweroffOutlined
 } from '@ant-design/icons';
 import { ModelType } from '@/app/pages/flow/components/input/FlowInputPanel';
 
@@ -28,7 +29,9 @@ interface CircuitToolbarProps {
   onAnalysis?: () => void;
   onClear?: () => void;
   onAnalyze?: () => void;
+  onRunSimulation?: () => void;
   isAnalyzing?: boolean;
+  isSimulating?: boolean;
   selectedModel?: ModelType;
   onModelChange?: (model: ModelType) => void;
   canUndo?: boolean;
@@ -46,12 +49,15 @@ export const CircuitToolbar: FC<CircuitToolbarProps> = ({
   onRotate,
   onZoomIn,
   onZoomOut,
-  onAnalysis,
   onClear,
+  onAnalysis,
+  onRunSimulation,
+  isAnalyzing = false,
   canUndo = false,
   canRedo = false,
   hasSelectedNode = false,
   hasContent = false,
+  isSimulating = false,
 }) => {
 
   // 只在开发环境下输出日志
@@ -167,6 +173,17 @@ export const CircuitToolbar: FC<CircuitToolbarProps> = ({
 
       <div className="h-6 mx-2 border-l border-gray-200"></div>
 
+      <Tooltip title={isSimulating ? '正在运行模拟' : '运行电路'}>
+        <Button
+          type="text"
+          onClick={onRunSimulation}
+          disabled={!hasContent || !onRunSimulation}
+          icon={<PoweroffOutlined />}
+          className={getButtonClass(!hasContent || !onRunSimulation)}
+          loading={isSimulating}
+        />
+      </Tooltip>
+
       <Tooltip title="分析电路">
         <Button
           type="text"
@@ -174,6 +191,7 @@ export const CircuitToolbar: FC<CircuitToolbarProps> = ({
           disabled={!hasContent || !onAnalysis}
           icon={<PlayCircleOutlined />}
           className={getButtonClass(!hasContent || !onAnalysis)}
+          loading={isAnalyzing}
         />
       </Tooltip>
 

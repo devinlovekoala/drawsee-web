@@ -5,7 +5,8 @@ import {
   ExperimentOutlined, 
   ThunderboltOutlined, 
   ApartmentOutlined, 
-  SettingOutlined
+  SettingOutlined,
+  DashboardOutlined
 } from '@ant-design/icons';
 
 // 元件类别分组
@@ -48,6 +49,16 @@ const elementCategories = [
       { type: CircuitElementType.OPAMP, name: '运算放大器', shortcut: 'O' },
       { type: CircuitElementType.WIRE, name: '导线', shortcut: 'W' },
       { type: CircuitElementType.JUNCTION, name: '连接点', shortcut: 'J' }
+    ]
+  },
+  {
+    key: 'measurement',
+    label: '测量仪表',
+    icon: <DashboardOutlined />,
+    elements: [
+      { type: CircuitElementType.AMMETER, name: '电流表 (A)', shortcut: 'Am' },
+      { type: CircuitElementType.VOLTMETER, name: '电压表 (V)', shortcut: 'Vm' },
+      { type: CircuitElementType.OSCILLOSCOPE, name: '示波器 (OSC)', shortcut: 'Osc' }
     ]
   }
 ];
@@ -162,6 +173,30 @@ const getElementIcon = (type: CircuitElementType) => {
       return (
         <svg {...svgProps}>
           <circle cx="20" cy="20" r="5" fill="currentColor" />
+        </svg>
+      );
+    case CircuitElementType.AMMETER:
+      return (
+        <svg {...svgProps}>
+          <circle cx="20" cy="20" r="15" strokeWidth="2" fill="none" />
+          <path d="M12,24 L18,14 L22,24" strokeWidth="2" fill="none" />
+          <path d="M20,24 L20,28" strokeWidth="2" />
+        </svg>
+      );
+    case CircuitElementType.VOLTMETER:
+      return (
+        <svg {...svgProps}>
+          <circle cx="20" cy="20" r="15" strokeWidth="2" fill="none" />
+          <path d="M12,26 L20,12 L28,26" strokeWidth="2" fill="none" />
+        </svg>
+      );
+    case CircuitElementType.OSCILLOSCOPE:
+      return (
+        <svg {...svgProps} viewBox="0 0 60 40">
+          <rect x="5" y="5" width="50" height="30" rx="4" strokeWidth="2" fill="none" />
+          <path d="M10,20 L20,15 L25,25 L30,10 L35,28 L45,18 L50,22" strokeWidth="2" fill="none" />
+          <path d="M5,35 L15,35" strokeWidth="2" />
+          <path d="M45,35 L55,35" strokeWidth="2" />
         </svg>
       );
     default:

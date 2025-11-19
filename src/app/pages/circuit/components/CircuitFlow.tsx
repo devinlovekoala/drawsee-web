@@ -36,6 +36,9 @@ import { ModelType as FlowModelType } from '@/app/pages/flow/components/input/Fl
 import ElementLibrary from './ElementLibrary';
 import CircuitToolbar from './CircuitToolbar';
 import SaveCircuitModal from './SaveCircuitModal';
+import { Line } from '@ant-design/charts';
+import { simulationClient } from '../simulation/simulationClient';
+import { SimulationMeasurementResult } from '../simulation/types';
 
 // 唯一节点ID生成
 let nodeIdCounter = 1;
@@ -64,7 +67,10 @@ const elementNamePrefixes: Record<CircuitElementType, string> = {
   [CircuitElementType.GROUND]: 'GND',
   [CircuitElementType.OPAMP]: 'U',
   [CircuitElementType.WIRE]: 'W',
-  [CircuitElementType.JUNCTION]: 'N'
+  [CircuitElementType.JUNCTION]: 'N',
+  [CircuitElementType.AMMETER]: 'AM',
+  [CircuitElementType.VOLTMETER]: 'VM',
+  [CircuitElementType.OSCILLOSCOPE]: 'OSC'
 };
 
 // 电路元件菜单配置
@@ -108,6 +114,18 @@ const elementMenuItems = [
   {
     key: CircuitElementType.OPAMP,
     label: '运算放大器',
+  },
+  {
+    key: CircuitElementType.AMMETER,
+    label: '电流表 (A)',
+  },
+  {
+    key: CircuitElementType.VOLTMETER,
+    label: '电压表 (V)',
+  },
+  {
+    key: CircuitElementType.OSCILLOSCOPE,
+    label: '示波器 (OSC)',
   },
 ];
 
@@ -155,6 +173,50 @@ const defaultPorts = {
     { id: 'input2', name: '输入2', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 70, align: 'center' as const } },
     { id: 'output', name: '输出', type: 'output' as const, position: { side: 'right' as const, x: 100, y: 50, align: 'center' as const } }
   ],
+  [CircuitElementType.AMMETER]: [
+    { id: 'in', name: '输入', type: 'bidirectional' as const, position: { side: 'left' as const, x: 0, y: 50, align: 'center' as const } },
+    { id: 'out', name: '输出', type: 'bidirectional' as const, position: { side: 'right' as const, x: 100, y: 50, align: 'center' as const } }
+  ],
+  [CircuitElementType.VOLTMETER]: [
+    { id: 'positive', name: '正端', type: 'bidirectional' as const, position: { side: 'left' as const, x: 0, y: 30, align: 'center' as const } },
+    { id: 'negative', name: '负端', type: 'bidirectional' as const, position: { side: 'right' as const, x: 100, y: 70, align: 'center' as const } }
+  ],
+  [CircuitElementType.OSCILLOSCOPE]: [
+    { id: 'channel1', name: '通道1', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 40, align: 'center' as const } },
+    { id: 'channel2', name: '通道2', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 70, align: 'center' as const } },
+    { id: 'ground', name: '参考地', type: 'bidirectional' as const, position: { side: 'bottom' as const, x: 50, y: 100, align: 'center' as const } }
+  ],
+};
+
+const measurementElementTypes = new Set<CircuitElementType>([
+  CircuitElementType.AMMETER,
+  CircuitElementType.VOLTMETER,
+  CircuitElementType.OSCILLOSCOPE,
+]);
+
+const measurementTypeLabels: Partial<Record<CircuitElementType, string>> = {
+  [CircuitElementType.AMMETER]: '电流表',
+  [CircuitElementType.VOLTMETER]: '电压表',
+  [CircuitElementType.OSCILLOSCOPE]: '示波器',
+};
+
+const measurementMetricLabels: Record<string, string> = {
+  current: '瞬时电流 (A)',
+  minCurrent: '最小电流 (A)',
+  maxCurrent: '最大电流 (A)',
+  avgCurrent: '平均电流 (A)',
+  rmsCurrent: '有效值电流 (A)',
+  peakCurrent: '峰值电流 (A)',
+  peakToPeakCurrent: '峰-峰电流 (A)',
+  voltage: '瞬时电压 (V)',
+  minVoltage: '最小电压 (V)',
+  maxVoltage: '最大电压 (V)',
+  avgVoltage: '平均电压 (V)',
+  rmsVoltage: '有效值电压 (V)',
+  peakVoltage: '峰值电压 (V)',
+  peakToPeakVoltage: '峰-峰电压 (V)',
+  frequency: '频率 (Hz)',
+  amplitude: '幅值 (V)',
 };
 
 // 在文件顶部添加接口定义
@@ -171,6 +233,12 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isSimulating, setIsSimulating] = useState(false);
+  const [simulationResults, setSimulationResults] = useState<Record<string, SimulationMeasurementResult>>({});
+  const [simulationStale, setSimulationStale] = useState(false);
+  const [measurementModalVisible, setMeasurementModalVisible] = useState(false);
+  const [activeMeasurementResult, setActiveMeasurementResult] = useState<SimulationMeasurementResult | null>(null);
+  const [activeScopeChannel, setActiveScopeChannel] = useState<string | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [currentModel, setCurrentModel] = useState<FlowModelType>(selectedModel as FlowModelType);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
@@ -198,6 +266,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
   const reactFlowInstance = useReactFlow();
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const { handleBlankQuery, handleAiTaskCountPlus } = useAppContext();
+  const lastSimSignatureRef = useRef<string | null>(null);
   
   const getLabelPrefix = useCallback((type: CircuitElementType) => {
     return elementNamePrefixes[type] || 'X';
@@ -230,6 +299,18 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
     const numericSuffix = nodeId.replace(/\D/g, '');
     return `${prefix}${numericSuffix || '1'}`;
   }, [getLabelPrefix]);
+
+  const computeSimSignature = useCallback(() => {
+    const nodeKey = nodes
+      .map(n => `${n.id}:${n.data.type}:${Math.round(n.position.x)}:${Math.round(n.position.y)}`)
+      .sort()
+      .join('|');
+    const edgeKey = edges
+      .map(e => `${e.id}:${e.source}:${e.sourceHandle}-${e.target}:${e.targetHandle}`)
+      .sort()
+      .join('|');
+    return `${nodeKey}#${edgeKey}`;
+  }, [nodes, edges]);
   
   // 监控节点和边变化，更新历史状态和撤销/重做按钮
   useEffect(() => {
@@ -466,32 +547,43 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
   // 添加一个函数来处理元件双击事件
   const handleNodeDoubleClick = useCallback((nodeId: string) => {
     console.log('CircuitFlow.handleNodeDoubleClick 被调用，nodeId:', nodeId);
-    console.log('当前所有节点:', nodes);
-    
     const node = nodes.find(n => n.id === nodeId);
-    if (node) {
-      console.log('找到节点数据:', node.data);
-      
-      // 创建一个完整的数据对象，只包含 CircuitNodeData 支持的属性
-      const nodeData = {
-        id: node.id,
-        label: node.data.label || '',
-        value: node.data.value || '',
-        element: node.data.element,
-        description: '',
-        ports: node.data.ports || [],
-      };
-      
-      console.log('设置 selectedElement:', nodeData);
-      setSelectedElement(nodeData);
-      
-      console.log('设置 configVisible = true');
-      setConfigVisible(true);
-    } else {
+    if (!node) {
       console.warn('未找到节点数据 id:', nodeId);
-      console.warn('请确认节点ID是否正确，所有节点ID:', nodes.map(n => n.id));
+      return;
     }
-  }, [nodes]);
+    
+    const nodeType = node.data.type as CircuitElementType;
+    if (measurementElementTypes.has(nodeType)) {
+      const measurement = simulationResults[nodeId];
+      if (measurement) {
+        setActiveMeasurementResult(measurement);
+        if (measurement.elementType === CircuitElementType.OSCILLOSCOPE) {
+          const firstChannel = (measurement.channels && measurement.channels[0]) || (measurement.nets && measurement.nets[0]) || null;
+          setActiveScopeChannel(firstChannel);
+        } else {
+          setActiveScopeChannel(null);
+        }
+        setMeasurementModalVisible(true);
+      } else {
+        message.info('请先点击工具栏中的“运行电路”按钮完成模拟仿真');
+      }
+      return;
+    }
+    
+    // 创建一个完整的数据对象，只包含 CircuitNodeData 支持的属性
+    const nodeData = {
+      id: node.id,
+      label: node.data.label || '',
+      value: node.data.value || '',
+      element: node.data.element,
+      description: '',
+      ports: node.data.ports || [],
+    };
+    
+    setSelectedElement(nodeData);
+    setConfigVisible(true);
+  }, [nodes, simulationResults]);
 
   // 创建新节点
   const addNewNode = useCallback(
@@ -520,6 +612,9 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
         [CircuitElementType.TRANSISTOR_PNP]: '',
         [CircuitElementType.GROUND]: '',
         [CircuitElementType.OPAMP]: '',
+        [CircuitElementType.AMMETER]: '0A',
+        [CircuitElementType.VOLTMETER]: '0V',
+        [CircuitElementType.OSCILLOSCOPE]: 'CH1',
       };
       
       const elementValue = defaultValues[type] || '';
@@ -634,6 +729,9 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
           [CircuitElementType.TRANSISTOR_PNP]: '',
           [CircuitElementType.GROUND]: '',
           [CircuitElementType.OPAMP]: '',
+          [CircuitElementType.AMMETER]: '0A',
+          [CircuitElementType.VOLTMETER]: '0V',
+          [CircuitElementType.OSCILLOSCOPE]: 'CH1',
         };
         
         // 根据节点类型获取默认端口配置
@@ -722,6 +820,33 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
       convertToCircuitDesign();
     }
   }, [nodes, edges, convertToCircuitDesign]);
+
+  // 拓扑变化时使仿真结果失效
+  useEffect(() => {
+    const sig = computeSimSignature();
+    if (lastSimSignatureRef.current && lastSimSignatureRef.current !== sig) {
+      if (Object.keys(simulationResults).length > 0) {
+        setSimulationResults({});
+        setActiveMeasurementResult(null);
+        setMeasurementModalVisible(false);
+        setActiveScopeChannel(null);
+        setNodes(currentNodes => currentNodes.map(node => {
+          if (!node.data.measurement) return node;
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              measurement: undefined,
+            },
+          };
+        }));
+      }
+      setSimulationStale(true);
+    }
+    if (!lastSimSignatureRef.current) {
+      lastSimSignatureRef.current = sig;
+    }
+  }, [computeSimSignature, simulationResults]);
 
   // 分析电路
   const handleAnalyzeCircuit = useCallback(async () => {
@@ -849,6 +974,76 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
       setIsAnalyzing(false);
     }
   }, [convertToCircuitDesign, currentModel, handleBlankQuery, handleAiTaskCountPlus, classId]);
+  
+  // 运行模拟仿真
+  const handleRunSimulation = useCallback(async () => {
+    if (isSimulating) return;
+    const circuitDesign = convertToCircuitDesign();
+    if (circuitDesign.elements.length === 0) {
+      message.error('电路中没有元件，无法进行模拟');
+      return;
+    }
+    const measurementNodes = nodes.filter(node => 
+      measurementElementTypes.has(node.data.type as CircuitElementType)
+    );
+    
+    if (measurementNodes.length === 0) {
+      message.warning('请先在电路中放置电流表、电压表或示波器后再运行模拟');
+      setSimulationResults({});
+      return;
+    }
+    
+    const connectionMap = edges.reduce<Record<string, Set<string>>>((acc, edge) => {
+      if (!acc[edge.source]) acc[edge.source] = new Set();
+      if (!acc[edge.target]) acc[edge.target] = new Set();
+      if (edge.sourceHandle) acc[edge.source].add(edge.sourceHandle);
+      if (edge.targetHandle) acc[edge.target].add(edge.targetHandle);
+      return acc;
+    }, {});
+    const unconnectedMeasurements = measurementNodes.filter(n => {
+      const ports = connectionMap[n.id] || new Set();
+      return ports.size < 2;
+    });
+    if (unconnectedMeasurements.length > 0) {
+      const labels = unconnectedMeasurements.map(n => n.data.label || n.id).join('、');
+      message.error(`以下仪表未正确接线，无法仿真：${labels}`);
+      return;
+    }
+    
+    setIsSimulating(true);
+    message.loading({ content: '正在运行仿真 (WASM)...', key: 'circuit-sim', duration: 0 });
+    try {
+      const results = await simulationClient.runSimulation(circuitDesign);
+      if (Object.keys(results).length === 0) {
+        message.warning({ content: '仿真未返回任何数据，请检查电路或参数设置', key: 'circuit-sim' });
+      }
+      setSimulationResults(results);
+      setNodes(currentNodes => currentNodes.map(node => {
+        const measurement = results[node.id] || null;
+        if (!measurement && !node.data.measurement) {
+          return node;
+        }
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            measurement: measurement || undefined,
+          },
+        };
+      }));
+      setActiveMeasurementResult(null);
+      setMeasurementModalVisible(false);
+      setActiveScopeChannel(null);
+      lastSimSignatureRef.current = computeSimSignature();
+      setSimulationStale(false);
+      message.success({ content: '仿真完成，双击仪表查看数据/波形', key: 'circuit-sim' });
+    } catch (err: any) {
+      console.error('仿真失败', err);
+      message.error({ content: `仿真失败: ${err?.message || '未知错误'}`, key: 'circuit-sim' });
+    } finally {
+      setIsSimulating(false);
+    }
+  }, [convertToCircuitDesign, nodes, isSimulating]);
 
   // 节点旋转功能
   const handleRotate = useCallback(() => {
@@ -1161,39 +1356,15 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
   useEffect(() => {
     const handleNodeDoubleClicked = (event: CustomEvent) => {
       const { nodeId } = event.detail;
-      console.log('CircuitFlow.handleNodeDoubleClicked 监听到事件 nodeId:', nodeId);
-      
-      // 查找节点数据
-      const node = nodes.find(n => n.id === nodeId);
-      if (node) {
-        console.log('找到节点数据, 打开配置面板');
-        
-        // 构建完整的节点数据对象
-        const nodeData = {
-          id: node.id,
-          type: node.data.type,
-          label: node.data.label || '',
-          value: node.data.value || '',
-          element: node.data.element,
-          description: node.data.description || '',
-          ports: node.data.ports || []
-        };
-        
-        // 设置选中的元件并打开配置面板
-        setSelectedElement(nodeData);
-        setConfigVisible(true);
-      } else {
-        console.warn('未找到节点数据:', nodeId);
-      }
+      handleNodeDoubleClick(nodeId);
     };
     
     document.addEventListener('circuit-node-double-clicked', handleNodeDoubleClicked as EventListener);
     
-    // 清理函数
     return () => {
       document.removeEventListener('circuit-node-double-clicked', handleNodeDoubleClicked as EventListener);
     };
-  }, [nodes]);
+  }, [handleNodeDoubleClick]);
 
   // 使用React.useMemo来优化ComponentConfig的渲染
   const componentConfigElement = React.useMemo(() => {
@@ -1209,6 +1380,54 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
       />
     );
   }, [selectedElement, configVisible, handleElementUpdate]);
+  
+  const availableScopeChannels = React.useMemo(() => {
+    if (!activeMeasurementResult || activeMeasurementResult.elementType !== CircuitElementType.OSCILLOSCOPE) {
+      return [];
+    }
+    const channelKeys = Object.keys(activeMeasurementResult.channelWaveforms || {});
+    if (channelKeys.length > 0) return channelKeys;
+    if (activeMeasurementResult.channels && activeMeasurementResult.channels.length > 0) {
+      return activeMeasurementResult.channels;
+    }
+    if (activeMeasurementResult.nets && activeMeasurementResult.nets.length > 0) {
+      return activeMeasurementResult.nets;
+    }
+    return [];
+  }, [activeMeasurementResult]);
+  
+  const activeWaveform = React.useMemo(() => {
+    if (!activeMeasurementResult) return null;
+    if (activeMeasurementResult.elementType === CircuitElementType.OSCILLOSCOPE) {
+      const selectedChannel = activeScopeChannel || availableScopeChannels[0] || null;
+      const channelWaveform = selectedChannel
+        ? activeMeasurementResult.channelWaveforms?.[selectedChannel]
+        : null;
+      if (channelWaveform && channelWaveform.length > 0) {
+        return channelWaveform;
+      }
+    }
+    return activeMeasurementResult.waveform || null;
+  }, [activeMeasurementResult, activeScopeChannel, availableScopeChannels]);
+  
+  const waveformChartConfig = React.useMemo(() => {
+    if (!activeWaveform || activeWaveform.length === 0) {
+      return null;
+    }
+    
+    return {
+      data: activeWaveform,
+      xField: 'time',
+      yField: 'value',
+      smooth: true,
+      height: 220,
+      autoFit: true,
+      xAxis: { title: { text: '时间 (ms)' } },
+      yAxis: { title: { text: '幅值' } },
+      tooltip: { showMarkers: true },
+      padding: [20, 10, 40, 50],
+    };
+  }, [activeWaveform]);
 
   return (
     <div ref={reactFlowWrapper} className="flex flex-row w-full h-full bg-white">
@@ -1242,8 +1461,10 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
               onFitView={() => reactFlowInstance.fitView()}
               onFullScreen={() => setFullScreenMode(!fullScreenMode)}
               onAnalysis={handleAnalyzeCircuit}
+              onRunSimulation={handleRunSimulation}
               onClear={handleClearCircuit}
               isAnalyzing={isAnalyzing}
+              isSimulating={isSimulating}
               selectedModel={currentModel}
               onModelChange={(model) => {
                 setCurrentModel(model);
@@ -1254,7 +1475,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
               canUndo={canUndo}
               canRedo={canRedo}
               hasSelectedNode={!!selectedNodeId}
-              hasContent={nodes.length > 0}
+              hasContent={nodes.length > 0 || edges.length > 0}
             />
           </div>
         )}
@@ -1315,7 +1536,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
         </div>
         
         {/* 状态信息栏 */}
-        <div className="bg-gray-50 border-t border-gray-200 p-2 text-xs text-gray-600 flex justify-between">
+        <div className="bg-gray-50 border-t border-gray-200 p-2 text-xs text-gray-600 flex justify-between items-center">
           <div>元件: {nodes.length} | 连接: {edges.length}</div>
           
           {selectedNodeId && (
@@ -1324,7 +1545,10 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
             </div>
           )}
           
-          <div>
+          <div className="flex items-center gap-3">
+            {simulationStale && (
+              <span className="text-amber-600">仿真结果已失效，请重新运行</span>
+            )}
             <button 
               className="text-gray-500 hover:text-gray-800 transition-colors"
               onClick={() => setShowElementLibrary(!showElementLibrary)}
@@ -1347,6 +1571,71 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
           console.log('电路保存成功');
         }}
       />
+      
+      <Modal
+        title={activeMeasurementResult ? `${activeMeasurementResult.label} 测量结果` : '测量结果'}
+        open={measurementModalVisible}
+        onCancel={() => {
+          setMeasurementModalVisible(false);
+          setActiveMeasurementResult(null);
+        }}
+        footer={null}
+        width={640}
+      >
+        {activeMeasurementResult ? (
+          <div className="space-y-4">
+            <div className="text-xs text-gray-500">
+              仪表类型：{measurementTypeLabels[activeMeasurementResult.type] || activeMeasurementResult.type}
+            </div>
+            {activeMeasurementResult.nets && activeMeasurementResult.nets.length > 0 && (
+              <div className="text-[11px] text-gray-500 flex flex-wrap gap-2">
+                <span className="text-gray-600">关联节点:</span>
+                {activeMeasurementResult.nets.map((n) => (
+                  <span key={n} className="rounded bg-gray-100 px-2 py-0.5 text-gray-700 border border-gray-200">
+                    {n}
+                  </span>
+                ))}
+              </div>
+            )}
+            {activeMeasurementResult.elementType === CircuitElementType.OSCILLOSCOPE && availableScopeChannels.length > 0 && (
+              <div className="flex items-center gap-2 text-[11px] text-gray-600">
+                <span className="text-gray-500">通道选择:</span>
+                {availableScopeChannels.map(ch => (
+                  <button
+                    key={ch}
+                    className={`px-2 py-0.5 rounded border text-xs transition ${activeScopeChannel === ch ? 'bg-blue-50 border-blue-400 text-blue-700' : 'border-gray-200 text-gray-700 hover:border-blue-300'}`}
+                    onClick={() => setActiveScopeChannel(ch)}
+                  >
+                    {ch}
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="grid grid-cols-2 gap-3">
+              {Object.entries(activeMeasurementResult.metrics || {}).map(([key, value]) => (
+                <div key={key} className="rounded border border-gray-100 bg-gray-50 px-3 py-2">
+                  <div className="text-[11px] text-gray-500">{measurementMetricLabels[key] || key}</div>
+                  <div className="text-base font-semibold text-gray-800">
+                    {typeof value === 'number' ? value.toFixed(3) : value}
+                  </div>
+                </div>
+              ))}
+            </div>
+            {waveformChartConfig ? (
+              <div className="rounded border border-gray-100 p-2 bg-white">
+                <Line {...waveformChartConfig} />
+                {activeScopeChannel && (
+                  <div className="mt-2 text-[11px] text-gray-500">当前波形通道: {activeScopeChannel}</div>
+                )}
+              </div>
+            ) : (
+              <div className="text-xs text-gray-500">当前仪表不提供波形显示。</div>
+            )}
+          </div>
+        ) : (
+          <div className="text-sm text-gray-500">暂无测量数据，请先运行模拟。</div>
+        )}
+      </Modal>
 
       {isAnalyzing && (
         <div style={{ 

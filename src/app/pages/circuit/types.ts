@@ -1,5 +1,6 @@
 import { CircuitElementType } from '@/api/types/circuit.types';
 import { XYPosition } from 'reactflow';
+import { SimulationMeasurementResult } from './simulation/types';
 
 export interface CircuitElement {
   id: string;
@@ -29,6 +30,7 @@ export interface CircuitNodeData {
   position?: XYPosition;
   rotation?: number;
   onNodeDoubleClick?: (id: string) => void;
+  measurement?: SimulationMeasurementResult;
 }
 
 export interface ConnectionData {

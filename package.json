@@ -8,7 +8,9 @@
     "build": "tsc -b && vite build",
     "build-skip-ts": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "ngspice:serve": "node server/ngspice-server.js",
+    "ngspice:serve-local": "NGSPICE_BIN=/home/devin/Workspace/drawsee-platform/ngspice/linux-ubuntu/build/ngspice PORT=3001 node server/ngspice-server.js"
   },
   "dependencies": {
     "@ant-design/charts": "^2.2.7",
@@ -40,6 +42,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "copy-to-clipboard": "^3.3.3",
+    "cors": "^2.8.5",
     "d3": "^7.9.0",
     "d3-flextree": "^2.1.2",
     "d3-interpolate": "^3.0.1",
@@ -48,6 +51,7 @@
     "elkjs": "^0.9.3",
     "entitree-flex": "^0.4.1",
     "event-source-polyfill": "^1.0.31",
+    "express": "^5.1.0",
     "framer-motion": "^12.5.0",
     "html-to-image": "^1.11.13",
     "katex": "^0.16.21",

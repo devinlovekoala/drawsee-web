@@ -3,6 +3,7 @@
 import React, { memo, useMemo, useEffect, useState, useCallback } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
 import { CircuitElement, CircuitElementType, ComponentVisualConfig } from '@/api/types/circuit.types';
+import { SimulationMeasurementResult } from '../simulation/types';
 
 // 端口类型定义
 export type PortType = 'input' | 'output' | 'bidirectional';
@@ -38,6 +39,7 @@ interface CircuitNodeData {
   onNodeClick?: (id: string) => void;
   description?: string;    // 添加description字段
   ports?: Port[];          // 添加ports字段
+  measurement?: SimulationMeasurementResult;
 }
 
 // 为每种元件类型定义默认端口
@@ -198,6 +200,30 @@ const SVGComponents: Record<CircuitElementType, React.FC<React.SVGProps<SVGSVGEl
     <svg {...props} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
       <circle cx="20" cy="20" r="5" fill="currentColor" />
       <circle cx="20" cy="20" r="8" stroke="currentColor" strokeWidth="1" strokeDasharray="2 2" fill="none" />
+    </svg>
+  ),
+  [CircuitElementType.AMMETER]: (props: React.SVGProps<SVGSVGElement>) => (
+    <svg {...props} viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="30" cy="30" r="20" stroke="currentColor" strokeWidth="2.5" fill="#F0F9FF" fillOpacity="0.6" />
+      <path d="M24,37 L30,23 L36,37" stroke="currentColor" strokeWidth="2.2" fill="none" />
+      <path d="M30,37 L30,41" stroke="currentColor" strokeWidth="2" />
+      <text x="26" y="21" fontSize="8" fill="currentColor">A</text>
+    </svg>
+  ),
+  [CircuitElementType.VOLTMETER]: (props: React.SVGProps<SVGSVGElement>) => (
+    <svg {...props} viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="30" cy="30" r="20" stroke="currentColor" strokeWidth="2.5" fill="#F0F9FF" fillOpacity="0.6" />
+      <path d="M22,38 L30,22 L38,38" stroke="currentColor" strokeWidth="2.2" fill="none" />
+      <text x="26" y="21" fontSize="8" fill="currentColor">V</text>
+    </svg>
+  ),
+  [CircuitElementType.OSCILLOSCOPE]: (props: React.SVGProps<SVGSVGElement>) => (
+    <svg {...props} viewBox="0 0 70 50" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="6" y="8" width="58" height="32" rx="4" stroke="currentColor" strokeWidth="2" fill="#F0F9FF" fillOpacity="0.5" />
+      <path d="M12,25 L20,19 L26,30 L32,15 L38,33 L46,23 L54,27" stroke="currentColor" strokeWidth="2" fill="none" />
+      <circle cx="56" cy="33" r="2" fill="currentColor" />
+      <path d="M15,42 L25,42" stroke="currentColor" strokeWidth="2" />
+      <path d="M45,42 L55,42" stroke="currentColor" strokeWidth="2" />
     </svg>
   )
 };
@@ -402,6 +428,9 @@ export const CircuitNode = memo(({ data, selected, id }: NodeProps<CircuitNodeDa
       [CircuitElementType.OPAMP]: '运放',
       [CircuitElementType.WIRE]: '导线',
       [CircuitElementType.JUNCTION]: '节点',
+      [CircuitElementType.AMMETER]: '电流表',
+      [CircuitElementType.VOLTMETER]: '电压表',
+      [CircuitElementType.OSCILLOSCOPE]: '示波器',
     };
     return typeNames[data.type] || '元件';
   }, [data.type]);
