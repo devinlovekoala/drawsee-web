@@ -41,7 +41,6 @@ class UnionFind {
 const getEndpointKey = (endpoint: Endpoint) => `${endpoint.elementId}:${endpoint.portId}`;
 
 const orderPortsForElement = (type: CircuitElementType, ports: Endpoint[], portIdToNet: Record<string, string>) => {
-  const portMap = (pid: string) => portIdToNet[getEndpointKey({ elementId: '', portId: pid })];
   switch (type) {
     case CircuitElementType.RESISTOR:
     case CircuitElementType.CAPACITOR:
@@ -65,8 +64,18 @@ const orderPortsForElement = (type: CircuitElementType, ports: Endpoint[], portI
       return [portIdToNet[getEndpointKey(in1)], portIdToNet[getEndpointKey(in2)], portIdToNet[getEndpointKey(out)]];
     }
     case CircuitElementType.AMMETER:
-    case CircuitElementType.VOLTMETER:
-      return ports.slice(0, 2).map(p => portIdToNet[getEndpointKey(p)]);
+    case CircuitElementType.VOLTMETER: {
+      // 对于电流表，需要正确的端口顺序
+      // SPICE 电压源 Vxxx n+ n- 测量的正电流是从 n+ 流向 n-（内部）
+      // 对应外部电流从 n- 流向 n+
+      // 为了让电流表显示正确的正电流（从 in 流入，从 out 流出），
+      // 需要让 SPICE 电压源的正向与外部电流方向一致
+      // 即 n+ = out, n- = in
+      const inPort = ports.find(p => p.portId === 'in') || ports[0];
+      const outPort = ports.find(p => p.portId === 'out') || ports[1] || ports[0];
+      // 返回 [out, in] 使得正电流对应从 in 流向 out（外部）
+      return [portIdToNet[getEndpointKey(outPort)], portIdToNet[getEndpointKey(inPort)]];
+    }
     case CircuitElementType.OSCILLOSCOPE: {
       const ch1 = ports.find(p => p.portId === 'channel1') || ports[0];
       const ch2 = ports.find(p => p.portId === 'channel2') || ports[1] || ports[0];
@@ -80,6 +89,102 @@ const orderPortsForElement = (type: CircuitElementType, ports: Endpoint[], portI
     default:
       return ports.map(p => portIdToNet[getEndpointKey(p)]);
   }
+};
+
+const MICRO_CHARS = ['μ', 'µ'];
+const UNIT_BASE_SUFFIXES = ['ohms', 'ohm', 'Ω', 'v', 'a', 'f', 'h'];
+
+const stripUnitBase = (suffixRaw: string) => {
+  if (!suffixRaw) return '';
+  const lower = suffixRaw.toLowerCase();
+  for (const base of UNIT_BASE_SUFFIXES) {
+    if (lower.endsWith(base.toLowerCase())) {
+      return suffixRaw.slice(0, suffixRaw.length - base.length);
+    }
+  }
+  return suffixRaw;
+};
+
+const getPrefixMultiplier = (prefixRaw: string) => {
+  if (!prefixRaw) return 1;
+  const lower = prefixRaw.toLowerCase();
+  if (lower.startsWith('meg') || prefixRaw === 'M') {
+    return 1e6;
+  }
+  const firstChar = prefixRaw[0];
+  switch (firstChar) {
+    case 'T':
+    case 't':
+      return 1e12;
+    case 'G':
+    case 'g':
+      return 1e9;
+    case 'M':
+      return 1e6;
+    case 'K':
+    case 'k':
+      return 1e3;
+    case 'm':
+      return 1e-3;
+    case 'U':
+    case 'u':
+      return 1e-6;
+    case 'n':
+    case 'N':
+      return 1e-9;
+    case 'p':
+    case 'P':
+      return 1e-12;
+    case 'f':
+    case 'F':
+      return 1e-15;
+    default:
+      if (MICRO_CHARS.includes(firstChar)) {
+        return 1e-6;
+      }
+      return 1;
+  }
+};
+
+const normalizeNumericValue = (rawValue: string, fallback: string) => {
+  if (!rawValue) return fallback;
+  const compact = rawValue.replace(/\s+/g, '').replace(/,/g, '.');
+  if (!compact) return fallback;
+  const match = compact.match(/^([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)([A-Za-zμµΩ]*)$/);
+  if (!match) {
+    const numeric = Number(compact);
+    return Number.isFinite(numeric) ? numeric.toString() : fallback;
+  }
+  const [, magnitude, suffixRaw = ''] = match;
+  const numericMagnitude = Number(magnitude);
+  if (!Number.isFinite(numericMagnitude)) return fallback;
+  const prefixPart = stripUnitBase(suffixRaw);
+  const multiplier = getPrefixMultiplier(prefixPart);
+  const normalized = numericMagnitude * multiplier;
+  if (!Number.isFinite(normalized)) return fallback;
+  // 使用 toPrecision 避免浮点数精度问题（如 10μA 变成 0.000009999999999999999）
+  // SPICE 解析器对超长小数可能有问题
+  const result = normalized.toPrecision(10);
+  // 移除不必要的尾部零，但保留科学计数法
+  return result.includes('e') ? result : parseFloat(result).toString();
+};
+
+const pickElementValue = (el: CircuitDesign['elements'][number], fallback: string) => {
+  let raw: unknown = el?.value;
+  if ((raw === undefined || raw === null) && el?.properties) {
+    const props = el.properties as Record<string, unknown>;
+    if ('value' in props) {
+      raw = props['value'];
+    }
+  }
+  const formatted =
+    typeof raw === 'number'
+      ? raw.toString()
+      : typeof raw === 'string'
+        ? raw.trim()
+        : '';
+  if (!formatted) return fallback;
+  return normalizeNumericValue(formatted, fallback);
 };
 
 export const buildNetlist = (design: CircuitDesign) => {
@@ -115,6 +220,61 @@ export const buildNetlist = (design: CircuitDesign) => {
     members.forEach(m => { endpointToNet[m] = netName; });
   }
 
+  const netAliases: Record<string, string> = {};
+
+  const ensureGroundReference = (): string | null => {
+    const hasGroundNet = Object.values(endpointToNet).some(net => net === '0');
+    if (hasGroundNet) return null;
+    const findCandidate = () => {
+      for (const el of design.elements) {
+        if (
+          el.type === CircuitElementType.VOLTAGE_SOURCE ||
+          el.type === CircuitElementType.CURRENT_SOURCE
+        ) {
+          const ports = el.ports || [];
+          const negativePort = ports.find(p => p.id === 'negative');
+          const fallbackPort = ports[1] || ports[0];
+          const selectedPort = negativePort || fallbackPort;
+          if (selectedPort) {
+            const key = getEndpointKey({ elementId: el.id, portId: selectedPort.id });
+            if (endpointToNet[key]) {
+              return endpointToNet[key];
+            }
+          }
+        }
+      }
+      const firstNet = Object.values(endpointToNet)[0];
+      return firstNet;
+    };
+
+    const candidateNet = findCandidate();
+    if (!candidateNet) return null;
+    netAliases[candidateNet] = '0';
+    return candidateNet;
+  };
+
+  const resolveNetName = (net?: string) => {
+    if (!net) return '';
+    let current = net;
+    const visited = new Set<string>();
+    while (netAliases[current]) {
+      if (visited.has(current)) break;
+      visited.add(current);
+      current = netAliases[current];
+    }
+    return current;
+  };
+
+  const groundedNet = ensureGroundReference();
+
+  const hasResolvedGround = Object.values(endpointToNet).some(net => resolveNetName(net) === '0');
+  if (!hasResolvedGround) {
+    const fallbackNet = groundedNet || Object.values(endpointToNet)[0];
+    if (fallbackNet) {
+      netAliases[fallbackNet] = '0';
+    }
+  }
+
   const lines: string[] = [];
   const bindings: MeasurementBinding[] = [];
 
@@ -123,25 +283,27 @@ export const buildNetlist = (design: CircuitDesign) => {
 
   design.elements.forEach(el => {
     const ports = (el.ports || []).map(p => ({ elementId: el.id, portId: p.id }));
-    const nets = orderPortsForElement(el.type as CircuitElementType, ports, endpointToNet);
-    const value = el.value || el.properties?.value || '';
-    const label = el.label || el.properties?.label || el.id;
+    const rawNets = orderPortsForElement(el.type as CircuitElementType, ports, endpointToNet);
+    const nets = rawNets.map(net => resolveNetName(net) || '0');
+    // 确保 label 是字符串类型
+    const propsLabel = el.properties?.label;
+    const label = el.label || (typeof propsLabel === 'string' ? propsLabel : undefined) || el.id;
 
     switch (el.type) {
       case CircuitElementType.RESISTOR:
-        lines.push(`R${label} ${nets[0]} ${nets[1]} ${value || '1k'}`);
+        lines.push(`R${label} ${nets[0]} ${nets[1]} ${pickElementValue(el, '1000')}`);
         break;
       case CircuitElementType.CAPACITOR:
-        lines.push(`C${label} ${nets[0]} ${nets[1]} ${value || '1u'}`);
+        lines.push(`C${label} ${nets[0]} ${nets[1]} ${pickElementValue(el, '0.000001')}`);
         break;
       case CircuitElementType.INDUCTOR:
-        lines.push(`L${label} ${nets[0]} ${nets[1]} ${value || '1m'}`);
+        lines.push(`L${label} ${nets[0]} ${nets[1]} ${pickElementValue(el, '0.001')}`);
         break;
       case CircuitElementType.VOLTAGE_SOURCE:
-        lines.push(`V${label} ${nets[0]} ${nets[1]} ${value || '5'}`);
+        lines.push(`V${label} ${nets[0]} ${nets[1]} ${pickElementValue(el, '5')}`);
         break;
       case CircuitElementType.CURRENT_SOURCE:
-        lines.push(`I${label} ${nets[0]} ${nets[1]} ${value || '0.01'}`);
+        lines.push(`I${label} ${nets[0]} ${nets[1]} ${pickElementValue(el, '0.01')}`);
         break;
       case CircuitElementType.DIODE:
         lines.push(`D${label} ${nets[0]} ${nets[1]} DDEFAULT`);
@@ -192,9 +354,14 @@ export const buildNetlist = (design: CircuitDesign) => {
   lines.push('.model DDEFAULT D');
   lines.push('.end');
 
+  const normalizedNets: Record<string, string> = {};
+  Object.entries(endpointToNet).forEach(([key, value]) => {
+    normalizedNets[key] = resolveNetName(value);
+  });
+
   return {
     netlist: lines.join('\n'),
     bindings,
-    nets: endpointToNet,
+    nets: normalizedNets,
   };
 };

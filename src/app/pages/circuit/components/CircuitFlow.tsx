@@ -27,6 +27,7 @@ import {
   CircuitElement
 } from '@/api/types/circuit.types';
 import { createAiTask } from '@/api/methods/flow.methods';
+import { updateCircuitDesign } from '@/api/methods/circuit.methods';
 import { CircuitNodeData, ModelType } from '../types';
 import { useAppContext } from '@/app/contexts/AppContext';
 import { CreateAiTaskDTO } from '@/api/types/flow.types';
@@ -219,6 +220,52 @@ const measurementMetricLabels: Record<string, string> = {
   amplitude: '幅值 (V)',
 };
 
+const measurementMetricUnits: Record<string, string> = {
+  current: 'A',
+  minCurrent: 'A',
+  maxCurrent: 'A',
+  avgCurrent: 'A',
+  rmsCurrent: 'A',
+  peakCurrent: 'A',
+  peakToPeakCurrent: 'A',
+  voltage: 'V',
+  minVoltage: 'V',
+  maxVoltage: 'V',
+  avgVoltage: 'V',
+  rmsVoltage: 'V',
+  peakVoltage: 'V',
+  peakToPeakVoltage: 'V',
+  frequency: 'Hz',
+  amplitude: 'V',
+};
+
+const SI_PREFIXES = [
+  { factor: 1e12, symbol: 'T' },
+  { factor: 1e9, symbol: 'G' },
+  { factor: 1e6, symbol: 'M' },
+  { factor: 1e3, symbol: 'k' },
+  { factor: 1, symbol: '' },
+  { factor: 1e-3, symbol: 'm' },
+  { factor: 1e-6, symbol: 'μ' },
+  { factor: 1e-9, symbol: 'n' },
+  { factor: 1e-12, symbol: 'p' },
+];
+
+const formatMeasurementValue = (value: number, unit?: string) => {
+  if (!Number.isFinite(value)) return '-';
+  if (value === 0) return unit ? `0 ${unit}` : '0';
+  const absValue = Math.abs(value);
+  if (absValue < 1e-12) {
+    return `${value.toExponential(3)}${unit ? ` ${unit}` : ''}`;
+  }
+  const prefix = SI_PREFIXES.find(p => absValue >= p.factor) || SI_PREFIXES[SI_PREFIXES.length - 1];
+  const scaled = value / prefix.factor;
+  const absScaled = Math.abs(scaled);
+  const precision = absScaled >= 100 ? 1 : absScaled >= 10 ? 2 : 3;
+  const suffix = `${prefix.symbol}${unit || ''}`.trim();
+  return `${scaled.toFixed(precision)}${suffix ? ` ${suffix}` : ''}`;
+};
+
 // 在文件顶部添加接口定义
 interface CircuitFlowProps {
   onCircuitDesignChange?: (design: CircuitDesign) => void;
@@ -262,6 +309,26 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
   const [saveModalVisible, setSaveModalVisible] = useState<boolean>(false);
   const [currentCircuitDesign, setCurrentCircuitDesign] = useState<CircuitDesign | null>(null);
   const elementNameCountersRef = useRef<Record<string, number>>({});
+  const initialDesignMetadata = React.useMemo(() => ({
+    title: initialCircuitDesign?.metadata?.title || '电路设计',
+    description: initialCircuitDesign?.metadata?.description || '使用DrawSee创建的电路',
+    createdAt: initialCircuitDesign?.metadata?.createdAt || new Date().toISOString(),
+    updatedAt: initialCircuitDesign?.metadata?.updatedAt || new Date().toISOString(),
+  }), [initialCircuitDesign]);
+  const [designMetadata, setDesignMetadata] = useState(initialDesignMetadata);
+  const designMetadataRef = useRef(designMetadata);
+  useEffect(() => {
+    designMetadataRef.current = designMetadata;
+  }, [designMetadata]);
+  const [persistedDesignId, setPersistedDesignId] = useState<string | null>(initialCircuitDesign?.id ?? null);
+  const designIdRef = useRef<string | null>(persistedDesignId);
+  useEffect(() => {
+    designIdRef.current = persistedDesignId;
+  }, [persistedDesignId]);
+  const [saveModalMode, setSaveModalMode] = useState<'save' | 'saveAs'>('save');
+  const [saveModalInitialValues, setSaveModalInitialValues] = useState<{ title?: string; description?: string }>({});
+  const autoSaveTimerRef = useRef<number | null>(null);
+  const autoSaveInfoShownRef = useRef(false);
   
   const reactFlowInstance = useReactFlow();
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
@@ -781,14 +848,16 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
       }));
 
       // 创建符合文档规范的电路设计对象
+      const metadataSnapshot = designMetadataRef.current;
       const circuitDesign: CircuitDesign = {
+        id: designIdRef.current ?? undefined,
         elements,
         connections,
         metadata: {
-          title: '电路设计',
-          description: '使用DrawSee创建的电路',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
+          title: metadataSnapshot.title,
+          description: metadataSnapshot.description,
+          createdAt: metadataSnapshot.createdAt,
+          updatedAt: metadataSnapshot.updatedAt
         }
       };
       
@@ -802,13 +871,14 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
       console.error('转换电路设计时出错:', error);
       message.error('转换电路设计时出错');
       return {
+        id: designIdRef.current ?? undefined,
         elements: [],
         connections: [],
         metadata: {
-          title: '电路设计',
-          description: '使用DrawSee创建的电路',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
+          title: designMetadataRef.current.title,
+          description: designMetadataRef.current.description,
+          createdAt: designMetadataRef.current.createdAt,
+          updatedAt: designMetadataRef.current.updatedAt
         }
       };
     }
@@ -820,6 +890,100 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
       convertToCircuitDesign();
     }
   }, [nodes, edges, convertToCircuitDesign]);
+
+  useEffect(() => {
+    return () => {
+      if (autoSaveTimerRef.current) {
+        window.clearTimeout(autoSaveTimerRef.current);
+      }
+    };
+  }, []);
+
+  const quickSaveExistingCircuit = useCallback(async (reason: 'manual' | 'auto' = 'manual', snapshot?: CircuitDesign) => {
+    if (!designIdRef.current) return false;
+    const baseDesign = snapshot || convertToCircuitDesign();
+    const now = new Date().toISOString();
+    const payload: CircuitDesign = {
+      ...baseDesign,
+      id: designIdRef.current || undefined,
+      metadata: {
+        ...baseDesign.metadata,
+        title: designMetadataRef.current.title,
+        description: designMetadataRef.current.description,
+        updatedAt: now,
+      },
+    };
+
+    try {
+      if (reason === 'manual') {
+        message.loading({ content: '保存电路中...', key: 'circuit-quick-save', duration: 0 });
+      }
+      await updateCircuitDesign(designIdRef.current!, payload, designMetadataRef.current.title, designMetadataRef.current.description);
+      setDesignMetadata(prev => ({ ...prev, updatedAt: now }));
+      if (reason === 'manual') {
+        message.success({ content: '电路已保存', key: 'circuit-quick-save', duration: 1.5 });
+      } else {
+        message.success({ content: '元件参数已自动保存', key: 'circuit-auto-save', duration: 1.5 });
+      }
+      return true;
+    } catch (error) {
+      console.error('保存电路失败:', error);
+      if (reason === 'manual') {
+        message.error({ content: '保存失败，请稍后重试', key: 'circuit-quick-save' });
+      } else {
+        message.error('自动保存失败，请手动保存');
+      }
+      return false;
+    }
+  }, [convertToCircuitDesign]);
+
+  const scheduleAutoSave = useCallback(() => {
+    if (!designIdRef.current) {
+      if (!autoSaveInfoShownRef.current) {
+        message.info('请先保存电路以启用自动保存');
+        autoSaveInfoShownRef.current = true;
+      }
+      return;
+    }
+    if (autoSaveTimerRef.current) {
+      window.clearTimeout(autoSaveTimerRef.current);
+    }
+    autoSaveTimerRef.current = window.setTimeout(() => {
+      quickSaveExistingCircuit('auto');
+      autoSaveTimerRef.current = null;
+    }, 600);
+  }, [quickSaveExistingCircuit]);
+
+  const openSaveModal = useCallback((mode: 'save' | 'saveAs', snapshot: CircuitDesign) => {
+    const designForModal: CircuitDesign = {
+      ...snapshot,
+      id: mode === 'saveAs' ? undefined : snapshot.id,
+      metadata: { ...snapshot.metadata },
+    };
+    setCurrentCircuitDesign(designForModal);
+    setSaveModalMode(mode);
+    const defaultTitle = mode === 'saveAs'
+      ? `${designMetadata.title || '电路设计'}-副本`
+      : (designMetadata.title || '');
+    setSaveModalInitialValues({
+      title: defaultTitle,
+      description: designMetadata.description,
+    });
+    setSaveModalVisible(true);
+  }, [designMetadata]);
+
+  const handleSaveModalSuccess = useCallback(({ id, title, description }: { id: string; title: string; description: string }) => {
+    const now = new Date().toISOString();
+    setPersistedDesignId(id);
+    setDesignMetadata(prev => ({
+      ...prev,
+      title,
+      description,
+      updatedAt: now,
+      createdAt: prev.createdAt || now,
+    }));
+    autoSaveInfoShownRef.current = false;
+  }, []);
 
   // 拓扑变化时使仿真结果失效
   useEffect(() => {
@@ -1233,7 +1397,9 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
     setSelectedElement(null);
     
     console.log('元件更新完成');
-  }, []);
+
+    scheduleAutoSave();
+  }, [scheduleAutoSave]);
   
   // 处理撤销
   const handleUndo = useCallback(() => {
@@ -1295,10 +1461,22 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
       return;
     }
 
-    // 设置当前电路设计数据并打开保存弹窗
-    setCurrentCircuitDesign(circuitDesign);
-    setSaveModalVisible(true);
-  }, [convertToCircuitDesign]);
+    if (!persistedDesignId) {
+      openSaveModal('save', circuitDesign);
+      return;
+    }
+
+    quickSaveExistingCircuit('manual', circuitDesign);
+  }, [convertToCircuitDesign, persistedDesignId, openSaveModal, quickSaveExistingCircuit]);
+
+  const handleSaveAsCircuit = useCallback(() => {
+    const circuitDesign = convertToCircuitDesign();
+    if (circuitDesign.elements.length === 0) {
+      message.error('电路中没有元件，请先添加元件');
+      return;
+    }
+    openSaveModal('saveAs', circuitDesign);
+  }, [convertToCircuitDesign, openSaveModal]);
   
   // 清空电路
   const handleClearCircuit = useCallback(() => {
@@ -1428,6 +1606,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
       padding: [20, 10, 40, 50],
     };
   }, [activeWaveform]);
+  const hasPersistedDesign = Boolean(persistedDesignId);
 
   return (
     <div ref={reactFlowWrapper} className="flex flex-row w-full h-full bg-white">
@@ -1445,6 +1624,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
           <div className="flex justify-between items-center">
             <CircuitToolbar 
               onSave={handleSaveCircuit}
+              onSaveAs={hasPersistedDesign ? handleSaveAsCircuit : undefined}
               onUndo={handleUndo}
               onRedo={handleRedo}
               onCopy={() => {
@@ -1476,6 +1656,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
               canRedo={canRedo}
               hasSelectedNode={!!selectedNodeId}
               hasContent={nodes.length > 0 || edges.length > 0}
+              canSaveAs={hasPersistedDesign && (nodes.length > 0 || edges.length > 0)}
             />
           </div>
         )}
@@ -1566,10 +1747,13 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
       <SaveCircuitModal
         visible={saveModalVisible}
         circuitDesign={currentCircuitDesign}
-        onClose={() => setSaveModalVisible(false)}
-        onSuccess={() => {
-          console.log('电路保存成功');
+        onClose={() => {
+          setSaveModalVisible(false);
+          setCurrentCircuitDesign(null);
         }}
+        onSuccess={handleSaveModalSuccess}
+        mode={saveModalMode}
+        initialValues={saveModalInitialValues}
       />
       
       <Modal
@@ -1616,7 +1800,9 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
                 <div key={key} className="rounded border border-gray-100 bg-gray-50 px-3 py-2">
                   <div className="text-[11px] text-gray-500">{measurementMetricLabels[key] || key}</div>
                   <div className="text-base font-semibold text-gray-800">
-                    {typeof value === 'number' ? value.toFixed(3) : value}
+                    {typeof value === 'number'
+                      ? formatMeasurementValue(value, measurementMetricUnits[key])
+                      : value}
                   </div>
                 </div>
               ))}

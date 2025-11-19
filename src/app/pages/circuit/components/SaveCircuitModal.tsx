@@ -1,4 +1,4 @@
-import { FC } from 'react';
+import { FC, useEffect, useMemo } from 'react';
 import { Modal, Form, Input, message } from 'antd';
 import { CircuitDesign } from '@/api/types/circuit.types';
 import { saveCircuitDesign } from '@/api/methods/circuit.methods';
@@ -7,7 +7,12 @@ interface SaveCircuitModalProps {
   visible: boolean;
   circuitDesign: CircuitDesign | null;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (payload: { id: string; title: string; description: string }) => void;
+  mode?: 'save' | 'saveAs';
+  initialValues?: {
+    title?: string;
+    description?: string;
+  };
 }
 
 interface SaveCircuitFormValues {
@@ -20,9 +25,21 @@ export const SaveCircuitModal: FC<SaveCircuitModalProps> = ({
   visible,
   circuitDesign,
   onClose,
-  onSuccess
+  onSuccess,
+  mode = 'save',
+  initialValues,
 }) => {
   const [form] = Form.useForm<SaveCircuitFormValues>();
+  const resolvedInitialValues = useMemo(() => ({
+    title: initialValues?.title ?? circuitDesign?.metadata?.title ?? '',
+    description: initialValues?.description ?? circuitDesign?.metadata?.description ?? '',
+  }), [initialValues, circuitDesign]);
+
+  useEffect(() => {
+    if (visible) {
+      form.setFieldsValue(resolvedInitialValues);
+    }
+  }, [visible, resolvedInitialValues, form]);
 
   // 处理表单提交
   const handleSubmit = async () => {
@@ -53,7 +70,11 @@ export const SaveCircuitModal: FC<SaveCircuitModalProps> = ({
         // 重置表单
         form.resetFields();
         // 调用成功回调
-        onSuccess();
+        onSuccess({
+          id: result.id,
+          title: values.title,
+          description: values.description || '',
+        });
         // 关闭弹窗
         onClose();
       } else {
@@ -82,11 +103,11 @@ export const SaveCircuitModal: FC<SaveCircuitModalProps> = ({
 
   return (
     <Modal
-      title="保存电路设计"
+      title={mode === 'saveAs' ? '另存为新的电路设计' : '保存电路设计'}
       open={visible}
       onOk={handleSubmit}
       onCancel={handleCancel}
-      okText="保存"
+      okText={mode === 'saveAs' ? '另存为' : '保存'}
       cancelText="取消"
       width={500}
       destroyOnClose

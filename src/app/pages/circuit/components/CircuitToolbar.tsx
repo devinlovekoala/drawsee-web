@@ -11,7 +11,8 @@ import {
   ZoomOutOutlined,
   PlayCircleOutlined,
   ClearOutlined,
-  PoweroffOutlined
+  PoweroffOutlined,
+  FileAddOutlined
 } from '@ant-design/icons';
 import { ModelType } from '@/app/pages/flow/components/input/FlowInputPanel';
 
@@ -38,10 +39,13 @@ interface CircuitToolbarProps {
   canRedo?: boolean;
   hasSelectedNode?: boolean;
   hasContent?: boolean;
+  onSaveAs?: () => void;
+  canSaveAs?: boolean;
 }
 
 export const CircuitToolbar: FC<CircuitToolbarProps> = ({
   onSave,
+  onSaveAs,
   onUndo,
   onRedo,
   onCopy,
@@ -58,6 +62,7 @@ export const CircuitToolbar: FC<CircuitToolbarProps> = ({
   hasSelectedNode = false,
   hasContent = false,
   isSimulating = false,
+  canSaveAs = false,
 }) => {
 
   // 只在开发环境下输出日志
@@ -94,6 +99,16 @@ export const CircuitToolbar: FC<CircuitToolbarProps> = ({
           disabled={!hasContent || !onSave}
           icon={<SaveOutlined />}
           className={getButtonClass(!hasContent || !onSave)}
+        />
+      </Tooltip>
+
+      <Tooltip title="另存为">
+        <Button
+          type="text"
+          onClick={onSaveAs}
+          disabled={!canSaveAs || !onSaveAs}
+          icon={<FileAddOutlined />}
+          className={getButtonClass(!canSaveAs || !onSaveAs)}
         />
       </Tooltip>
 

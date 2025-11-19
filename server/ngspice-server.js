@@ -25,6 +25,8 @@ const parseRawAscii = (rawBuffer) => {
   const variableNames = [];
   let inVariables = false;
   let inValues = false;
+  let currentPointIndex = -1;
+  let currentVarIndex = 0;
 
   for (const rawLine of lines) {
     if (rawLine.startsWith('Variables:')) {
@@ -51,13 +53,32 @@ const parseRawAscii = (rawBuffer) => {
     if (inValues) {
       const trimmed = rawLine.trim();
       if (!trimmed) continue;
-      const match = trimmed.match(/^(\d+)\s+([-+eE0-9.]+)/);
-      if (!match) continue;
-      const index = Number(match[1]);
-      const value = Number(match[2]);
-      const vectorName = variableNames[index];
-      if (vectorName) {
-        vectors[vectorName].real.push(value);
+
+      // 检查是否是新数据点的开始（带有点索引的行）
+      const pointMatch = trimmed.match(/^(\d+)\s+([-+eE0-9.]+)/);
+      if (pointMatch) {
+        // 新数据点开始
+        currentPointIndex = Number(pointMatch[1]);
+        currentVarIndex = 0;
+        const value = Number(pointMatch[2]);
+        const vectorName = variableNames[currentVarIndex];
+        if (vectorName) {
+          vectors[vectorName].real.push(value);
+        }
+        currentVarIndex++;
+        continue;
+      }
+
+      // 检查是否是后续变量值（只有数值的行）
+      const valueMatch = trimmed.match(/^([-+eE0-9.]+)$/);
+      if (valueMatch && currentPointIndex >= 0) {
+        const value = Number(valueMatch[1]);
+        const vectorName = variableNames[currentVarIndex];
+        if (vectorName) {
+          vectors[vectorName].real.push(value);
+        }
+        currentVarIndex++;
+        continue;
       }
     }
   }

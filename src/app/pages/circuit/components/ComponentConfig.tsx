@@ -1,23 +1,28 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { CircuitElementType } from '@/api/types/circuit.types';
 import { CircuitNodeData } from '@/app/pages/circuit/types';
 import { getElementUnit, getElementTypeName } from '../utils/element-utils';
 
-// 单位选项
-interface UnitOptions {
-  resistance: string[];
-  capacitance: string[];
-  inductance: string[];
-  voltage: string[];
-  current: string[];
-  frequency: string[];
-  resistance_default: string;
-  capacitance_default: string;
-  inductance_default: string;
-  voltage_default: string;
-  current_default: string;
-  frequency_default: string;
-}
+const UNIT_OPTIONS_MAP: Partial<Record<CircuitElementType, string[]>> = {
+  [CircuitElementType.RESISTOR]: ['Ω', 'kΩ', 'MΩ'],
+  [CircuitElementType.CAPACITOR]: ['F', 'mF', 'μF', 'nF', 'pF'],
+  [CircuitElementType.INDUCTOR]: ['H', 'mH', 'μH'],
+  [CircuitElementType.VOLTAGE_SOURCE]: ['V', 'mV'],
+  [CircuitElementType.CURRENT_SOURCE]: ['A', 'mA', 'μA'],
+};
+
+const VALUE_WITH_UNIT_REGEX = /^([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)([A-Za-zμµΩ]*)$/;
+
+const splitValueAndUnit = (value?: string) => {
+  if (!value) return null;
+  const trimmed = value.trim();
+  const match = trimmed.match(VALUE_WITH_UNIT_REGEX);
+  if (!match) return null;
+  return {
+    numeric: match[1],
+    unit: match[2] || '',
+  };
+};
 
 interface ComponentConfigProps {
   element: CircuitNodeData | null;
@@ -40,7 +45,9 @@ const ComponentConfig: React.FC<ComponentConfigProps> = ({
   onUpdate
 }) => {
   const [labelInput, setLabelInput] = useState('');
-  const [valueInput, setValueInput] = useState('');
+  const [valueNumberInput, setValueNumberInput] = useState('');
+  const [valueUnitInput, setValueUnitInput] = useState('');
+  const [rawValueInput, setRawValueInput] = useState('');
   // 添加一个状态来跟踪组件是否已经初始化
   const [initialized, setInitialized] = useState(false);
 
@@ -61,12 +68,36 @@ const ComponentConfig: React.FC<ComponentConfigProps> = ({
     }
   }, [visible]);
 
+  const unitOptions = useMemo(() => {
+    if (!element?.element?.type) return [];
+    return UNIT_OPTIONS_MAP[element.element.type] || [];
+  }, [element?.element?.type]);
+
+  const resolveElementValue = useCallback(() => {
+    if (!element) return '';
+    const elementValue =
+      (element.element?.properties?.value as string | undefined) ??
+      element.element?.value ??
+      element.value ??
+      '';
+    return elementValue;
+  }, [element]);
+
   useEffect(() => {
     if (element) {
-      setLabelInput(element.label || '');
-      setValueInput(element.value || '');
+      setLabelInput(element.label || element.element?.properties?.label || element.element?.label || '');
+      const resolvedValue = resolveElementValue();
+      setRawValueInput(resolvedValue);
+      if (unitOptions.length > 0) {
+        const parsed = splitValueAndUnit(resolvedValue);
+        setValueNumberInput(parsed?.numeric || '');
+        setValueUnitInput(parsed?.unit || unitOptions[0]);
+      } else {
+        setValueNumberInput('');
+        setValueUnitInput('');
+      }
     }
-  }, [element]);
+  }, [element, unitOptions, resolveElementValue]);
 
   const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
@@ -80,15 +111,19 @@ const ComponentConfig: React.FC<ComponentConfigProps> = ({
       console.error('无法提交更新：element.id 为空');
       return;
     }
+
+    const structuredValue = unitOptions.length > 0
+      ? (valueNumberInput ? `${valueNumberInput}${valueUnitInput || ''}` : element.value || '')
+      : rawValueInput;
     
     const updates: Partial<CircuitNodeData> = {
       label: labelInput,
-      value: valueInput,
+      value: structuredValue,
     };
     
     onUpdate(element.id, updates);
     onClose();
-  }, [element, labelInput, valueInput, onUpdate, onClose]);
+  }, [element, labelInput, valueNumberInput, valueUnitInput, rawValueInput, unitOptions, onUpdate, onClose]);
 
   if (!visible) {
     return null;
@@ -138,14 +173,38 @@ const ComponentConfig: React.FC<ComponentConfigProps> = ({
             <label className="block text-sm font-medium text-gray-700 mb-1">
               元件值 {elementUnit && `(${elementUnit})`}
             </label>
-            <input 
-              type="text" 
-              value={valueInput} 
-              onChange={(e) => setValueInput(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              style={{ borderColor: theme.border }}
-              placeholder={elementUnit ? `例如: 1k${elementUnit}` : '输入值'}
-            />
+            {unitOptions.length > 0 ? (
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  step="any"
+                  value={valueNumberInput}
+                  onChange={(e) => setValueNumberInput(e.target.value)}
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  style={{ borderColor: theme.border }}
+                  placeholder="请输入数值"
+                />
+                <select
+                  value={valueUnitInput || unitOptions[0]}
+                  onChange={(e) => setValueUnitInput(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  style={{ borderColor: theme.border }}
+                >
+                  {unitOptions.map((option) => (
+                    <option key={option} value={option}>{option}</option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <input 
+                type="text" 
+                value={rawValueInput} 
+                onChange={(e) => setRawValueInput(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                style={{ borderColor: theme.border }}
+                placeholder={elementUnit ? `例如: 1k${elementUnit}` : '输入值'}
+              />
+            )}
           </div>
           
           <div className="flex justify-end space-x-3">

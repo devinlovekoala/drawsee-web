@@ -33,6 +33,34 @@ export const saveCircuitDesign = async (
 };
 
 /**
+ * 更新已有的电路设计
+ */
+export const updateCircuitDesign = async (
+  id: string,
+  circuitDesign: CircuitDesign,
+  title?: string,
+  description?: string
+): Promise<{ success: boolean }> => {
+  try {
+    const payload = {
+      ...circuitDesign,
+      metadata: {
+        ...circuitDesign.metadata,
+        title: title ?? circuitDesign.metadata.title,
+        description: description ?? circuitDesign.metadata.description,
+        updatedAt: new Date().toISOString()
+      }
+    };
+
+    const response = await alova.Put<{ success: boolean }>(`/api/circuits/${id}`, payload);
+    return response;
+  } catch (error) {
+    console.error('更新电路设计失败:', error);
+    throw error;
+  }
+};
+
+/**
  * 获取电路设计列表
  * @returns 电路设计列表
  */

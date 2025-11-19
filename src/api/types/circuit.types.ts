@@ -73,6 +73,7 @@ export interface CircuitConnection {
 
 // 电路设计定义
 export interface CircuitDesign {
+  id?: string;
   elements: CircuitElement[];
   connections: CircuitConnection[];
   metadata: {
