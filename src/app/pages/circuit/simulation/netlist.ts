@@ -63,18 +63,18 @@ const orderPortsForElement = (type: CircuitElementType, ports: Endpoint[], portI
       const out = ports.find(p => p.portId === 'output') || ports[2] || ports[0];
       return [portIdToNet[getEndpointKey(in1)], portIdToNet[getEndpointKey(in2)], portIdToNet[getEndpointKey(out)]];
     }
-    case CircuitElementType.AMMETER:
-    case CircuitElementType.VOLTMETER: {
-      // 对于电流表，需要正确的端口顺序
+    case CircuitElementType.AMMETER: {
+      // 电流表使用 in/out 端口
       // SPICE 电压源 Vxxx n+ n- 测量的正电流是从 n+ 流向 n-（内部）
-      // 对应外部电流从 n- 流向 n+
       // 为了让电流表显示正确的正电流（从 in 流入，从 out 流出），
-      // 需要让 SPICE 电压源的正向与外部电流方向一致
-      // 即 n+ = out, n- = in
+      // 需要 n+ = out, n- = in
       const inPort = ports.find(p => p.portId === 'in') || ports[0];
       const outPort = ports.find(p => p.portId === 'out') || ports[1] || ports[0];
-      // 返回 [out, in] 使得正电流对应从 in 流向 out（外部）
       return [portIdToNet[getEndpointKey(outPort)], portIdToNet[getEndpointKey(inPort)]];
+    }
+    case CircuitElementType.VOLTMETER: {
+      // 电压表：直接使用端口数组顺序，保持向后兼容
+      return ports.slice(0, 2).map(p => portIdToNet[getEndpointKey(p)]);
     }
     case CircuitElementType.OSCILLOSCOPE: {
       const ch1 = ports.find(p => p.portId === 'channel1') || ports[0];

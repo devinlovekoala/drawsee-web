@@ -12,7 +12,7 @@ const PORT = process.env.PORT || 3001;
 const DEFAULT_BIN = '/home/devin/Workspace/drawsee-platform/ngspice/linux-ubuntu/build/ngspice';
 const NGSPICE_BIN = process.env.NGSPICE_BIN || DEFAULT_BIN;
 
-app.use(express.json({ limit: '2mb' }));
+app.use(express.json({ limit: '2mb' }));  
 app.use(cors());
 
 const textDecoder = new TextDecoder();
@@ -217,10 +217,28 @@ app.post('/simulate', async (req, res) => {
         }
       } else if (binding.elementType === 'voltmeter' && netNames.length >= 2) {
         const [n1, n2] = netNames;
-        const v1 = vectors[`v(${n1})`];
-        const v2 = vectors[`v(${n2})`];
-        if (v1 && v2) {
-          const diff = v1.real.map((v, idx) => v - (v2.real[idx] || 0));
+        // 处理地节点：节点 0 的电压始终为 0，ngspice 不会输出 v(0)
+        const v1 = n1 === '0' ? null : vectors[`v(${n1})`];
+        const v2 = n2 === '0' ? null : vectors[`v(${n2})`];
+
+        // 如果两个节点都是地，电压为 0
+        if (n1 === '0' && n2 === '0') {
+          metrics.voltage = 0;
+          metrics.minVoltage = 0;
+          metrics.maxVoltage = 0;
+          metrics.avgVoltage = 0;
+          metrics.rmsVoltage = 0;
+          metrics.peakVoltage = 0;
+          metrics.peakToPeakVoltage = 0;
+        } else if (v1 || v2 || n1 === '0' || n2 === '0') {
+          // 至少有一个节点有电压数据，或者有一个是地节点
+          const numPoints = time.length || v1?.real.length || v2?.real.length || 0;
+          const diff = [];
+          for (let i = 0; i < numPoints; i++) {
+            const val1 = n1 === '0' ? 0 : (v1?.real[i] || 0);
+            const val2 = n2 === '0' ? 0 : (v2?.real[i] || 0);
+            diff.push(val1 - val2);
+          }
           const stats = computeStats(diff);
           if (stats) {
             metrics.voltage = formatNumber(stats.last);
