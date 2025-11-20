@@ -6,6 +6,7 @@ import { promises as fs } from 'fs';
 import { tmpdir } from 'os';
 import path from 'path';
 import { execFile } from 'child_process';
+import { classifyNgspiceError } from './ngspice-error-helper.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -298,7 +299,9 @@ app.post('/simulate', async (req, res) => {
 
     res.json({ measurements });
   } catch (err) {
-    res.status(500).json({ error: err?.message || 'simulation failed' });
+    const raw = err?.message || err?.stack || '';
+    const info = classifyNgspiceError(raw);
+    res.status(500).json({ error: info.message, errorDetails: info });
   }
 });
 

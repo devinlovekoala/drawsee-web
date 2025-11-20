@@ -195,6 +195,11 @@ const measurementElementTypes = new Set<CircuitElementType>([
   CircuitElementType.OSCILLOSCOPE,
 ]);
 
+const powerSourceElementTypes = new Set<CircuitElementType>([
+  CircuitElementType.VOLTAGE_SOURCE,
+  CircuitElementType.CURRENT_SOURCE,
+]);
+
 const measurementTypeLabels: Partial<Record<CircuitElementType, string>> = {
   [CircuitElementType.AMMETER]: '电流表',
   [CircuitElementType.VOLTMETER]: '电压表',
@@ -1145,6 +1150,13 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
     const circuitDesign = convertToCircuitDesign();
     if (circuitDesign.elements.length === 0) {
       message.error('电路中没有元件，无法进行模拟');
+      return;
+    }
+    const hasPowerSource = circuitDesign.elements.some(el =>
+      powerSourceElementTypes.has(el.type as CircuitElementType)
+    );
+    if (!hasPowerSource) {
+      message.error('电路缺少电源器件，请添加电压源或电流源后再运行仿真');
       return;
     }
     const measurementNodes = nodes.filter(node => 

@@ -1,5 +1,6 @@
 /// <reference lib="webworker" />
-import { SimulationRequest, SimulationResponse, SimulationWaveformPoint, SimulationMeasurementResult } from './types';
+import { SimulationRequest, SimulationResponse, SimulationWaveformPoint, SimulationMeasurementResult, SimulationErrorDetails } from './types';
+import { classifyNgspiceError } from './ngspiceErrors';
 
 const ctx: DedicatedWorkerGlobalScope = self as any;
 
@@ -7,6 +8,43 @@ const NGSPICE_SCRIPT = '/ngspice/ngspice.js';
 
 let ngModule: any = null;
 let moduleReady: Promise<any> | null = null;
+let ngspiceLogBuffer: string[] = [];
+
+const resetNgspiceLogs = () => {
+  ngspiceLogBuffer = [];
+};
+
+const appendNgspiceLog = (text: any, isError = false) => {
+  const str = typeof text === 'string' ? text : String(text ?? '');
+  if (str) {
+    ngspiceLogBuffer.push(str);
+  }
+  const logger = isError ? console.error : console.log;
+  logger('[ngspice]', str);
+};
+
+const buildSimulationError = (error: any, fallback?: string) => {
+  const logText = ngspiceLogBuffer.join('\n');
+  const info = classifyNgspiceError(logText || error?.message || fallback || '');
+  const simError: any = new Error(info.message || fallback || '仿真失败');
+  simError.code = info.code;
+  simError.rawMessage = info.rawMessage;
+  simError.details = info;
+  return simError;
+const extractErrorDetails = (error: any): SimulationErrorDetails | undefined => {
+  if (!error) return undefined;
+  if (error.details) return error.details as SimulationErrorDetails;
+  if (error.code || error.rawMessage || error.message) {
+    return {
+      code: error.code || 'unknown',
+      message: error.message || '仿真失败',
+      rawMessage: error.rawMessage,
+    };
+  }
+  return undefined;
+};
+
+};
 
 const ensureNgSpice = () => {
   if (ngModule) return Promise.resolve(ngModule);
@@ -15,8 +53,8 @@ const ensureNgSpice = () => {
   moduleReady = new Promise((resolve, reject) => {
     (self as any).Module = {
       locateFile: (path: string) => `/ngspice/${path}`,
-      print: (text: string) => console.log('[ngspice]', text),
-      printErr: (text: string) => console.error('[ngspice]', text),
+      print: (text: string) => appendNgspiceLog(text, false),
+      printErr: (text: string) => appendNgspiceLog(text, true),
       noExitRuntime: true,
       onAbort: (text: string) => {
         moduleReady = null;
@@ -57,6 +95,7 @@ const runNetlist = async (netlist: string) => {
   const FS = getFilesystem();
   const filename = '/tmp.cir';
   const rawPath = '/tmp.raw';
+  resetNgspiceLogs();
 
   const content = `set filetype=ascii\nset wr_singlescale\n${netlist}`;
   try {
@@ -64,43 +103,45 @@ const runNetlist = async (netlist: string) => {
       FS.unlink(filename);
     }
   } catch (err) {
-    // ignore
+    // ignore stale files
   }
   FS.writeFile(filename, content);
   try {
     if (FS.analyzePath(rawPath).exists) {
       FS.unlink(rawPath);
     }
-  } catch {}
-
-  try {
-    mod.callMain(['-b', filename, '-r', rawPath]);
-  } catch (err: any) {
-    // Emscripten main may throw ExitStatus; treat non-zero as error
-    if (!err || err.name !== 'ExitStatus') {
-      throw err;
-    }
+  } catch (err) {
+    // ignore stale files
   }
 
   const args = ['-b', filename, '-r', rawPath];
-  if (typeof mod.callMain === 'function') {
-    try {
+  const invokeNgspice = () => {
+    if (typeof mod.callMain === 'function') {
       mod.callMain(args);
-    } catch (err: any) {
-      if (!err || err.name !== 'ExitStatus') {
-        throw err;
-      }
+    } else if (typeof mod._main === 'function') {
+      mod._main(args.length, 0);
+    } else {
+      throw new Error('NGSPICE_MAIN_UNAVAILABLE');
     }
-  } else if (typeof mod._main === 'function') {
-    mod._main(args.length, 0);
+  };
+
+  try {
+    invokeNgspice();
+  } catch (err: any) {
+    if (err?.name === 'ExitStatus' && (!('status' in err) || err.status === 0)) {
+      // 正常退出
+    } else {
+      throw buildSimulationError(err, 'ngspice 执行失败');
+    }
   }
 
   if (!FS.analyzePath(rawPath).exists) {
-    throw new Error('ngspice did not produce raw output');
+    throw buildSimulationError(new Error('RAW_OUTPUT_MISSING'), 'ngspice 未产生结果，请检查电路连线');
   }
   const raw = FS.readFile(rawPath);
   return raw;
 };
+
 
 const textDecoder = new TextDecoder();
 
@@ -313,7 +354,12 @@ ctx.addEventListener('message', async (event: MessageEvent<SimulationRequest>) =
     ctx.postMessage(response);
   } catch (error: any) {
     console.error('Simulation worker error', error);
-    const response: SimulationResponse = { measurements: [], error: error?.message || '仿真失败' };
+    const details = extractErrorDetails(error);
+    const response: SimulationResponse = {
+      measurements: [],
+      error: details?.message || error?.message || '仿真失败',
+      errorDetails: details,
+    };
     ctx.postMessage(response);
   }
 });

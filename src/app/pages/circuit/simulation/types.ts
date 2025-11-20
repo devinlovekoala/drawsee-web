@@ -38,7 +38,15 @@ export interface SimulationMeasurementResult {
   channelWaveforms?: Record<string, SimulationWaveformPoint[]>;
 }
 
+export interface SimulationErrorDetails {
+  code: string;
+  message: string;
+  rawMessage?: string;
+  suggestion?: string;
+}
+
 export interface SimulationResponse {
   measurements: SimulationMeasurementResult[];
   error?: string;
+  errorDetails?: SimulationErrorDetails;
 }

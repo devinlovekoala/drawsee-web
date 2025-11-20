@@ -5,6 +5,7 @@ import {
   SimulationMeasurementResult,
   SimulationRequest,
   SimulationResponse,
+  SimulationErrorDetails,
 } from './types';
 
 type WorkerInstance = Worker | null;
@@ -15,6 +16,16 @@ class SimulationClient {
   private pendingReject: ((err: Error) => void) | null = null;
   private fallbackEndpoint = import.meta.env.VITE_NGSPICE_API_URL || 'http://localhost:3001/simulate';
   private preferBackend = Boolean(import.meta.env.VITE_NGSPICE_API_URL);
+
+
+
+  private buildError(message: string, details?: SimulationErrorDetails) {
+    const error: any = new Error(message);
+    if (details) {
+      error.details = details;
+    }
+    return error;
+  }
 
   private ensureWorker() {
     if (this.worker) return;
@@ -59,7 +70,7 @@ class SimulationClient {
         if (!this.worker) return reject(new Error('Simulation worker unavailable'));
         this.pending = (res) => {
           if (res.error) {
-            reject(new Error(res.error));
+            reject(this.buildError(res.error, res.errorDetails));
             return;
           }
           const map: Record<string, SimulationMeasurementResult> = {};
@@ -78,6 +89,9 @@ class SimulationClient {
       });
       return result;
     } catch (err: any) {
+      if (err?.details) {
+        throw err;
+      }
       // 任何 worker 侧错误都降级到后端仿真
       return this.runViaBackend(request);
     }
@@ -94,7 +108,7 @@ class SimulationClient {
     }
     const data: SimulationResponse = await response.json();
     if (data.error) {
-      throw new Error(data.error);
+      throw this.buildError(data.error, data.errorDetails);
     }
     const map: Record<string, SimulationMeasurementResult> = {};
     data.measurements.forEach(m => {

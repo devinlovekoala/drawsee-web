@@ -190,6 +190,7 @@ const pickElementValue = (el: CircuitDesign['elements'][number], fallback: strin
 export const buildNetlist = (design: CircuitDesign) => {
   const uf = new UnionFind();
   const groundEndpoints = new Set<string>();
+  const elementNetMap: Record<string, string[]> = {};
 
   design.connections.forEach(conn => {
     const sourceKey = getEndpointKey({ elementId: conn.source.elementId, portId: conn.source.portId });
@@ -285,6 +286,7 @@ export const buildNetlist = (design: CircuitDesign) => {
     const ports = (el.ports || []).map(p => ({ elementId: el.id, portId: p.id }));
     const rawNets = orderPortsForElement(el.type as CircuitElementType, ports, endpointToNet);
     const nets = rawNets.map(net => resolveNetName(net) || '0');
+    elementNetMap[el.id] = nets;
     // 确保 label 是字符串类型
     const propsLabel = el.properties?.label;
     const label = el.label || (typeof propsLabel === 'string' ? propsLabel : undefined) || el.id;
@@ -363,5 +365,6 @@ export const buildNetlist = (design: CircuitDesign) => {
     netlist: lines.join('\n'),
     bindings,
     nets: normalizedNets,
+    elementNets: elementNetMap,
   };
 };
