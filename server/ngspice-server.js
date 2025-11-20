@@ -5,7 +5,6 @@ import cors from 'cors';
 import { promises as fs } from 'fs';
 import { tmpdir } from 'os';
 import path from 'path';
-import { randomUUID } from 'crypto';
 import { execFile } from 'child_process';
 
 const app = express();
