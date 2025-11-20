@@ -5,9 +5,12 @@ import { UserDocumentVO } from '@/api/types/document.types';
  * 获取用户PDF文档列表
  * @returns PDF文档列表
  */
-export const getUserPdfDocuments = async (): Promise<UserDocumentVO[]> => {
+export const getUserPdfDocuments = async (options?: { forceRefresh?: boolean }): Promise<UserDocumentVO[]> => {
   try {
-    const response = await alova.Get<UserDocumentVO[]>('/user/document/pdf/list');
+    const requestConfig = options?.forceRefresh
+      ? { params: { _: Date.now() } }
+      : undefined;
+    const response = await alova.Get<UserDocumentVO[]>('/user/document/pdf/list', requestConfig);
     return response;
   } catch (error) {
     console.error('获取用户PDF文档列表失败:', error);

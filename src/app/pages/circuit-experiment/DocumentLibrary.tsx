@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Table, Button, Card, Space, message, Modal, Typography, Spin, Tag, Tooltip } from 'antd';
 import { DeleteOutlined, EyeOutlined, ExperimentOutlined, UploadOutlined } from '@ant-design/icons';
 import { getUserPdfDocuments, deleteDocument } from '@/api/methods/document.methods';
@@ -9,6 +9,13 @@ import { bytesToSize } from '@/utils/file';
 import { getResourceUrl } from '@/api/methods/flow.methods';
 import { ModelSelector } from '../../pages/blank/components/ModelSelector';
 import { ModelType } from '../flow/components/input/FlowInputPanel';
+
+type DocumentLibraryLocationState = {
+  classId?: string;
+  refreshToken?: number;
+  timestamp?: number;
+  [key: string]: unknown;
+};
 
 const { Title } = Typography;
 
@@ -22,23 +29,30 @@ export default function DocumentLibrary() {
   const [deleteLoading, setDeleteLoading] = useState<boolean>(false);
   const navigate = useNavigate();
   const location = useLocation();
+  const locationState = location.state as DocumentLibraryLocationState | null;
   const [selectedModel, setSelectedModel] = useState<ModelType>('deepseekV3');
   // 不使用handleBlankQuery/handleAiTaskCountPlus，分析功能已被前端临时禁用
   // const { handleBlankQuery, handleAiTaskCountPlus } = useAppContext();
   
   // 从location中获取班级ID
-  const classId = location.state?.classId as string || null;
+  const classId = locationState?.classId || null;
   // avoid unused variable lint (intentional):
   void classId;
 
-  // 获取文档列表
-  const fetchDocuments = async () => {
+  const extractFileNameFromPath = useCallback((objectPath?: string): string => {
+    if (!objectPath) return '';
+    const pathParts = objectPath.split('/');
+    const fileName = pathParts[pathParts.length - 1];
+    const cleanFileName = fileName.replace(/^\d+_/, '');
+    return decodeURIComponent(cleanFileName);
+  }, []);
+
+  const fetchDocuments = useCallback(async (options?: { forceRefresh?: boolean }) => {
     try {
       setLoading(true);
       console.log('开始获取文档列表...');
-      const response = await getUserPdfDocuments();
+      const response = await getUserPdfDocuments(options);
       
-      // 处理后端返回的数据，确保文件名字段存在
       const processedDocuments = response.map(doc => ({
         ...doc,
         fileName: doc.fileName || extractFileNameFromPath(doc.objectPath) || doc.title || '未知文件名',
@@ -53,17 +67,7 @@ export default function DocumentLibrary() {
     } finally {
       setLoading(false);
     }
-  };
-
-  // 从对象路径中提取文件名
-  const extractFileNameFromPath = (objectPath?: string): string => {
-    if (!objectPath) return '';
-    const pathParts = objectPath.split('/');
-    const fileName = pathParts[pathParts.length - 1];
-    // 移除时间戳前缀（如果存在）
-    const cleanFileName = fileName.replace(/^\d+_/, '');
-    return decodeURIComponent(cleanFileName);
-  };
+  }, [extractFileNameFromPath]);
 
   // 获取文档的最新访问URL
   const getLatestDocumentUrl = async (document: UserDocumentVO): Promise<string> => {
@@ -88,7 +92,23 @@ export default function DocumentLibrary() {
   useEffect(() => {
     console.log('DocumentLibrary 组件加载');
     fetchDocuments();
-  }, []);
+  }, [fetchDocuments]);
+
+  const refreshSignal = locationState?.refreshToken || locationState?.timestamp;
+
+  useEffect(() => {
+    if (!refreshSignal) return;
+    console.log('检测到路由状态刷新信号，重新获取文档列表');
+    fetchDocuments({ forceRefresh: true });
+    if (locationState) {
+      const { refreshToken: _refresh, timestamp: _timestamp, ...rest } = locationState;
+      const hasRest = Object.keys(rest).length > 0;
+      navigate(location.pathname, {
+        replace: true,
+        state: hasRest ? rest : undefined
+      });
+    }
+  }, [refreshSignal, fetchDocuments, location.pathname, navigate, locationState]);
 
   // 删除文档
   const handleDelete = async (id: number) => {
@@ -108,14 +128,12 @@ export default function DocumentLibrary() {
           console.log('API删除成功');
           
           message.success('删除成功');
-          
-          // 简单粗暴：直接刷新页面
-          console.log('删除成功，刷新页面');
-          window.location.reload();
-          
+          setDocuments(prev => prev.filter(doc => doc.id !== id));
+          await fetchDocuments({ forceRefresh: true });
         } catch (error) {
           console.error('删除实验文档失败:', error);
           message.error('删除实验文档失败');
+        } finally {
           setDeleteLoading(false);
         }
       }

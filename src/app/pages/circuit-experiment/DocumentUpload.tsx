@@ -102,14 +102,9 @@ export default function DocumentUpload() {
       
       // 跳转到文档库页面
       navigate('/circuit-experiment/documents', {
-        replace: true
+        replace: true,
+        state: { refreshToken: Date.now() }
       });
-      
-      // 跳转后立即刷新页面，确保显示最新数据
-      setTimeout(() => {
-        console.log('上传成功，刷新页面显示最新数据');
-        window.location.reload();
-      }, 100);
     } catch (error) {
       console.error('文档上传失败:', error);
       message.error('文档上传失败');
