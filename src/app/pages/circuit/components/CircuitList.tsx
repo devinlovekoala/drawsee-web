@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { getCircuitDesigns, deleteCircuitDesign } from '@/api/methods/circuit.methods';
 import { Table, Button, Card, Space, message, Modal, Empty, Typography, Spin } from 'antd';
 import { DeleteOutlined, EditOutlined, EyeOutlined, PlusOutlined } from '@ant-design/icons';
@@ -25,23 +25,25 @@ export const CircuitList = () => {
   const navigate = useNavigate();
 
   // 获取电路设计列表
-  const fetchCircuitDesigns = async () => {
+  const fetchCircuitDesigns = useCallback(async (options?: { forceRefresh?: boolean }) => {
     try {
       setLoading(true);
-      const response = await getCircuitDesigns();
+      const response = await getCircuitDesigns(options);
       setDesigns(response.designs);
+      return response;
     } catch (error) {
       console.error('获取电路设计列表失败:', error);
       message.error('获取电路设计列表失败');
+      throw error;
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   // 组件加载时获取列表
   useEffect(() => {
     fetchCircuitDesigns();
-  }, []);
+  }, [fetchCircuitDesigns]);
 
   // 删除电路设计
   const handleDelete = async (id: string) => {
@@ -56,8 +58,10 @@ export const CircuitList = () => {
           setDeleteLoading(true);
           await deleteCircuitDesign(id);
           message.success('删除成功');
-          // 重新获取列表
-          fetchCircuitDesigns();
+          // 乐观更新以便立即在列表中移除
+          setDesigns((prev) => prev.filter((design) => String(design.id) !== String(id)));
+          // 重新获取列表确保数据与服务器同步并规避缓存
+          await fetchCircuitDesigns({ forceRefresh: true });
         } catch (error) {
           console.error('删除电路设计失败:', error);
           message.error('删除电路设计失败');

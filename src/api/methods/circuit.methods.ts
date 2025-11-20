@@ -64,9 +64,15 @@ export const updateCircuitDesign = async (
  * 获取电路设计列表
  * @returns 电路设计列表
  */
-export const getCircuitDesigns = async () => {
+export const getCircuitDesigns = async (options?: { forceRefresh?: boolean }) => {
   try {
-    const response = await alova.Get<{ designs: Array<{ id: string; title: string; createdAt: string; updatedAt: string }> }>('/api/circuits');
+    const requestConfig = options?.forceRefresh
+      ? { params: { _: Date.now() } }
+      : undefined;
+    const response = await alova.Get<{ designs: Array<{ id: string; title: string; createdAt: string; updatedAt: string }> }>(
+      '/api/circuits',
+      requestConfig
+    );
     return response;
   } catch (error) {
     console.error('获取电路设计列表失败:', error);

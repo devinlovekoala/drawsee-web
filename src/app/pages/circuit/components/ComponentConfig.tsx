@@ -24,6 +24,35 @@ const splitValueAndUnit = (value?: string) => {
   };
 };
 
+const normalizeUnitToken = (unit: string) =>
+  unit
+    .trim()
+    .replace(/ohms?/gi, 'ohm')
+    .replace(/[ωΩ]/gi, 'ohm')
+    .replace(/[μµ]/gi, 'u')
+    .toLowerCase();
+
+const getMatchingUnit = (unit: string | undefined, options: string[]): string => {
+  if (!options.length) return '';
+  if (!unit) return options[0];
+  if (options.includes(unit)) return unit;
+
+  const normalizedInput = normalizeUnitToken(unit);
+  const normalizedOptionMap = options.reduce<Record<string, string>>((acc, option) => {
+    const normalized = normalizeUnitToken(option);
+    if (!acc[normalized]) {
+      acc[normalized] = option;
+    }
+    return acc;
+  }, {});
+
+  return (
+    normalizedOptionMap[normalizedInput] ||
+    options.find((option) => option.toLowerCase() === unit.toLowerCase()) ||
+    options[0]
+  );
+};
+
 interface ComponentConfigProps {
   element: CircuitNodeData | null;
   visible: boolean;
@@ -91,7 +120,7 @@ const ComponentConfig: React.FC<ComponentConfigProps> = ({
       if (unitOptions.length > 0) {
         const parsed = splitValueAndUnit(resolvedValue);
         setValueNumberInput(parsed?.numeric || '');
-        setValueUnitInput(parsed?.unit || unitOptions[0]);
+        setValueUnitInput(getMatchingUnit(parsed?.unit, unitOptions));
       } else {
         setValueNumberInput('');
         setValueUnitInput('');
