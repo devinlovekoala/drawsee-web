@@ -17,6 +17,7 @@ import CircuitExperimentTask from "@/app/pages/circuit-experiment/CircuitExperim
 import DocumentLibrary from "@/app/pages/circuit-experiment/DocumentLibrary";
 import DocumentUpload from "@/app/pages/circuit-experiment/DocumentUpload";
 import DocumentAnalysis from "@/app/pages/circuit-experiment/DocumentAnalysis";
+import DigitalWorkbench from "@/app/pages/digital/DigitalWorkbench";
 
 const router = createBrowserRouter([
   {
@@ -38,6 +39,10 @@ const router = createBrowserRouter([
       {
         path: '/course',
         element: <Course />
+      },
+      {
+        path: '/digital',
+        element: <DigitalWorkbench />
       },
       {
         path: '/circuit',
