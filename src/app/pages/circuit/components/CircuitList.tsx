@@ -142,7 +142,7 @@ export const CircuitList = () => {
 
         {loading ? (
           <div className="flex justify-center items-center py-12">
-            <Spin size="large" tip="加载中..." />
+            <Spin size="large" />
           </div>
         ) : designs.length > 0 ? (
           <Table 

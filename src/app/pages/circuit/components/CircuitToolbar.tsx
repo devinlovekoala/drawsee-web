@@ -12,7 +12,8 @@ import {
   PlayCircleOutlined,
   ClearOutlined,
   PoweroffOutlined,
-  FileAddOutlined
+  FileAddOutlined,
+  PictureOutlined
 } from '@ant-design/icons';
 import { ModelType } from '@/app/pages/flow/components/input/FlowInputPanel';
 
@@ -41,6 +42,8 @@ interface CircuitToolbarProps {
   hasContent?: boolean;
   onSaveAs?: () => void;
   canSaveAs?: boolean;
+  onImageImport?: () => void;
+  isImportingImage?: boolean;
 }
 
 export const CircuitToolbar: FC<CircuitToolbarProps> = ({
@@ -63,6 +66,8 @@ export const CircuitToolbar: FC<CircuitToolbarProps> = ({
   hasContent = false,
   isSimulating = false,
   canSaveAs = false,
+  onImageImport,
+  isImportingImage = false,
 }) => {
 
   // 只在开发环境下输出日志
@@ -109,6 +114,17 @@ export const CircuitToolbar: FC<CircuitToolbarProps> = ({
           disabled={!canSaveAs || !onSaveAs}
           icon={<FileAddOutlined />}
           className={getButtonClass(!canSaveAs || !onSaveAs)}
+        />
+      </Tooltip>
+
+      <Tooltip title="图片识别导入">
+        <Button
+          type="text"
+          onClick={onImageImport}
+          disabled={!onImageImport}
+          icon={<PictureOutlined />}
+          loading={isImportingImage}
+          className={getButtonClass(!onImageImport)}
         />
       </Tooltip>
 

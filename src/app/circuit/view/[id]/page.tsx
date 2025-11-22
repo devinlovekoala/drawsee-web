@@ -46,7 +46,7 @@ export default function CircuitViewPage() {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-full">
-        <Spin size="large" tip="加载中..." />
+        <Spin size="large" />
       </div>
     );
   }

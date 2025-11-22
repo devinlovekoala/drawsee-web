@@ -28,6 +28,7 @@ import {
 } from '@/api/types/circuit.types';
 import { createAiTask } from '@/api/methods/flow.methods';
 import { updateCircuitDesign } from '@/api/methods/circuit.methods';
+import { recognizeCircuitDesignFromImage } from '@/api/methods/tool.methods';
 import { CircuitNodeData, ModelType } from '../types';
 import { useAppContext } from '@/app/contexts/AppContext';
 import { CreateAiTaskDTO } from '@/api/types/flow.types';
@@ -52,6 +53,7 @@ import {
   ApiOutlined,
   HddOutlined
 } from '@ant-design/icons';
+import ImageUploader from '@/app/components/ImageUploader';
 
 // 唯一节点ID生成
 let nodeIdCounter = 1;
@@ -487,6 +489,8 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
   const [saveModalInitialValues, setSaveModalInitialValues] = useState<{ title?: string; description?: string }>({});
   const autoSaveTimerRef = useRef<number | null>(null);
   const autoSaveInfoShownRef = useRef(false);
+  const [isImportingFromImage, setIsImportingFromImage] = useState(false);
+  const [isImportModalVisible, setIsImportModalVisible] = useState(false);
   
   const reactFlowInstance = useReactFlow();
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
@@ -520,6 +524,110 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
       elementNameCountersRef.current[type] = Math.max(current, parsedValue);
     }
   }, [getLabelPrefix]);
+
+  const loadCircuitDesign = useCallback((design: CircuitDesign, options: { fitView?: boolean; notifyChange?: boolean } = {}) => {
+    if (!design) {
+      return;
+    }
+
+    const safeElements = design.elements || [];
+    const safeConnections = design.connections || [];
+
+    const newNodes: Node[] = safeElements.map((element) => {
+      const propertyLabel = typeof element.properties?.['label'] === 'string'
+        ? element.properties['label'] as string
+        : undefined;
+      const propertyValue = typeof element.properties?.['value'] === 'string'
+        ? element.properties['value'] as string
+        : undefined;
+
+      const resolvedLabel = element.label || propertyLabel || element.id;
+      const resolvedValue = element.value || propertyValue || '';
+
+      return {
+        id: element.id,
+        type: 'circuitNode',
+        position: element.position || { x: 0, y: 0 },
+        data: {
+          id: element.id,
+          type: element.type,
+          label: resolvedLabel,
+          value: resolvedValue,
+          element,
+          description: '',
+          ports: element.ports || []
+        }
+      };
+    });
+
+    const newEdges: Edge[] = safeConnections.map((connection) => {
+      const edgeId = connection.id || `edge-${connection.source.elementId}-${connection.source.portId}-${connection.target.elementId}-${connection.target.portId}`;
+      return {
+        id: edgeId,
+        source: connection.source.elementId,
+        sourceHandle: connection.source.portId,
+        target: connection.target.elementId,
+        targetHandle: connection.target.portId,
+        type: 'default',
+        animated: false,
+        style: { stroke: '#3B82F6', strokeWidth: 2 },
+        data: {}
+      };
+    });
+
+    setNodes(newNodes);
+    setEdges(newEdges);
+    setSelectedNodeId(null);
+    setSelectedEdgeId(null);
+    setHistoryState({
+      past: [],
+      present: { nodes: newNodes, edges: newEdges },
+      future: []
+    });
+    setCanUndo(false);
+    setCanRedo(false);
+
+    if (safeElements.length > 0) {
+      safeElements.forEach((element) => {
+        registerExistingElementLabel(
+          element.type as CircuitElementType,
+          element.label || (typeof element.properties?.['label'] === 'string' ? element.properties['label'] as string : undefined)
+        );
+      });
+    }
+
+    if (options.notifyChange && onCircuitDesignChange) {
+      onCircuitDesignChange(design);
+    }
+
+    if (options.fitView !== false) {
+      setTimeout(() => {
+        reactFlowInstance.fitView({ padding: 0.2 });
+      }, 100);
+    }
+  }, [onCircuitDesignChange, reactFlowInstance, registerExistingElementLabel]);
+
+  const handleImageImportClick = useCallback(() => {
+    setIsImportModalVisible(true);
+  }, []);
+
+  const recognizeCircuitImage = useCallback(async (file: File) => {
+    const design = await recognizeCircuitDesignFromImage(file);
+    const summary = `识别成功，包含${design.elements?.length ?? 0}个元件和${design.connections?.length ?? 0}条连接`;
+    return { text: summary, extraData: design };
+  }, []);
+
+  const handleCircuitDesignFromImage = useCallback((data: unknown) => {
+    const design = data as CircuitDesign;
+    loadCircuitDesign(design, { fitView: true, notifyChange: true });
+    setIsImportModalVisible(false);
+    message.success('识别完成，电路已载入画布');
+  }, [loadCircuitDesign]);
+
+  const handleImportModalClose = useCallback(() => {
+    if (isImportingFromImage) return;
+    setIsImportModalVisible(false);
+  }, [isImportingFromImage]);
   
   const getFallbackLabelFromId = useCallback((type: CircuitElementType, nodeId: string) => {
     const prefix = getLabelPrefix(type);
@@ -599,65 +707,12 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
   const initialLoadRef = useRef(false);
   
   useEffect(() => {
-    // 避免重复加载初始数据
     if (initialCircuitDesign && initialCircuitDesign.elements.length > 0 && !initialLoadRef.current) {
       console.log('加载初始电路设计数据', initialCircuitDesign);
       initialLoadRef.current = true;
-      
-      // 将电路设计元素转换为节点
-      const newNodes = initialCircuitDesign.elements.map(element => {
-        // 创建完整的结构化节点数据
-        const completeNodeData = {
-          id: element.id,
-          type: element.type,
-          label: element.label || `${element.type}`,
-          value: element.value || '',
-          element: element,
-          description: '',
-          ports: element.ports || []
-        };
-        
-        return {
-          id: element.id,
-          type: 'circuitNode',
-          position: element.position,
-          data: completeNodeData
-        };
-      });
-      
-      // 将电路设计连接转换为边
-      const newEdges = initialCircuitDesign.connections.map(connection => {
-        const edgeId = `edge-${connection.source.elementId}-${connection.source.portId}-${connection.target.elementId}-${connection.target.portId}`;
-        return {
-          id: edgeId,
-          source: connection.source.elementId,
-          sourceHandle: connection.source.portId,
-          target: connection.target.elementId,
-          targetHandle: connection.target.portId,
-          type: 'default',
-          animated: false,
-          style: { stroke: '#3B82F6', strokeWidth: 2 },
-          data: {}
-        };
-      });
-      
-      setNodes(newNodes);
-      setEdges(newEdges);
-      
-      // 稍微延迟后重新计算视图，确保所有节点都已渲染
-      setTimeout(() => {
-        reactFlowInstance.fitView({ padding: 0.2 });
-      }, 100);
-      
-      // 同步命名计数器，确保后续新增元件继续编号
-      initialCircuitDesign.elements.forEach(element => {
-        registerExistingElementLabel(
-          element.type,
-          element.label || (typeof element.properties?.label === 'string' ? element.properties.label : undefined)
-        );
-      });
+      loadCircuitDesign(initialCircuitDesign, { fitView: true, notifyChange: false });
     }
-  }, [initialCircuitDesign, reactFlowInstance, registerExistingElementLabel]);
+  }, [initialCircuitDesign, loadCircuitDesign]);
   
   // 监听节点旋转事件，更新连线
   useEffect(() => {
@@ -1884,6 +1939,8 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
               hasSelectedNode={!!selectedNodeId}
               hasContent={nodes.length > 0 || edges.length > 0}
               canSaveAs={hasPersistedDesign && (nodes.length > 0 || edges.length > 0)}
+              onImageImport={handleImageImportClick}
+              isImportingImage={isImportingFromImage}
             />
           </div>
         )}
@@ -1982,6 +2039,32 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
         mode={saveModalMode}
         initialValues={saveModalInitialValues}
       />
+
+      <Modal
+        title="AI 图片识别导入"
+        open={isImportModalVisible}
+        onCancel={handleImportModalClose}
+        footer={null}
+        destroyOnClose
+        width={520}
+      >
+        <div className="space-y-3 text-sm text-gray-600">
+          <p>上传线下电路图或手绘草图，系统会尝试解析并转换为可编辑的画布设计。</p>
+          <ul className="list-disc list-inside text-xs text-gray-500">
+            <li>支持 PNG/JPG 图片，建议保持线条清晰。</li>
+            <li>识别成功会直接更新当前画布，请在导入前保存重要设计。</li>
+          </ul>
+        </div>
+        <ImageUploader
+          className="mt-4"
+          customRecognizeFn={recognizeCircuitImage}
+          onExtraData={handleCircuitDesignFromImage}
+          enableMathDetection={false}
+          resultTitle="识别摘要"
+          onLoadingChange={setIsImportingFromImage}
+          showStartButton={true}
+        />
+      </Modal>
       
       <Modal
         title={activeMeasurementResult ? `${activeMeasurementResult.label} 测量结果` : '测量结果'}
@@ -2125,7 +2208,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
           backgroundColor: 'rgba(255, 255, 255, 0.8)',
           zIndex: 1000
         }}>
-          <Spin size="large" spinning={true} tip="正在分析电路，请稍候..." />
+          <Spin size="large" spinning={true} />
         </div>
       )}
     </div>

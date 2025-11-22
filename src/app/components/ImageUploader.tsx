@@ -4,19 +4,37 @@ import { ImageIcon, LoaderIcon, XIcon, FunctionSquareIcon } from 'lucide-react';
 import LaTeXRenderer from '@/app/components/ui/latex-renderer';
 
 interface ImageUploaderProps {
-  onTextRecognized: (text: string) => void;
+  onTextRecognized?: (text: string) => void;
   className?: string;
+  customRecognizeFn?: (file: File) => Promise<{ text?: string; extraData?: unknown }>;
+  onExtraData?: (data: unknown) => void;
+  enableMathDetection?: boolean;
+  resultTitle?: string;
+  showResultPreview?: boolean;
+  onLoadingChange?: (loading: boolean) => void;
+  /**
+   * 如果为 true，上传图片后不会自动识别，组件会显示“开始转换”按钮，用户点击后才触发识别。
+   */
+  showStartButton?: boolean;
 }
 
 const ImageUploader: React.FC<ImageUploaderProps> = ({ 
-  onTextRecognized,
-  className = ''
+  onTextRecognized = () => {},
+  className = '',
+  customRecognizeFn,
+  onExtraData,
+  enableMathDetection = true,
+  resultTitle = '识别结果',
+  showResultPreview = true,
+  onLoadingChange
+  , showStartButton = false
 }) => {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [recognizedText, setRecognizedText] = useState<string | null>(null);
   const [hasMathFormula, setHasMathFormula] = useState(false);
+  const [lastFile, setLastFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 检查文本是否包含数学公式
@@ -62,8 +80,12 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
     };
     reader.readAsDataURL(file);
     
-    // 开始识别文字
-    recognizeImage(file);
+    // 记录最后一次文件
+    setLastFile(file);
+    // 如果不要求手动触发，则立即识别
+    if (!showStartButton) {
+      recognizeImage(file);
+    }
   };
 
   // 处理图片拖放
@@ -92,8 +114,12 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
     };
     reader.readAsDataURL(file);
     
-    // 开始识别文字
-    recognizeImage(file);
+    // 记录最后一次文件
+    setLastFile(file);
+    // 如果不要求手动触发，则立即识别
+    if (!showStartButton) {
+      recognizeImage(file);
+    }
   };
 
   // 处理拖拽进入区域
@@ -115,22 +141,32 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
   // 识别图片中的文字
   const recognizeImage = async (file: File) => {
     setIsLoading(true);
+    onLoadingChange?.(true);
     try {
-      const response = await recognizeTextFromImage(file);
-      // 保存识别的文本
-      setRecognizedText(response.text);
-      
-      // 检查是否包含数学公式
-      const containsMath = checkForMathFormulas(response.text);
-      setHasMathFormula(containsMath);
-      
-      // 传递识别结果给父组件
-      onTextRecognized(response.text);
+      const recognitionResult = customRecognizeFn
+        ? await customRecognizeFn(file)
+        : await recognizeTextFromImage(file);
+
+      const resultText = recognitionResult?.text ?? '';
+      setRecognizedText(resultText);
+
+      if (enableMathDetection) {
+        const containsMath = checkForMathFormulas(resultText);
+        setHasMathFormula(containsMath);
+      } else {
+        setHasMathFormula(false);
+      }
+
+      onTextRecognized(resultText);
+      if (recognitionResult?.extraData && onExtraData) {
+        onExtraData(recognitionResult.extraData);
+      }
     } catch (err) {
       console.error('文字识别失败:', err);
       setError('文字识别失败，请重试');
     } finally {
       setIsLoading(false);
+      onLoadingChange?.(false);
     }
   };
 
@@ -175,11 +211,11 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
             </div>
             
             {/* 识别结果预览 */}
-            {recognizedText && !isLoading && (
+            {recognizedText && !isLoading && showResultPreview && (
               <div className="mt-2 p-2 w-full">
                 <div className="flex items-center gap-2 mb-1">
-                  <h3 className="text-xs font-medium text-indigo-700">识别结果</h3>
-                  {hasMathFormula && (
+                  <h3 className="text-xs font-medium text-indigo-700">{resultTitle}</h3>
+                  {enableMathDetection && hasMathFormula && (
                     <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-800">
                       <FunctionSquareIcon size={12} className="mr-1" />
                       包含数学公式
@@ -188,12 +224,35 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
                 </div>
                 
                 <div className="max-h-20 overflow-y-auto p-2 bg-white rounded text-xs border border-indigo-100">
-                  {hasMathFormula ? (
+                  {enableMathDetection && hasMathFormula ? (
                     <LaTeXRenderer latex={recognizedText} className="text-xs" />
                   ) : (
                     <p className="whitespace-pre-wrap text-gray-700">{recognizedText}</p>
                   )}
                 </div>
+              </div>
+            )}
+
+            {/* 如果启用手动开始并已上传图片，则显示开始按钮 */}
+            {showStartButton && imagePreview && !isLoading && (
+              <div className="mt-3 flex justify-center">
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-2 rounded bg-indigo-600 px-3 py-1 text-white text-sm hover:bg-indigo-700"
+                  onClick={() => {
+                    if (!lastFile) {
+                      setError('未检测到上传文件');
+                      return;
+                    }
+                    // 清理之前的识别结果
+                    setRecognizedText(null);
+                    setHasMathFormula(false);
+                    setError(null);
+                    recognizeImage(lastFile);
+                  }}
+                >
+                  开始转换
+                </button>
               </div>
             )}
           </div>
