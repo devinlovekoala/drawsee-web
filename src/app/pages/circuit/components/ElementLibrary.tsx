@@ -1,67 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { CircuitElementType } from '@/api/types/circuit.types';
 import { Tabs, Tooltip } from 'antd';
-import { 
-  ExperimentOutlined, 
-  ThunderboltOutlined, 
-  ApartmentOutlined, 
-  SettingOutlined,
-  DashboardOutlined
-} from '@ant-design/icons';
-
-// 元件类别分组
-const elementCategories = [
-  {
-    key: 'passive',
-    label: '无源元件',
-    icon: <ExperimentOutlined />,
-    elements: [
-      { type: CircuitElementType.RESISTOR, name: '电阻器 (R)', shortcut: 'R' },
-      { type: CircuitElementType.CAPACITOR, name: '电容器 (C)', shortcut: 'C' },
-      { type: CircuitElementType.INDUCTOR, name: '电感器 (L)', shortcut: 'L' },
-      { type: CircuitElementType.GROUND, name: '接地 (GND)', shortcut: 'G' }
-    ]
-  },
-  {
-    key: 'source',
-    label: '电源元件',
-    icon: <ThunderboltOutlined />,
-    elements: [
-      { type: CircuitElementType.VOLTAGE_SOURCE, name: '电压源 (V)', shortcut: 'V' },
-      { type: CircuitElementType.CURRENT_SOURCE, name: '电流源 (I)', shortcut: 'I' }
-    ]
-  },
-  {
-    key: 'semiconductor',
-    label: '半导体',
-    icon: <ApartmentOutlined />,
-    elements: [
-      { type: CircuitElementType.DIODE, name: '二极管 (D)', shortcut: 'D' },
-      { type: CircuitElementType.TRANSISTOR_NPN, name: 'NPN 晶体管', shortcut: 'N' },
-      { type: CircuitElementType.TRANSISTOR_PNP, name: 'PNP 晶体管', shortcut: 'P' }
-    ]
-  },
-  {
-    key: 'other',
-    label: '其他',
-    icon: <SettingOutlined />,
-    elements: [
-      { type: CircuitElementType.OPAMP, name: '运算放大器', shortcut: 'O' },
-      { type: CircuitElementType.WIRE, name: '导线', shortcut: 'W' },
-      { type: CircuitElementType.JUNCTION, name: '连接点', shortcut: 'J' }
-    ]
-  },
-  {
-    key: 'measurement',
-    label: '测量仪表',
-    icon: <DashboardOutlined />,
-    elements: [
-      { type: CircuitElementType.AMMETER, name: '电流表 (A)', shortcut: 'Am' },
-      { type: CircuitElementType.VOLTMETER, name: '电压表 (V)', shortcut: 'Vm' },
-      { type: CircuitElementType.OSCILLOSCOPE, name: '示波器 (OSC)', shortcut: 'Osc' }
-    ]
-  }
-];
 
 // 元件图标渲染
 const getElementIcon = (type: CircuitElementType) => {
@@ -199,18 +138,97 @@ const getElementIcon = (type: CircuitElementType) => {
           <path d="M45,35 L55,35" strokeWidth="2" />
         </svg>
       );
+    case CircuitElementType.DIGITAL_INPUT:
+      return (
+        <svg {...svgProps} viewBox="0 0 60 40">
+          <rect x="8" y="10" width="30" height="20" rx="4" strokeWidth="2" fill="none" />
+          <path d="M38,20 L54,20" strokeWidth="2" />
+          <path d="M49,15 L54,20 L49,25" strokeWidth="2" fill="none" />
+        </svg>
+      );
+    case CircuitElementType.DIGITAL_OUTPUT:
+      return (
+        <svg {...svgProps} viewBox="0 0 60 40">
+          <rect x="22" y="10" width="30" height="20" rx="4" strokeWidth="2" fill="none" />
+          <path d="M6,20 L22,20" strokeWidth="2" />
+          <path d="M11,15 L6,20 L11,25" strokeWidth="2" fill="none" />
+        </svg>
+      );
+    case CircuitElementType.DIGITAL_CLOCK:
+      return (
+        <svg {...svgProps} viewBox="0 0 40 40">
+          <circle cx="20" cy="20" r="12" strokeWidth="2" fill="none" />
+          <path d="M20,20 L20,12" strokeWidth="2" />
+          <path d="M20,20 L26,23" strokeWidth="2" />
+        </svg>
+      );
+    case CircuitElementType.DIGITAL_AND:
+    case CircuitElementType.DIGITAL_NAND:
+      return (
+        <svg {...svgProps} viewBox="0 0 60 40">
+          <path d="M5,15 L20,15 M5,25 L20,25" strokeWidth="2" />
+          <path d="M20,8 H35 C45,8 50,13 50,20 C50,27 45,32 35,32 H20 Z" strokeWidth="2" fill="none" />
+          {type === CircuitElementType.DIGITAL_NAND && <circle cx="53" cy="20" r="3" strokeWidth="2" fill="none" />}
+        </svg>
+      );
+    case CircuitElementType.DIGITAL_OR:
+    case CircuitElementType.DIGITAL_NOR:
+      return (
+        <svg {...svgProps} viewBox="0 0 60 40">
+          <path d="M5,15 L22,15 M5,25 L22,25" strokeWidth="2" />
+          <path d="M20,8 C25,14 25,26 20,32 H36 C46,32 52,26 52,20 C52,14 46,8 36,8 H20 Z" strokeWidth="2" fill="none" />
+          {type === CircuitElementType.DIGITAL_NOR && <circle cx="55" cy="20" r="3" strokeWidth="2" fill="none" />}
+        </svg>
+      );
+    case CircuitElementType.DIGITAL_NOT:
+      return (
+        <svg {...svgProps} viewBox="0 0 40 40">
+          <path d="M5,20 L15,20" strokeWidth="2" />
+          <path d="M15,12 L15,28 L30,20 Z" strokeWidth="2" fill="none" />
+          <circle cx="33" cy="20" r="2.5" strokeWidth="2" fill="none" />
+        </svg>
+      );
+    case CircuitElementType.DIGITAL_XOR:
+    case CircuitElementType.DIGITAL_XNOR:
+      return (
+        <svg {...svgProps} viewBox="0 0 60 40">
+          <path d="M10,8 C15,14 15,26 10,32" strokeWidth="2" fill="none" />
+          <path d="M15,8 C20,14 20,26 15,32 H34 C44,32 50,26 50,20 C50,14 44,8 34,8 H15 Z" strokeWidth="2" fill="none" />
+          {type === CircuitElementType.DIGITAL_XNOR && <circle cx="53" cy="20" r="3" strokeWidth="2" fill="none" />}
+        </svg>
+      );
+    case CircuitElementType.DIGITAL_DFF:
+      return (
+        <svg {...svgProps} viewBox="0 0 50 40">
+          <rect x="10" y="10" width="30" height="20" rx="4" strokeWidth="2" fill="none" />
+          <path d="M5,20 L10,20" strokeWidth="2" />
+          <path d="M40,20 L45,20" strokeWidth="2" />
+        </svg>
+      );
     default:
       return null;
   }
 };
 
 // 元件库主组件
-interface ElementLibraryProps {
-  onSelectElement: (type: CircuitElementType) => void;
+export interface ElementCategory {
+  key: string;
+  label: string;
+  icon: React.ReactNode;
+  elements: Array<{ type: CircuitElementType; name: string; shortcut: string }>;
 }
 
-const ElementLibrary: React.FC<ElementLibraryProps> = ({ onSelectElement }) => {
-  const [activeKey, setActiveKey] = useState('passive');
+interface ElementLibraryProps {
+  onSelectElement: (type: CircuitElementType) => void;
+  categories: ElementCategory[];
+}
+
+const ElementLibrary: React.FC<ElementLibraryProps> = ({ onSelectElement, categories }) => {
+  const [activeKey, setActiveKey] = useState(() => categories[0]?.key ?? '');
+
+  useEffect(() => {
+    setActiveKey(categories[0]?.key ?? '');
+  }, [categories]);
   
   // 渲染元件项
   const renderElement = (element: { type: CircuitElementType, name: string, shortcut: string }) => {
@@ -237,13 +255,21 @@ const ElementLibrary: React.FC<ElementLibraryProps> = ({ onSelectElement }) => {
   };
 
   // 渲染选项卡内容
-  const renderTabContent = (category: any) => {
+  const renderTabContent = (category: ElementCategory) => {
     return (
       <div className="element-category-content p-2">
         {category.elements.map(renderElement)}
       </div>
     );
   };
+
+  if (!categories.length) {
+    return (
+      <div className="element-library-container flex h-full items-center justify-center border-r border-gray-200 bg-white text-sm text-gray-500">
+        暂无可用元件
+      </div>
+    );
+  }
 
   return (
     <div className="element-library-container h-full bg-white border-r border-gray-200 overflow-y-auto">
@@ -256,7 +282,7 @@ const ElementLibrary: React.FC<ElementLibraryProps> = ({ onSelectElement }) => {
         activeKey={activeKey}
         onChange={setActiveKey}
         tabPosition="left"
-        items={elementCategories.map(category => ({
+        items={categories.map(category => ({
           key: category.key,
           label: (
             <div className="flex flex-col items-center">

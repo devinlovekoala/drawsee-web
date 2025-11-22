@@ -16,7 +16,18 @@ export enum CircuitElementType {
   JUNCTION = 'junction',
   AMMETER = 'ammeter',
   VOLTMETER = 'voltmeter',
-  OSCILLOSCOPE = 'oscilloscope'
+  OSCILLOSCOPE = 'oscilloscope',
+  DIGITAL_INPUT = 'digital_input',
+  DIGITAL_OUTPUT = 'digital_output',
+  DIGITAL_CLOCK = 'digital_clock',
+  DIGITAL_AND = 'digital_and',
+  DIGITAL_OR = 'digital_or',
+  DIGITAL_NOT = 'digital_not',
+  DIGITAL_NAND = 'digital_nand',
+  DIGITAL_NOR = 'digital_nor',
+  DIGITAL_XOR = 'digital_xor',
+  DIGITAL_XNOR = 'digital_xnor',
+  DIGITAL_DFF = 'digital_dff'
 }
 
 // 基础坐标类型
@@ -151,6 +162,50 @@ export const ComponentVisualConfig: Record<CircuitElementType, ComponentVisualCo
   [CircuitElementType.OSCILLOSCOPE]: {
     width: 60,
     height: 45
+  },
+  [CircuitElementType.DIGITAL_INPUT]: {
+    width: 48,
+    height: 32
+  },
+  [CircuitElementType.DIGITAL_OUTPUT]: {
+    width: 48,
+    height: 32
+  },
+  [CircuitElementType.DIGITAL_CLOCK]: {
+    width: 48,
+    height: 32
+  },
+  [CircuitElementType.DIGITAL_AND]: {
+    width: 60,
+    height: 40
+  },
+  [CircuitElementType.DIGITAL_OR]: {
+    width: 60,
+    height: 40
+  },
+  [CircuitElementType.DIGITAL_NOT]: {
+    width: 60,
+    height: 40
+  },
+  [CircuitElementType.DIGITAL_NAND]: {
+    width: 60,
+    height: 40
+  },
+  [CircuitElementType.DIGITAL_NOR]: {
+    width: 60,
+    height: 40
+  },
+  [CircuitElementType.DIGITAL_XOR]: {
+    width: 60,
+    height: 40
+  },
+  [CircuitElementType.DIGITAL_XNOR]: {
+    width: 60,
+    height: 40
+  },
+  [CircuitElementType.DIGITAL_DFF]: {
+    width: 60,
+    height: 40
   }
 };
 

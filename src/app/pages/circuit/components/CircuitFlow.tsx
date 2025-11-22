@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useState, useRef, useEffect } from 'react';
+import React, { useCallback, useState, useRef, useEffect, useMemo } from 'react';
 import ReactFlow, {
   addEdge,
   Background,
@@ -34,12 +34,24 @@ import { CreateAiTaskDTO } from '@/api/types/flow.types';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { ModelSelector } from '@/app/pages/blank/components/ModelSelector';
 import { ModelType as FlowModelType } from '@/app/pages/flow/components/input/FlowInputPanel';
-import ElementLibrary from './ElementLibrary';
+import ElementLibrary, { ElementCategory } from './ElementLibrary';
 import CircuitToolbar from './CircuitToolbar';
 import SaveCircuitModal from './SaveCircuitModal';
 import { Line } from '@ant-design/charts';
 import { simulationClient } from '../simulation/simulationClient';
 import { SimulationMeasurementResult } from '../simulation/types';
+import { runDigitalSimulation } from '@/app/pages/digital/simulation/digitalSimulationClient';
+import { DigitalSimulationResult } from '@/app/pages/digital/simulation/types';
+import {
+  ExperimentOutlined,
+  ThunderboltOutlined,
+  ApartmentOutlined,
+  SettingOutlined,
+  DashboardOutlined,
+  GatewayOutlined,
+  ApiOutlined,
+  HddOutlined
+} from '@ant-design/icons';
 
 // 唯一节点ID生成
 let nodeIdCounter = 1;
@@ -71,64 +83,153 @@ const elementNamePrefixes: Record<CircuitElementType, string> = {
   [CircuitElementType.JUNCTION]: 'N',
   [CircuitElementType.AMMETER]: 'AM',
   [CircuitElementType.VOLTMETER]: 'VM',
-  [CircuitElementType.OSCILLOSCOPE]: 'OSC'
+  [CircuitElementType.OSCILLOSCOPE]: 'OSC',
+  [CircuitElementType.DIGITAL_INPUT]: 'DIN',
+  [CircuitElementType.DIGITAL_OUTPUT]: 'DOUT',
+  [CircuitElementType.DIGITAL_CLOCK]: 'CLK',
+  [CircuitElementType.DIGITAL_AND]: 'AND',
+  [CircuitElementType.DIGITAL_OR]: 'OR',
+  [CircuitElementType.DIGITAL_NOT]: 'NOT',
+  [CircuitElementType.DIGITAL_NAND]: 'NAND',
+  [CircuitElementType.DIGITAL_NOR]: 'NOR',
+  [CircuitElementType.DIGITAL_XOR]: 'XOR',
+  [CircuitElementType.DIGITAL_XNOR]: 'XNOR',
+  [CircuitElementType.DIGITAL_DFF]: 'DFF'
 };
 
-// 电路元件菜单配置
-const elementMenuItems = [
+type CircuitWorkspaceMode = 'analog' | 'digital' | 'hybrid';
+
+const analogElementCategories: ElementCategory[] = [
   {
-    key: CircuitElementType.RESISTOR,
-    label: '电阻器 (R)',
+    key: 'passive',
+    label: '无源元件',
+    icon: <ExperimentOutlined />,
+    elements: [
+      { type: CircuitElementType.RESISTOR, name: '电阻器 (R)', shortcut: 'R' },
+      { type: CircuitElementType.CAPACITOR, name: '电容器 (C)', shortcut: 'C' },
+      { type: CircuitElementType.INDUCTOR, name: '电感器 (L)', shortcut: 'L' },
+      { type: CircuitElementType.GROUND, name: '接地 (GND)', shortcut: 'G' }
+    ]
   },
   {
-    key: CircuitElementType.CAPACITOR,
-    label: '电容器 (C)',
+    key: 'source',
+    label: '电源元件',
+    icon: <ThunderboltOutlined />,
+    elements: [
+      { type: CircuitElementType.VOLTAGE_SOURCE, name: '电压源 (V)', shortcut: 'V' },
+      { type: CircuitElementType.CURRENT_SOURCE, name: '电流源 (I)', shortcut: 'I' }
+    ]
   },
   {
-    key: CircuitElementType.INDUCTOR,
-    label: '电感器 (L)',
+    key: 'semiconductor',
+    label: '半导体',
+    icon: <ApartmentOutlined />,
+    elements: [
+      { type: CircuitElementType.DIODE, name: '二极管 (D)', shortcut: 'D' },
+      { type: CircuitElementType.TRANSISTOR_NPN, name: 'NPN 晶体管', shortcut: 'N' },
+      { type: CircuitElementType.TRANSISTOR_PNP, name: 'PNP 晶体管', shortcut: 'P' }
+    ]
   },
   {
-    key: CircuitElementType.VOLTAGE_SOURCE,
-    label: '电压源 (V)',
+    key: 'other',
+    label: '其他',
+    icon: <SettingOutlined />,
+    elements: [
+      { type: CircuitElementType.OPAMP, name: '运算放大器', shortcut: 'O' },
+      { type: CircuitElementType.WIRE, name: '导线', shortcut: 'W' },
+      { type: CircuitElementType.JUNCTION, name: '连接点', shortcut: 'J' }
+    ]
   },
   {
-    key: CircuitElementType.CURRENT_SOURCE,
-    label: '电流源 (I)',
-  },
-  {
-    key: CircuitElementType.DIODE,
-    label: '二极管 (D)',
-  },
-  {
-    key: CircuitElementType.TRANSISTOR_NPN,
-    label: 'NPN 晶体管',
-  },
-  {
-    key: CircuitElementType.TRANSISTOR_PNP,
-    label: 'PNP 晶体管',
-  },
-  {
-    key: CircuitElementType.GROUND,
-    label: '接地 (GND)',
-  },
-  {
-    key: CircuitElementType.OPAMP,
-    label: '运算放大器',
-  },
-  {
-    key: CircuitElementType.AMMETER,
-    label: '电流表 (A)',
-  },
-  {
-    key: CircuitElementType.VOLTMETER,
-    label: '电压表 (V)',
-  },
-  {
-    key: CircuitElementType.OSCILLOSCOPE,
-    label: '示波器 (OSC)',
-  },
+    key: 'measurement',
+    label: '测量仪表',
+    icon: <DashboardOutlined />,
+    elements: [
+      { type: CircuitElementType.AMMETER, name: '电流表 (A)', shortcut: 'Am' },
+      { type: CircuitElementType.VOLTMETER, name: '电压表 (V)', shortcut: 'Vm' },
+      { type: CircuitElementType.OSCILLOSCOPE, name: '示波器 (OSC)', shortcut: 'Osc' }
+    ]
+  }
 ];
+
+const digitalElementCategories: ElementCategory[] = [
+  {
+    key: 'digital-io',
+    label: '数字I/O',
+    icon: <ApiOutlined />,
+    elements: [
+      { type: CircuitElementType.DIGITAL_INPUT, name: '数字输入', shortcut: 'IN' },
+      { type: CircuitElementType.DIGITAL_OUTPUT, name: '数字输出', shortcut: 'OUT' },
+      { type: CircuitElementType.DIGITAL_CLOCK, name: '时钟源', shortcut: 'CLK' }
+    ]
+  },
+  {
+    key: 'digital-logic',
+    label: '逻辑门',
+    icon: <GatewayOutlined />,
+    elements: [
+      { type: CircuitElementType.DIGITAL_AND, name: '与门 (AND)', shortcut: 'AND' },
+      { type: CircuitElementType.DIGITAL_OR, name: '或门 (OR)', shortcut: 'OR' },
+      { type: CircuitElementType.DIGITAL_NOT, name: '非门 (NOT)', shortcut: 'NOT' },
+      { type: CircuitElementType.DIGITAL_NAND, name: '与非门 (NAND)', shortcut: 'NAND' },
+      { type: CircuitElementType.DIGITAL_NOR, name: '或非门 (NOR)', shortcut: 'NOR' },
+      { type: CircuitElementType.DIGITAL_XOR, name: '异或门 (XOR)', shortcut: 'XOR' },
+      { type: CircuitElementType.DIGITAL_XNOR, name: '同或门 (XNOR)', shortcut: 'XNOR' }
+    ]
+  },
+  {
+    key: 'digital-seq',
+    label: '时序单元',
+    icon: <HddOutlined />,
+    elements: [
+      { type: CircuitElementType.DIGITAL_DFF, name: 'D 触发器', shortcut: 'DFF' }
+    ]
+  }
+];
+
+type MenuItemConfig = { key: CircuitElementType; label: string };
+
+const analogElementMenuItems: MenuItemConfig[] = [
+  { key: CircuitElementType.RESISTOR, label: '电阻器 (R)' },
+  { key: CircuitElementType.CAPACITOR, label: '电容器 (C)' },
+  { key: CircuitElementType.INDUCTOR, label: '电感器 (L)' },
+  { key: CircuitElementType.VOLTAGE_SOURCE, label: '电压源 (V)' },
+  { key: CircuitElementType.CURRENT_SOURCE, label: '电流源 (I)' },
+  { key: CircuitElementType.DIODE, label: '二极管 (D)' },
+  { key: CircuitElementType.TRANSISTOR_NPN, label: 'NPN 晶体管' },
+  { key: CircuitElementType.TRANSISTOR_PNP, label: 'PNP 晶体管' },
+  { key: CircuitElementType.GROUND, label: '接地 (GND)' },
+  { key: CircuitElementType.OPAMP, label: '运算放大器' },
+  { key: CircuitElementType.AMMETER, label: '电流表 (A)' },
+  { key: CircuitElementType.VOLTMETER, label: '电压表 (V)' },
+  { key: CircuitElementType.OSCILLOSCOPE, label: '示波器 (OSC)' }
+];
+
+const digitalElementMenuItems: MenuItemConfig[] = [
+  { key: CircuitElementType.DIGITAL_INPUT, label: '数字输入 (IN)' },
+  { key: CircuitElementType.DIGITAL_OUTPUT, label: '数字输出 (OUT)' },
+  { key: CircuitElementType.DIGITAL_CLOCK, label: '时钟源 (CLK)' },
+  { key: CircuitElementType.DIGITAL_AND, label: '与门 (AND)' },
+  { key: CircuitElementType.DIGITAL_OR, label: '或门 (OR)' },
+  { key: CircuitElementType.DIGITAL_NOT, label: '非门 (NOT)' },
+  { key: CircuitElementType.DIGITAL_NAND, label: '与非门 (NAND)' },
+  { key: CircuitElementType.DIGITAL_NOR, label: '或非门 (NOR)' },
+  { key: CircuitElementType.DIGITAL_XOR, label: '异或门 (XOR)' },
+  { key: CircuitElementType.DIGITAL_XNOR, label: '同或门 (XNOR)' },
+  { key: CircuitElementType.DIGITAL_DFF, label: 'D 触发器 (DFF)' }
+];
+
+const getElementCategories = (mode: CircuitWorkspaceMode): ElementCategory[] => {
+  if (mode === 'digital') return digitalElementCategories;
+  if (mode === 'hybrid') return [...digitalElementCategories, ...analogElementCategories];
+  return analogElementCategories;
+};
+
+const getElementMenuItems = (mode: CircuitWorkspaceMode): MenuItemConfig[] => {
+  if (mode === 'digital') return digitalElementMenuItems;
+  if (mode === 'hybrid') return [...digitalElementMenuItems, ...analogElementMenuItems];
+  return analogElementMenuItems;
+};
 
 // 默认端口配置
 const defaultPorts = {
@@ -186,6 +287,54 @@ const defaultPorts = {
     { id: 'channel1', name: '通道1', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 40, align: 'center' as const } },
     { id: 'channel2', name: '通道2', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 70, align: 'center' as const } },
     { id: 'ground', name: '参考地', type: 'bidirectional' as const, position: { side: 'bottom' as const, x: 50, y: 100, align: 'center' as const } }
+  ],
+  [CircuitElementType.DIGITAL_INPUT]: [
+    { id: 'out', name: '输出', type: 'output' as const, position: { side: 'right' as const, x: 100, y: 50, align: 'center' as const } }
+  ],
+  [CircuitElementType.DIGITAL_OUTPUT]: [
+    { id: 'in', name: '输入', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 50, align: 'center' as const } }
+  ],
+  [CircuitElementType.DIGITAL_CLOCK]: [
+    { id: 'out', name: 'CLK', type: 'output' as const, position: { side: 'right' as const, x: 100, y: 50, align: 'center' as const } }
+  ],
+  [CircuitElementType.DIGITAL_AND]: [
+    { id: 'in1', name: '输入A', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 35, align: 'center' as const } },
+    { id: 'in2', name: '输入B', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 65, align: 'center' as const } },
+    { id: 'out', name: '输出', type: 'output' as const, position: { side: 'right' as const, x: 100, y: 50, align: 'center' as const } }
+  ],
+  [CircuitElementType.DIGITAL_OR]: [
+    { id: 'in1', name: '输入A', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 35, align: 'center' as const } },
+    { id: 'in2', name: '输入B', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 65, align: 'center' as const } },
+    { id: 'out', name: '输出', type: 'output' as const, position: { side: 'right' as const, x: 100, y: 50, align: 'center' as const } }
+  ],
+  [CircuitElementType.DIGITAL_NOT]: [
+    { id: 'in', name: '输入', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 50, align: 'center' as const } },
+    { id: 'out', name: '输出', type: 'output' as const, position: { side: 'right' as const, x: 100, y: 50, align: 'center' as const } }
+  ],
+  [CircuitElementType.DIGITAL_NAND]: [
+    { id: 'in1', name: '输入A', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 35, align: 'center' as const } },
+    { id: 'in2', name: '输入B', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 65, align: 'center' as const } },
+    { id: 'out', name: '输出', type: 'output' as const, position: { side: 'right' as const, x: 100, y: 50, align: 'center' as const } }
+  ],
+  [CircuitElementType.DIGITAL_NOR]: [
+    { id: 'in1', name: '输入A', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 35, align: 'center' as const } },
+    { id: 'in2', name: '输入B', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 65, align: 'center' as const } },
+    { id: 'out', name: '输出', type: 'output' as const, position: { side: 'right' as const, x: 100, y: 50, align: 'center' as const } }
+  ],
+  [CircuitElementType.DIGITAL_XOR]: [
+    { id: 'in1', name: '输入A', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 35, align: 'center' as const } },
+    { id: 'in2', name: '输入B', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 65, align: 'center' as const } },
+    { id: 'out', name: '输出', type: 'output' as const, position: { side: 'right' as const, x: 100, y: 50, align: 'center' as const } }
+  ],
+  [CircuitElementType.DIGITAL_XNOR]: [
+    { id: 'in1', name: '输入A', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 35, align: 'center' as const } },
+    { id: 'in2', name: '输入B', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 65, align: 'center' as const } },
+    { id: 'out', name: '输出', type: 'output' as const, position: { side: 'right' as const, x: 100, y: 50, align: 'center' as const } }
+  ],
+  [CircuitElementType.DIGITAL_DFF]: [
+    { id: 'd', name: 'D', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 40, align: 'center' as const } },
+    { id: 'clk', name: 'CLK', type: 'input' as const, position: { side: 'bottom' as const, x: 50, y: 100, align: 'center' as const } },
+    { id: 'q', name: 'Q', type: 'output' as const, position: { side: 'right' as const, x: 100, y: 40, align: 'center' as const } }
   ],
 };
 
@@ -279,9 +428,11 @@ interface CircuitFlowProps {
   isReadOnly?: boolean; // 是否为只读模式，禁用编辑功能
   classId?: string | null; // 添加班级ID参数
   onModelChange?: (model: FlowModelType) => void; // 修改为使用 FlowModelType
+  workspaceMode?: CircuitWorkspaceMode;
 }
 
-export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3', initialCircuitDesign, isReadOnly = false, classId = null, onModelChange }: CircuitFlowProps) => {
+export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3', initialCircuitDesign, isReadOnly = false, classId = null, onModelChange, workspaceMode: workspaceModeProp = 'analog' }: CircuitFlowProps) => {
+  const workspaceMode = workspaceModeProp;
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -291,6 +442,8 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
   const [measurementModalVisible, setMeasurementModalVisible] = useState(false);
   const [activeMeasurementResult, setActiveMeasurementResult] = useState<SimulationMeasurementResult | null>(null);
   const [activeScopeChannel, setActiveScopeChannel] = useState<string | null>(null);
+  const [digitalSimResult, setDigitalSimResult] = useState<DigitalSimulationResult | null>(null);
+  const [digitalSimModalVisible, setDigitalSimModalVisible] = useState(false);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [currentModel, setCurrentModel] = useState<FlowModelType>(selectedModel as FlowModelType);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
@@ -338,6 +491,8 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
   const reactFlowInstance = useReactFlow();
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const { handleBlankQuery, handleAiTaskCountPlus } = useAppContext();
+  const paletteCategories = useMemo(() => getElementCategories(workspaceMode), [workspaceMode]);
+  const elementMenuItems = useMemo(() => getElementMenuItems(workspaceMode), [workspaceMode]);
   const lastSimSignatureRef = useRef<string | null>(null);
   
   const getLabelPrefix = useCallback((type: CircuitElementType) => {
@@ -687,6 +842,17 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
         [CircuitElementType.AMMETER]: '0A',
         [CircuitElementType.VOLTMETER]: '0V',
         [CircuitElementType.OSCILLOSCOPE]: 'CH1',
+        [CircuitElementType.DIGITAL_INPUT]: '1',
+        [CircuitElementType.DIGITAL_OUTPUT]: '',
+        [CircuitElementType.DIGITAL_CLOCK]: '10ns',
+        [CircuitElementType.DIGITAL_AND]: '',
+        [CircuitElementType.DIGITAL_OR]: '',
+        [CircuitElementType.DIGITAL_NOT]: '',
+        [CircuitElementType.DIGITAL_NAND]: '',
+        [CircuitElementType.DIGITAL_NOR]: '',
+        [CircuitElementType.DIGITAL_XOR]: '',
+        [CircuitElementType.DIGITAL_XNOR]: '',
+        [CircuitElementType.DIGITAL_DFF]: ''
       };
       
       const elementValue = defaultValues[type] || '';
@@ -745,7 +911,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
       // 添加元件后显示简短提示
       message.success(`已添加${elementMenuItems.find(item => item.key === type)?.label || type}`, 1);
     },
-    [reactFlowInstance, getNextElementLabel]
+    [reactFlowInstance, getNextElementLabel, elementMenuItems]
   );
   
   // 将Flow画布数据转换为CircuitDesign格式
@@ -1146,8 +1312,41 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
   
   // 运行模拟仿真
   const handleRunSimulation = useCallback(async () => {
-    if (isSimulating) return;
     const circuitDesign = convertToCircuitDesign();
+    if (workspaceMode === 'digital') {
+      if (isSimulating) return;
+      if (circuitDesign.elements.length === 0) {
+        message.error('请先在画布中放置至少一个数字元件');
+        return;
+      }
+      const hasOutput = circuitDesign.elements.some(
+        (el) => el.type === CircuitElementType.DIGITAL_OUTPUT
+      );
+      if (!hasOutput) {
+        message.warning('至少放置一个数字输出元件以观察波形');
+        return;
+      }
+      setIsSimulating(true);
+      message.loading({ content: '正在运行数字仿真...', key: 'circuit-sim', duration: 0 });
+      try {
+        const result = await runDigitalSimulation(circuitDesign);
+        setDigitalSimResult(result);
+        setDigitalSimModalVisible(true);
+        message.success({ content: '数字仿真完成，查看波形面板了解详情', key: 'circuit-sim' });
+        if (result.warnings.length) {
+          result.warnings.forEach((warn, idx) => {
+            message.warning({ content: warn, key: `digital-warn-${idx}` });
+          });
+        }
+      } catch (err: any) {
+        console.error('数字仿真失败', err);
+        message.error({ content: `数字仿真失败: ${err?.message || '未知错误'}`, key: 'circuit-sim' });
+      } finally {
+        setIsSimulating(false);
+      }
+      return;
+    }
+    if (isSimulating) return;
     if (circuitDesign.elements.length === 0) {
       message.error('电路中没有元件，无法进行模拟');
       return;
@@ -1219,7 +1418,20 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
     } finally {
       setIsSimulating(false);
     }
-  }, [convertToCircuitDesign, nodes, isSimulating]);
+  }, [convertToCircuitDesign, nodes, edges, isSimulating, workspaceMode, computeSimSignature]);
+
+  const handleDownloadDigitalVcd = useCallback(() => {
+    if (!digitalSimResult?.rawVcd) {
+      message.warning('暂无可下载的数字波形。');
+      return;
+    }
+    const blob = new Blob([digitalSimResult.rawVcd], { type: 'text/plain;charset=utf-8' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'digital-wave.vcd';
+    link.click();
+    URL.revokeObjectURL(link.href);
+  }, [digitalSimResult]);
 
   // 节点旋转功能
   const handleRotate = useCallback(() => {
@@ -1625,7 +1837,10 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
       {/* 左侧元件库面板 */}
       {!isReadOnly && showElementLibrary && (
         <div className="w-64 h-full overflow-auto border-r border-gray-200">
-          <ElementLibrary onSelectElement={addNewNode} />
+          <ElementLibrary 
+            onSelectElement={addNewNode} 
+            categories={paletteCategories}
+          />
         </div>
       )}
       
@@ -1835,6 +2050,68 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
         )}
       </Modal>
 
+      <Modal
+        title="数字仿真波形"
+        open={digitalSimModalVisible}
+        onCancel={() => setDigitalSimModalVisible(false)}
+        footer={(
+          <div className="flex w-full flex-wrap items-center justify-between gap-2">
+            <div className="text-xs text-gray-500">
+              {digitalSimResult?.warnings?.length ? digitalSimResult.warnings.join(' / ') : '仿真完成，可下载 VCD 查看完整波形'}
+            </div>
+            <div className="flex gap-2">
+              <Button onClick={handleDownloadDigitalVcd} disabled={!digitalSimResult?.rawVcd}>
+                下载 VCD
+              </Button>
+              <Button type="primary" onClick={() => setDigitalSimModalVisible(false)}>
+                关闭
+              </Button>
+            </div>
+          </div>
+        )}
+        width={760}
+      >
+        {digitalSimResult ? (
+          <div className="space-y-4">
+            {digitalSimResult.waveforms.length ? digitalSimResult.waveforms.map((trace) => (
+              <div key={trace.signal} className="rounded-md border border-slate-200 bg-white p-3 shadow-sm">
+                <div className="flex items-center justify-between text-sm font-medium text-slate-700">
+                  <div>
+                    {trace.label || trace.signal}
+                    {trace.role && (
+                      <span className="ml-2 rounded bg-slate-100 px-2 py-0.5 text-[11px] font-normal uppercase text-slate-500">
+                        {trace.role}
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-xs text-slate-400">{trace.samples.length} 点</span>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-600">
+                  {trace.samples.length ? trace.samples.slice(0, 32).map((sample) => (
+                    <code
+                      key={`${trace.signal}-${sample.time}`}
+                      className="rounded bg-slate-100 px-2 py-0.5 font-mono text-[11px]"
+                    >
+                      t={sample.time}ns → {sample.value}
+                    </code>
+                  )) : (
+                    <span className="text-slate-400">暂无波形数据</span>
+                  )}
+                </div>
+              </div>
+            )) : (
+              <div className="rounded border border-dashed border-slate-200 p-6 text-center text-sm text-slate-500">
+                未捕获任何波形信号，请检查是否添加了数字输入/输出。
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="rounded border border-dashed border-slate-200 p-6 text-center text-sm text-slate-500">
+            暂无仿真结果。
+          </div>
+        )}
+      </Modal>
+
       {isAnalyzing && (
         <div style={{ 
           position: 'absolute', 
@@ -1855,7 +2132,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
   );
 };
 
-export const CircuitFlowWithProvider = ({ onCircuitDesignChange, selectedModel, initialCircuitDesign, isReadOnly, classId, onModelChange }: CircuitFlowProps) => (
+export const CircuitFlowWithProvider = ({ onCircuitDesignChange, selectedModel, initialCircuitDesign, isReadOnly, classId, onModelChange, workspaceMode }: CircuitFlowProps) => (
   <ReactFlowProvider>
     <CircuitFlow 
       onCircuitDesignChange={onCircuitDesignChange}
@@ -1864,6 +2141,7 @@ export const CircuitFlowWithProvider = ({ onCircuitDesignChange, selectedModel, 
       isReadOnly={isReadOnly}
       classId={classId}
       onModelChange={onModelChange}
+      workspaceMode={workspaceMode}
     />
   </ReactFlowProvider>
 );

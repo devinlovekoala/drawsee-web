@@ -86,6 +86,54 @@ const defaultPorts: Record<string, Port[]> = {
     { id: 'input2', name: '输入2', type: 'input', position: { side: 'left', x: 0, y: 65 } },
     { id: 'output', name: '输出', type: 'output', position: { side: 'right', x: 110, y: 50 } }
   ],
+  [CircuitElementType.DIGITAL_INPUT]: [
+    { id: 'out', name: '输出', type: 'output', position: { side: 'right', x: 100, y: 50 } }
+  ],
+  [CircuitElementType.DIGITAL_OUTPUT]: [
+    { id: 'in', name: '输入', type: 'input', position: { side: 'left', x: 0, y: 50 } }
+  ],
+  [CircuitElementType.DIGITAL_CLOCK]: [
+    { id: 'out', name: 'CLK', type: 'output', position: { side: 'right', x: 100, y: 50 } }
+  ],
+  [CircuitElementType.DIGITAL_AND]: [
+    { id: 'in1', name: '输入A', type: 'input', position: { side: 'left', x: 0, y: 35 } },
+    { id: 'in2', name: '输入B', type: 'input', position: { side: 'left', x: 0, y: 65 } },
+    { id: 'out', name: '输出', type: 'output', position: { side: 'right', x: 100, y: 50 } }
+  ],
+  [CircuitElementType.DIGITAL_OR]: [
+    { id: 'in1', name: '输入A', type: 'input', position: { side: 'left', x: 0, y: 35 } },
+    { id: 'in2', name: '输入B', type: 'input', position: { side: 'left', x: 0, y: 65 } },
+    { id: 'out', name: '输出', type: 'output', position: { side: 'right', x: 100, y: 50 } }
+  ],
+  [CircuitElementType.DIGITAL_NOT]: [
+    { id: 'in', name: '输入', type: 'input', position: { side: 'left', x: 0, y: 50 } },
+    { id: 'out', name: '输出', type: 'output', position: { side: 'right', x: 105, y: 50 } }
+  ],
+  [CircuitElementType.DIGITAL_NAND]: [
+    { id: 'in1', name: '输入A', type: 'input', position: { side: 'left', x: 0, y: 35 } },
+    { id: 'in2', name: '输入B', type: 'input', position: { side: 'left', x: 0, y: 65 } },
+    { id: 'out', name: '输出', type: 'output', position: { side: 'right', x: 110, y: 50 } }
+  ],
+  [CircuitElementType.DIGITAL_NOR]: [
+    { id: 'in1', name: '输入A', type: 'input', position: { side: 'left', x: 0, y: 35 } },
+    { id: 'in2', name: '输入B', type: 'input', position: { side: 'left', x: 0, y: 65 } },
+    { id: 'out', name: '输出', type: 'output', position: { side: 'right', x: 110, y: 50 } }
+  ],
+  [CircuitElementType.DIGITAL_XOR]: [
+    { id: 'in1', name: '输入A', type: 'input', position: { side: 'left', x: 0, y: 35 } },
+    { id: 'in2', name: '输入B', type: 'input', position: { side: 'left', x: 0, y: 65 } },
+    { id: 'out', name: '输出', type: 'output', position: { side: 'right', x: 100, y: 50 } }
+  ],
+  [CircuitElementType.DIGITAL_XNOR]: [
+    { id: 'in1', name: '输入A', type: 'input', position: { side: 'left', x: 0, y: 35 } },
+    { id: 'in2', name: '输入B', type: 'input', position: { side: 'left', x: 0, y: 65 } },
+    { id: 'out', name: '输出', type: 'output', position: { side: 'right', x: 110, y: 50 } }
+  ],
+  [CircuitElementType.DIGITAL_DFF]: [
+    { id: 'd', name: 'D', type: 'input', position: { side: 'left', x: 0, y: 40 } },
+    { id: 'clk', name: 'CLK', type: 'input', position: { side: 'bottom', x: 50, y: 100 } },
+    { id: 'q', name: 'Q', type: 'output', position: { side: 'right', x: 100, y: 40 } }
+  ],
 };
 
 // 为每种元件类型定义默认端口配置函数
@@ -224,6 +272,95 @@ const SVGComponents: Record<CircuitElementType, React.FC<React.SVGProps<SVGSVGEl
       <circle cx="56" cy="33" r="2" fill="currentColor" />
       <path d="M15,42 L25,42" stroke="currentColor" strokeWidth="2" />
       <path d="M45,42 L55,42" stroke="currentColor" strokeWidth="2" />
+    </svg>
+  ),
+  [CircuitElementType.DIGITAL_INPUT]: (props: React.SVGProps<SVGSVGElement>) => (
+    <svg {...props} viewBox="0 0 60 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="6" y="10" width="32" height="20" rx="4" stroke="currentColor" strokeWidth="2" fill="#EEF2FF" />
+      <path d="M38,20 L55,20" stroke="currentColor" strokeWidth="2" />
+      <path d="M50,15 L55,20 L50,25" stroke="currentColor" strokeWidth="2" fill="none" />
+      <text x="12" y="23" fontSize="10" fill="currentColor">IN</text>
+    </svg>
+  ),
+  [CircuitElementType.DIGITAL_OUTPUT]: (props: React.SVGProps<SVGSVGElement>) => (
+    <svg {...props} viewBox="0 0 60 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="22" y="10" width="32" height="20" rx="4" stroke="currentColor" strokeWidth="2" fill="#FEF3C7" />
+      <path d="M5,20 L22,20" stroke="currentColor" strokeWidth="2" />
+      <path d="M10,15 L5,20 L10,25" stroke="currentColor" strokeWidth="2" fill="none" />
+      <text x="30" y="23" fontSize="10" fill="currentColor">OUT</text>
+    </svg>
+  ),
+  [CircuitElementType.DIGITAL_CLOCK]: (props: React.SVGProps<SVGSVGElement>) => (
+    <svg {...props} viewBox="0 0 60 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="10" y="8" width="40" height="24" rx="6" stroke="currentColor" strokeWidth="2" fill="#E0F2FE" />
+      <circle cx="30" cy="20" r="8" stroke="currentColor" strokeWidth="2" fill="none" />
+      <path d="M30,20 L30,13" stroke="currentColor" strokeWidth="2" />
+      <path d="M30,20 L36,23" stroke="currentColor" strokeWidth="2" />
+      <text x="14" y="23" fontSize="8" fill="currentColor">CLK</text>
+    </svg>
+  ),
+  [CircuitElementType.DIGITAL_AND]: (props: React.SVGProps<SVGSVGElement>) => (
+    <svg {...props} viewBox="0 0 60 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M5,15 L20,15 M5,25 L20,25" stroke="currentColor" strokeWidth="2" />
+      <path d="M20,8 H35 C45,8 50,13 50,20 C50,27 45,32 35,32 H20 Z" stroke="currentColor" strokeWidth="2" fill="#ECFDF5" />
+      <path d="M50,20 L55,20" stroke="currentColor" strokeWidth="2" />
+    </svg>
+  ),
+  [CircuitElementType.DIGITAL_OR]: (props: React.SVGProps<SVGSVGElement>) => (
+    <svg {...props} viewBox="0 0 60 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M5,15 L20,15 M5,25 L20,25" stroke="currentColor" strokeWidth="2" />
+      <path d="M18,8 C24,14 24,26 18,32 H38 C48,32 54,26 54,20 C54,14 48,8 38,8 H18 Z" stroke="currentColor" strokeWidth="2" fill="#F0F9FF" />
+      <path d="M54,20 L59,20" stroke="currentColor" strokeWidth="2" />
+    </svg>
+  ),
+  [CircuitElementType.DIGITAL_NOT]: (props: React.SVGProps<SVGSVGElement>) => (
+    <svg {...props} viewBox="0 0 60 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M5,20 L20,20" stroke="currentColor" strokeWidth="2" />
+      <path d="M20,10 L20,30 L40,20 Z" stroke="currentColor" strokeWidth="2" fill="#FEF3C7" />
+      <circle cx="43" cy="20" r="3" stroke="currentColor" strokeWidth="2" fill="#fff" />
+      <path d="M46,20 L55,20" stroke="currentColor" strokeWidth="2" />
+    </svg>
+  ),
+  [CircuitElementType.DIGITAL_NAND]: (props: React.SVGProps<SVGSVGElement>) => (
+    <svg {...props} viewBox="0 0 60 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M5,15 L20,15 M5,25 L20,25" stroke="currentColor" strokeWidth="2" />
+      <path d="M20,8 H35 C45,8 50,13 50,20 C50,27 45,32 35,32 H20 Z" stroke="currentColor" strokeWidth="2" fill="#F5F3FF" />
+      <circle cx="53" cy="20" r="3" stroke="currentColor" strokeWidth="2" fill="#fff" />
+      <path d="M56,20 L60,20" stroke="currentColor" strokeWidth="2" />
+    </svg>
+  ),
+  [CircuitElementType.DIGITAL_NOR]: (props: React.SVGProps<SVGSVGElement>) => (
+    <svg {...props} viewBox="0 0 60 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M5,15 L22,15 M5,25 L22,25" stroke="currentColor" strokeWidth="2" />
+      <path d="M20,8 C25,14 25,26 20,32 H36 C46,32 52,26 52,20 C52,14 46,8 36,8 H20 Z" stroke="currentColor" strokeWidth="2" fill="#F5F3FF" />
+      <circle cx="55" cy="20" r="3" stroke="currentColor" strokeWidth="2" fill="#fff" />
+      <path d="M58,20 L60,20" stroke="currentColor" strokeWidth="2" />
+    </svg>
+  ),
+  [CircuitElementType.DIGITAL_XOR]: (props: React.SVGProps<SVGSVGElement>) => (
+    <svg {...props} viewBox="0 0 60 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M10,8 C15,14 15,26 10,32" stroke="currentColor" strokeWidth="2" fill="none" />
+      <path d="M15,8 C20,14 20,26 15,32 H34 C44,32 50,26 50,20 C50,14 44,8 34,8 H15 Z" stroke="currentColor" strokeWidth="2" fill="#ECFEFF" />
+      <path d="M5,15 L18,15 M5,25 L18,25" stroke="currentColor" strokeWidth="2" />
+      <path d="M50,20 L58,20" stroke="currentColor" strokeWidth="2" />
+    </svg>
+  ),
+  [CircuitElementType.DIGITAL_XNOR]: (props: React.SVGProps<SVGSVGElement>) => (
+    <svg {...props} viewBox="0 0 60 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M8,8 C13,14 13,26 8,32" stroke="currentColor" strokeWidth="2" fill="none" />
+      <path d="M13,8 C18,14 18,26 13,32 H32 C42,32 48,26 48,20 C48,14 42,8 32,8 H13 Z" stroke="currentColor" strokeWidth="2" fill="#EEF2FF" />
+      <circle cx="51" cy="20" r="3" stroke="currentColor" strokeWidth="2" fill="#fff" />
+      <path d="M54,20 L58,20" stroke="currentColor" strokeWidth="2" />
+      <path d="M3,15 L15,15 M3,25 L15,25" stroke="currentColor" strokeWidth="2" />
+    </svg>
+  ),
+  [CircuitElementType.DIGITAL_DFF]: (props: React.SVGProps<SVGSVGElement>) => (
+    <svg {...props} viewBox="0 0 60 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="12" y="8" width="36" height="24" rx="4" stroke="currentColor" strokeWidth="2" fill="#F0FDFA" />
+      <text x="27" y="24" fontSize="12" fill="currentColor">D</text>
+      <path d="M5,20 L12,20" stroke="currentColor" strokeWidth="2" />
+      <path d="M48,20 L55,20" stroke="currentColor" strokeWidth="2" />
+      <path d="M30,32 L30,38 M26,35 L34,35" stroke="currentColor" strokeWidth="2" />
     </svg>
   )
 };

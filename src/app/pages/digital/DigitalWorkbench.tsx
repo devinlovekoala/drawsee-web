@@ -1,14 +1,10 @@
 import { Button } from 'antd';
 import { ArrowLeft, Cpu } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import SimulationControlPanel from './components/SimulationControlPanel';
-import DigitalCanvas from './components/DigitalCanvas';
-import WaveformPreview from './components/WaveformPreview';
-import { useDigitalLabStore } from './store/useDigitalLabStore';
+import { CircuitFlowWithProvider } from '../circuit/components/CircuitFlow';
 
 const DigitalWorkbench = () => {
   const navigate = useNavigate();
-  const { design, simulation } = useDigitalLabStore();
 
   return (
     <div className="flex h-full flex-col bg-slate-50">
@@ -23,31 +19,19 @@ const DigitalWorkbench = () => {
               数字电路工作台
             </div>
             <p className="text-xs text-slate-500">
-              使用 DigitalJS 搭建逻辑电路，调用 Icarus Verilog 后端进行波形仿真
+              使用 React Flow 画布搭建数字逻辑，后续可接入 Icarus Verilog 进行仿真
             </p>
           </div>
         </div>
         <div className="text-right text-xs text-slate-500">
-          <div>当前设计：{design.name}</div>
-          <div>顶层模块：{design.topModule || 'digital_top'}</div>
+          <div>编辑模式：数字逻辑</div>
+          <div>提示：当前版本支持搭建和管理电路结构</div>
         </div>
       </header>
 
       <main className="flex flex-1 overflow-hidden">
-        <section className="flex flex-1 flex-col overflow-y-auto p-4">
-          <DigitalCanvas project={design.artifacts?.digitalJsProject} />
-        </section>
-        <aside className="w-96 border-l border-slate-200 bg-white p-4">
-          <SimulationControlPanel />
-        </aside>
+        <CircuitFlowWithProvider workspaceMode="digital" />
       </main>
-
-      <section className="h-64 border-t border-slate-200 bg-white p-4">
-        <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-          波形预览
-        </h3>
-        <WaveformPreview waveforms={simulation.result?.waveforms} status={simulation.status} />
-      </section>
     </div>
   );
 };

@@ -4,7 +4,7 @@ import { CircuitDesign } from '@/api/types/circuit.types';
 import { CircuitFlowWithProvider } from './components/CircuitFlow';
 import { ModelType } from '../flow/components/input/FlowInputPanel';
 import { Button, Tooltip } from 'antd';
-import { BrainCircuit, InfoIcon, Save } from 'lucide-react';
+import { BrainCircuit, InfoIcon, Save, Cpu } from 'lucide-react';
 
 // 电路分析页面 - 提供电路设计可视化界面
 function Circuit() {
@@ -52,6 +52,14 @@ function Circuit() {
                 帮助
               </Button>
             </Tooltip>
+            
+            <Button
+              type="default"
+              icon={<Cpu size={16} />}
+              onClick={() => navigate('/digital')}
+            >
+              数字电路工作台
+            </Button>
             
             <Button 
               type="primary"
