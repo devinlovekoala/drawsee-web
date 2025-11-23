@@ -15,7 +15,7 @@ import ReactFlow, {
   useReactFlow,
   ReactFlowProvider,
 } from 'reactflow';
-import { Button, Dropdown, message, Space, Modal, Spin } from 'antd';
+import { Button, message, Modal, Spin } from 'antd';
 import 'reactflow/dist/style.css';
 import { CircuitNode } from './CircuitNode';
 import ConnectionEdge, { ConnectionPreview } from './ConnectionEdge';
@@ -33,7 +33,6 @@ import { CircuitNodeData, ModelType } from '../types';
 import { useAppContext } from '@/app/contexts/AppContext';
 import { CreateAiTaskDTO } from '@/api/types/flow.types';
 import { useHotkeys } from 'react-hotkeys-hook';
-import { ModelSelector } from '@/app/pages/blank/components/ModelSelector';
 import { ModelType as FlowModelType } from '@/app/pages/flow/components/input/FlowInputPanel';
 import ElementLibrary, { ElementCategory } from './ElementLibrary';
 import CircuitToolbar from './CircuitToolbar';
@@ -491,7 +490,9 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
   const autoSaveInfoShownRef = useRef(false);
   const [isImportingFromImage, setIsImportingFromImage] = useState(false);
   const [isImportModalVisible, setIsImportModalVisible] = useState(false);
-  
+  const [hasUploadedImage, setHasUploadedImage] = useState(false);
+  const imageUploaderRef = useRef<{ triggerRecognition: () => void; hasImage: () => boolean }>(null);
+
   const reactFlowInstance = useReactFlow();
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const { handleBlankQuery, handleAiTaskCountPlus } = useAppContext();
@@ -2044,25 +2045,51 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
         title="AI 图片识别导入"
         open={isImportModalVisible}
         onCancel={handleImportModalClose}
-        footer={null}
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button
+              onClick={handleImportModalClose}
+              disabled={isImportingFromImage}
+            >
+              取消
+            </Button>
+            <Button
+              type="primary"
+              onClick={() => {
+                if (imageUploaderRef.current) {
+                  imageUploaderRef.current.triggerRecognition();
+                }
+              }}
+              disabled={!hasUploadedImage || isImportingFromImage}
+              loading={isImportingFromImage}
+            >
+              开始转换
+            </Button>
+          </div>
+        }
         destroyOnClose
         width={520}
+        closable={!isImportingFromImage}
+        maskClosable={!isImportingFromImage}
       >
         <div className="space-y-3 text-sm text-gray-600">
           <p>上传线下电路图或手绘草图，系统会尝试解析并转换为可编辑的画布设计。</p>
           <ul className="list-disc list-inside text-xs text-gray-500">
             <li>支持 PNG/JPG 图片，建议保持线条清晰。</li>
             <li>识别成功会直接更新当前画布，请在导入前保存重要设计。</li>
+            <li>上传图片后，点击下方"开始转换"按钮开始识别。</li>
           </ul>
         </div>
         <ImageUploader
+          ref={imageUploaderRef}
           className="mt-4"
           customRecognizeFn={recognizeCircuitImage}
           onExtraData={handleCircuitDesignFromImage}
           enableMathDetection={false}
           resultTitle="识别摘要"
           onLoadingChange={setIsImportingFromImage}
-          showStartButton={true}
+          onFileChange={setHasUploadedImage}
+          showStartButton={false}
         />
       </Modal>
       

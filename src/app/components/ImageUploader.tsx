@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useImperativeHandle, forwardRef } from 'react';
 import { recognizeTextFromImage } from '@/api/methods/tool.methods';
 import { ImageIcon, LoaderIcon, XIcon, FunctionSquareIcon } from 'lucide-react';
 import LaTeXRenderer from '@/app/components/ui/latex-renderer';
@@ -13,12 +13,21 @@ interface ImageUploaderProps {
   showResultPreview?: boolean;
   onLoadingChange?: (loading: boolean) => void;
   /**
-   * 如果为 true，上传图片后不会自动识别，组件会显示“开始转换”按钮，用户点击后才触发识别。
+   * 如果为 true，上传图片后不会自动识别，组件会显示"开始转换"按钮，用户点击后才触发识别。
    */
   showStartButton?: boolean;
+  /**
+   * 当上传文件状态改变时的回调
+   */
+  onFileChange?: (hasFile: boolean) => void;
 }
 
-const ImageUploader: React.FC<ImageUploaderProps> = ({ 
+export interface ImageUploaderRef {
+  triggerRecognition: () => void;
+  hasImage: () => boolean;
+}
+
+const ImageUploader = forwardRef<ImageUploaderRef, ImageUploaderProps>(({
   onTextRecognized = () => {},
   className = '',
   customRecognizeFn,
@@ -26,9 +35,10 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
   enableMathDetection = true,
   resultTitle = '识别结果',
   showResultPreview = true,
-  onLoadingChange
-  , showStartButton = false
-}) => {
+  onLoadingChange,
+  showStartButton = false,
+  onFileChange
+}, ref) => {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -36,6 +46,18 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
   const [hasMathFormula, setHasMathFormula] = useState(false);
   const [lastFile, setLastFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // 暴露给父组件的方法
+  useImperativeHandle(ref, () => ({
+    triggerRecognition: () => {
+      if (lastFile) {
+        recognizeImage(lastFile);
+      }
+    },
+    hasImage: () => {
+      return !!lastFile;
+    }
+  }));
 
   // 检查文本是否包含数学公式
   const checkForMathFormulas = (text: string): boolean => {
@@ -72,16 +94,22 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
     setError(null);
     setRecognizedText(null);
     setHasMathFormula(false);
-    
+
     // 创建预览
     const reader = new FileReader();
     reader.onload = () => {
       setImagePreview(reader.result as string);
     };
     reader.readAsDataURL(file);
-    
+
     // 记录最后一次文件
     setLastFile(file);
+
+    // 通知父组件文件已上传
+    if (onFileChange) {
+      onFileChange(true);
+    }
+
     // 如果不要求手动触发，则立即识别
     if (!showStartButton) {
       recognizeImage(file);
@@ -92,30 +120,36 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
   const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     event.stopPropagation();
-    
+
     const file = event.dataTransfer.files[0];
     if (!file) return;
-    
+
     // 验证文件是否为图片
     if (!file.type.match('image.*')) {
       setError('请上传图片文件');
       return;
     }
-    
+
     // 重置状态
     setError(null);
     setRecognizedText(null);
     setHasMathFormula(false);
-    
+
     // 创建预览
     const reader = new FileReader();
     reader.onload = () => {
       setImagePreview(reader.result as string);
     };
     reader.readAsDataURL(file);
-    
+
     // 记录最后一次文件
     setLastFile(file);
+
+    // 通知父组件文件已上传
+    if (onFileChange) {
+      onFileChange(true);
+    }
+
     // 如果不要求手动触发，则立即识别
     if (!showStartButton) {
       recognizeImage(file);
@@ -133,8 +167,13 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
     setImagePreview(null);
     setRecognizedText(null);
     setHasMathFormula(false);
+    setLastFile(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
+    }
+    // 通知父组件文件已清除
+    if (onFileChange) {
+      onFileChange(false);
     }
   };
 
@@ -158,7 +197,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
       }
 
       onTextRecognized(resultText);
-      if (recognitionResult?.extraData && onExtraData) {
+      if ('extraData' in recognitionResult && recognitionResult.extraData && onExtraData) {
         onExtraData(recognitionResult.extraData);
       }
     } catch (err) {
@@ -293,6 +332,8 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
       </div>
     </div>
   );
-};
+});
+
+ImageUploader.displayName = 'ImageUploader';
 
 export default ImageUploader; 
