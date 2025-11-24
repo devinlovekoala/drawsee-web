@@ -339,6 +339,136 @@ const defaultPorts = {
   ],
 };
 
+const DIGITAL_ELEMENT_TYPES = new Set<CircuitElementType>([
+  CircuitElementType.DIGITAL_INPUT,
+  CircuitElementType.DIGITAL_OUTPUT,
+  CircuitElementType.DIGITAL_CLOCK,
+  CircuitElementType.DIGITAL_AND,
+  CircuitElementType.DIGITAL_OR,
+  CircuitElementType.DIGITAL_NOT,
+  CircuitElementType.DIGITAL_NAND,
+  CircuitElementType.DIGITAL_NOR,
+  CircuitElementType.DIGITAL_XOR,
+  CircuitElementType.DIGITAL_XNOR,
+  CircuitElementType.DIGITAL_DFF,
+]);
+
+const labelTypeHints: Array<{ keywords: RegExp; type: CircuitElementType }> = [
+  { keywords: /NAND/i, type: CircuitElementType.DIGITAL_NAND },
+  { keywords: /NOR/i, type: CircuitElementType.DIGITAL_NOR },
+  { keywords: /XNOR/i, type: CircuitElementType.DIGITAL_XNOR },
+  { keywords: /XOR/i, type: CircuitElementType.DIGITAL_XOR },
+  { keywords: /AND/i, type: CircuitElementType.DIGITAL_AND },
+  { keywords: /OR/i, type: CircuitElementType.DIGITAL_OR },
+  { keywords: /NOT|INV|INVERTER/i, type: CircuitElementType.DIGITAL_NOT },
+  { keywords: /^Q$/i, type: CircuitElementType.DIGITAL_DFF },
+];
+
+const normalizeElementType = (type: CircuitElementType, label?: string): CircuitElementType => {
+  if (!label) return type;
+  const hint = labelTypeHints.find(entry => entry.keywords.test(label));
+  return hint ? hint.type : type;
+};
+
+const clonePorts = (ports: Port[]) => ports.map(port => ({
+  ...port,
+  position: {
+    ...port.position,
+    align: port.position?.align || 'center'
+  }
+}));
+
+const normalizeElementPorts = (element: CircuitElement): Port[] => {
+  const defaults = defaultPorts[element.type as keyof typeof defaultPorts];
+  const existing = element.ports ? clonePorts(element.ports) : [];
+  if (!defaults) {
+    return existing;
+  }
+
+  if (existing.length === 0) {
+    return clonePorts(defaults);
+  }
+
+  const positionMissing = existing.some(port => !port.position || typeof port.position.x !== 'number' || typeof port.position.y !== 'number');
+  const overlapping = (() => {
+    const seen = new Set<string>();
+    return existing.some(port => {
+      const key = `${port.position?.side}-${Math.round(port.position?.y ?? 0)}`;
+      if (seen.has(key)) {
+        return true;
+      }
+      seen.add(key);
+      return false;
+    });
+  })();
+
+  if (positionMissing || overlapping || existing.length !== defaults.length) {
+    return clonePorts(defaults);
+  }
+
+  return existing;
+};
+
+const clusterCenters = (values: number[], threshold: number) => {
+  if (!values.length) return [0];
+  const sorted = [...values].sort((a, b) => a - b);
+  const centers: number[] = [];
+  let clusterSum = sorted[0];
+  let clusterCount = 1;
+  let lastValue = sorted[0];
+  for (let i = 1; i < sorted.length; i++) {
+    const value = sorted[i];
+    if (Math.abs(value - lastValue) > threshold) {
+      centers.push(clusterSum / clusterCount);
+      clusterSum = value;
+      clusterCount = 1;
+    } else {
+      clusterSum += value;
+      clusterCount += 1;
+    }
+    lastValue = value;
+  }
+  centers.push(clusterSum / clusterCount);
+  return centers;
+};
+
+const mapToGridPosition = (value: number, centers: number[], spacing: number, padding: number) => {
+  if (!centers.length) return padding;
+  let bestIndex = 0;
+  let bestDelta = Infinity;
+  centers.forEach((center, idx) => {
+    const delta = Math.abs(value - center);
+    if (delta < bestDelta) {
+      bestDelta = delta;
+      bestIndex = idx;
+    }
+  });
+  return padding + bestIndex * spacing;
+};
+
+const enhanceDigitalLayout = (elements: CircuitElement[]) => {
+  if (!elements.length) return elements;
+  const xValues = elements.map(el => el.position?.x ?? 0);
+  const yValues = elements.map(el => el.position?.y ?? 0);
+  const xCenters = clusterCenters(xValues, 140);
+  const yCenters = clusterCenters(yValues, 90);
+  const columnSpacing = 200;
+  const rowSpacing = 130;
+  const paddingX = 60;
+  const paddingY = 60;
+
+  return elements.map(element => {
+    const currentPos = element.position || { x: 0, y: 0 };
+    return {
+      ...element,
+      position: {
+        x: mapToGridPosition(currentPos.x, xCenters, columnSpacing, paddingX),
+        y: mapToGridPosition(currentPos.y, yCenters, rowSpacing, paddingY)
+      }
+    };
+  });
+};
+
 const measurementElementTypes = new Set<CircuitElementType>([
   CircuitElementType.AMMETER,
   CircuitElementType.VOLTMETER,
@@ -526,15 +656,34 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
     }
   }, [getLabelPrefix]);
 
-  const loadCircuitDesign = useCallback((design: CircuitDesign, options: { fitView?: boolean; notifyChange?: boolean } = {}) => {
+  const loadCircuitDesign = useCallback((design: CircuitDesign, options: { fitView?: boolean; notifyChange?: boolean; enhanceLayout?: boolean } = {}) => {
     if (!design) {
       return;
     }
 
-    const safeElements = design.elements || [];
+    const applyEnhancedLayout = options.enhanceLayout ?? false;
+    const safeElements = (design.elements || []).map((element) => ({
+      ...element,
+      position: {
+        x: element.position?.x ?? 0,
+        y: element.position?.y ?? 0
+      }
+    }));
+    const processedElements = applyEnhancedLayout ? enhanceDigitalLayout(safeElements) : safeElements;
+    const normalizedElements = processedElements.map((element) => {
+      const propertyLabel = typeof element.properties?.['label'] === 'string'
+        ? element.properties['label'] as string
+        : undefined;
+      const resolvedLabel = element.label || propertyLabel || element.id;
+      return {
+        ...element,
+        type: normalizeElementType(element.type as CircuitElementType, resolvedLabel),
+      };
+    });
     const safeConnections = design.connections || [];
+    const elementTypeMap = new Map(normalizedElements.map((element) => [element.id, element.type]));
 
-    const newNodes: Node[] = safeElements.map((element) => {
+    const newNodes: Node[] = normalizedElements.map((element) => {
       const propertyLabel = typeof element.properties?.['label'] === 'string'
         ? element.properties['label'] as string
         : undefined;
@@ -544,6 +693,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
 
       const resolvedLabel = element.label || propertyLabel || element.id;
       const resolvedValue = element.value || propertyValue || '';
+      const normalizedPorts = normalizeElementPorts(element);
 
       return {
         id: element.id,
@@ -556,7 +706,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
           value: resolvedValue,
           element,
           description: '',
-          ports: element.ports || []
+          ports: normalizedPorts
         }
       };
     });
@@ -572,7 +722,11 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
         type: 'default',
         animated: false,
         style: { stroke: '#3B82F6', strokeWidth: 2 },
-        data: {}
+        data: {
+          lineType: applyEnhancedLayout ? 'manhattan' : 'step',
+          sourceType: elementTypeMap.get(connection.source.elementId),
+          targetType: elementTypeMap.get(connection.target.elementId)
+        }
       };
     });
 
@@ -588,8 +742,8 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
     setCanUndo(false);
     setCanRedo(false);
 
-    if (safeElements.length > 0) {
-      safeElements.forEach((element) => {
+    if (normalizedElements.length > 0) {
+      normalizedElements.forEach((element) => {
         registerExistingElementLabel(
           element.type as CircuitElementType,
           element.label || (typeof element.properties?.['label'] === 'string' ? element.properties['label'] as string : undefined)
@@ -620,7 +774,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
 
   const handleCircuitDesignFromImage = useCallback((data: unknown) => {
     const design = data as CircuitDesign;
-    loadCircuitDesign(design, { fitView: true, notifyChange: true });
+    loadCircuitDesign(design, { fitView: true, notifyChange: true, enhanceLayout: true });
     setIsImportModalVisible(false);
     message.success('识别完成，电路已载入画布');
   }, [loadCircuitDesign]);
