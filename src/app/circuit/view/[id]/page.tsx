@@ -75,11 +75,12 @@ export default function CircuitViewPage() {
         title={circuitDesign.metadata.title || '电路设计'} 
         className="flex-grow flex flex-col overflow-hidden" 
         bodyStyle={{ 
-          height: 'calc(100vh - 170px)', 
           padding: '12px',
           display: 'flex',
           flexDirection: 'column',
-          overflow: 'hidden'
+          overflow: 'hidden',
+          flex: 1,
+          minHeight: 0
         }}
         style={{ 
           zIndex: 10,
@@ -101,7 +102,7 @@ export default function CircuitViewPage() {
           </div>
         }
       >
-        <div className="flex-grow h-full">
+        <div className="flex-1 min-h-0">
           <CircuitFlowWithProvider 
             initialCircuitDesign={circuitDesign}
             isReadOnly={true}

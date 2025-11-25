@@ -24,11 +24,12 @@ export default function CircuitCreatePage() {
         title="新建电路设计"
         className="h-full"
         bodyStyle={{ 
-          height: 'calc(100vh - 170px)', 
           padding: '12px',
           display: 'flex',
           flexDirection: 'column',
-          overflow: 'hidden' // 确保内容不会溢出
+          overflow: 'hidden', // 确保内容不会溢出
+          flex: 1,
+          minHeight: 0
         }}
         style={{ 
           zIndex: 10, // 确保Card不会遮挡其他UI元素
@@ -44,7 +45,7 @@ export default function CircuitCreatePage() {
           </div>
         }
       >
-        <div className="h-full flex-grow">
+        <div className="flex-1 min-h-0">
           <CircuitFlowWithProvider 
             isReadOnly={false}
             onCircuitDesignChange={handleCircuitDesignChange}
