@@ -1255,7 +1255,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
   const hasUnsavedChangesRef = useRef(false);
   const currentDesignRef = useRef<CircuitDesign>(initialCircuitDesign ?? getEmptyDesignSnapshot());
   const lastSavedDesignHashRef = useRef<string>(serializeCircuitDesignSnapshot(currentDesignRef.current));
-  const suppressUnsavedTrackingRef = useRef(true);
+  const suppressUnsavedTrackingRef = useRef<boolean>(!!initialCircuitDesign);
   const updateUnsavedState = useCallback((dirty: boolean) => {
     if (hasUnsavedChangesRef.current !== dirty) {
       hasUnsavedChangesRef.current = dirty;
