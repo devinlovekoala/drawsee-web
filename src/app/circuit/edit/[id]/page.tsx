@@ -183,13 +183,15 @@ export default function CircuitEditPage() {
       <Card 
         title={`编辑: ${circuitDesign.metadata.title || '电路设计'}`} 
         className="flex-grow flex flex-col overflow-hidden"
-        bodyStyle={{ 
-          padding: '12px',
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden',
-          flex: 1,
-          minHeight: 0
+        styles={{
+          body: {
+            padding: '12px',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            flex: 1,
+            minHeight: 0
+          }
         }}
         style={{ 
           zIndex: 10,

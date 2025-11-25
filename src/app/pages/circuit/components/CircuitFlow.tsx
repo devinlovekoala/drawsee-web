@@ -31,7 +31,7 @@ import {
 import { createAiTask } from '@/api/methods/flow.methods';
 import { updateCircuitDesign } from '@/api/methods/circuit.methods';
 import { recognizeCircuitDesignFromImage } from '@/api/methods/tool.methods';
-import { CircuitNodeData, ModelType } from '../types';
+import { CircuitNodeData } from '../types';
 import { useAppContext } from '@/app/contexts/AppContext';
 import { CreateAiTaskDTO } from '@/api/types/flow.types';
 import { useHotkeys } from 'react-hotkeys-hook';
@@ -103,6 +103,15 @@ const elementNamePrefixes: Record<CircuitElementType, string> = {
   [CircuitElementType.DIGITAL_XNOR]: 'XNOR',
   [CircuitElementType.DIGITAL_DFF]: 'DFF'
 };
+
+const serializeCircuitDesignSnapshot = (design?: CircuitDesign | null): string => JSON.stringify({
+  elements: design?.elements ?? [],
+  connections: design?.connections ?? [],
+  metadata: {
+    title: design?.metadata?.title ?? '',
+    description: design?.metadata?.description ?? ''
+  }
+});
 
 type CircuitWorkspaceMode = 'analog' | 'digital' | 'hybrid';
 
@@ -600,6 +609,337 @@ const autoCompleteAnalogConnections = (
   return workingConnections;
 };
 
+const removeInvalidPowerGroundShorts = (
+  elements: CircuitElement[],
+  connections: CircuitConnection[]
+) => {
+  if (!connections.length) return connections;
+  const elementMap = new Map(elements.map((element) => [element.id, element]));
+  return connections.filter((connection) => {
+    const sourceElement = elementMap.get(connection.source.elementId);
+    const targetElement = elementMap.get(connection.target.elementId);
+    if (!sourceElement || !targetElement) {
+      return true;
+    }
+    const sourceType = sourceElement.type as CircuitElementType;
+    const targetType = targetElement.type as CircuitElementType;
+    const sourceIsPositive = powerSourceElementTypes.has(sourceType) && connection.source.portId === 'positive';
+    const targetIsPositive = powerSourceElementTypes.has(targetType) && connection.target.portId === 'positive';
+    const sourceIsGround = sourceType === CircuitElementType.GROUND && connection.source.portId === 'ground';
+    const targetIsGround = targetType === CircuitElementType.GROUND && connection.target.portId === 'ground';
+    if ((sourceIsPositive && targetIsGround) || (targetIsPositive && sourceIsGround)) {
+      return false;
+    }
+    return true;
+  });
+};
+
+const ensurePowerNegativeGrounded = (
+  elements: CircuitElement[],
+  connections: CircuitConnection[]
+) => {
+  const ground = elements.find((element) => element.type === CircuitElementType.GROUND);
+  if (!ground) {
+    return connections;
+  }
+  const groundId = ground.id;
+  const connectionExists = (sourceId: string, sourcePort: string, targetId: string, targetPort: string) =>
+    connections.some(
+      (connection) =>
+        connection.source.elementId === sourceId &&
+        connection.source.portId === sourcePort &&
+        connection.target.elementId === targetId &&
+        connection.target.portId === targetPort
+    );
+
+  const newConnections = [...connections];
+  elements.forEach((element) => {
+    if (!powerSourceElementTypes.has(element.type as CircuitElementType)) {
+      return;
+    }
+    if (!connectionExists(element.id, 'negative', groundId, 'ground')) {
+      newConnections.push({
+        id: `auto-ground-${element.id}-${groundId}`,
+        source: { elementId: element.id, portId: 'negative' },
+        target: { elementId: groundId, portId: 'ground' },
+      });
+    }
+  });
+
+  return newConnections;
+};
+
+const isBjtBiasCandidate = (elements: CircuitElement[]) => {
+  const hasBjt = elements.some(
+    (element) =>
+      element.type === CircuitElementType.TRANSISTOR_NPN ||
+      element.type === CircuitElementType.TRANSISTOR_PNP
+  );
+  if (!hasBjt) return false;
+  const hasSupply = elements.some((element) =>
+    powerSourceElementTypes.has(element.type as CircuitElementType)
+  );
+  const hasGround = elements.some((element) => element.type === CircuitElementType.GROUND);
+  const hasBiasResistor = elements.some(
+    (element) =>
+      element.type === CircuitElementType.RESISTOR &&
+      (resistorBasePattern.test(getElementResolvedLabel(element)) ||
+        resistorCollectorPattern.test(getElementResolvedLabel(element)) ||
+        resistorEmitterPattern.test(getElementResolvedLabel(element)))
+  );
+  return hasBjt && hasSupply && hasGround && hasBiasResistor;
+};
+
+const rebuildBjtBiasConnections = (
+  elements: CircuitElement[],
+  connections: CircuitConnection[]
+) => {
+  if (!isBjtBiasCandidate(elements)) {
+    return connections;
+  }
+  const transistor = elements.find(
+    (element) =>
+      element.type === CircuitElementType.TRANSISTOR_NPN ||
+      element.type === CircuitElementType.TRANSISTOR_PNP
+  );
+  const ground = elements.find((element) => element.type === CircuitElementType.GROUND);
+  const baseResistor = elements.find(
+    (element) =>
+      element.type === CircuitElementType.RESISTOR &&
+      resistorBasePattern.test(getElementResolvedLabel(element))
+  );
+  const collectorResistor = elements.find(
+    (element) =>
+      element.type === CircuitElementType.RESISTOR &&
+      resistorCollectorPattern.test(getElementResolvedLabel(element))
+  );
+  const emitterResistor = elements.find(
+    (element) =>
+      element.type === CircuitElementType.RESISTOR &&
+      resistorEmitterPattern.test(getElementResolvedLabel(element))
+  );
+  const supplies = elements.filter((element) =>
+    powerSourceElementTypes.has(element.type as CircuitElementType)
+  );
+  if (!transistor || !ground || !baseResistor || supplies.length === 0) {
+    return connections;
+  }
+
+  const elementById = new Map(elements.map((element) => [element.id, element]));
+  const findConnectedPowerSource = (elementId?: string, portId?: string) => {
+    if (!elementId) return undefined;
+    for (const connection of connections) {
+      const matchSource =
+        connection.source.elementId === elementId &&
+        (!portId || connection.source.portId === portId);
+      const matchTarget =
+        connection.target.elementId === elementId &&
+        (!portId || connection.target.portId === portId);
+      if (matchSource) {
+        const candidate = elementById.get(connection.target.elementId);
+        if (candidate && powerSourceElementTypes.has(candidate.type as CircuitElementType)) {
+          return candidate;
+        }
+      }
+      if (matchTarget) {
+        const candidate = elementById.get(connection.source.elementId);
+        if (candidate && powerSourceElementTypes.has(candidate.type as CircuitElementType)) {
+          return candidate;
+        }
+      }
+    }
+    return undefined;
+  };
+
+  const fallbackSupply = supplies[0];
+  const baseSupply = findConnectedPowerSource(baseResistor.id, 'port1') || fallbackSupply;
+  const rawCollectorSupply = collectorResistor
+    ? findConnectedPowerSource(collectorResistor.id, 'port1')
+    : baseSupply;
+  const collectorSupply = rawCollectorSupply || baseSupply;
+
+  const involvedIds = new Set<string>([
+    baseSupply?.id,
+    collectorSupply?.id,
+    baseResistor.id,
+    collectorResistor?.id,
+    emitterResistor?.id,
+    transistor.id,
+    ground.id,
+  ].filter((id): id is string => Boolean(id)));
+
+  const preservedConnections = connections.filter((connection) => {
+    const sourceInvolved = involvedIds.has(connection.source.elementId);
+    const targetInvolved = involvedIds.has(connection.target.elementId);
+    return !(sourceInvolved && targetInvolved);
+  });
+
+  const addConnection = (
+    list: CircuitConnection[],
+    seen: Set<string>,
+    sourceId: string | undefined,
+    sourcePort: string,
+    targetId: string | undefined,
+    targetPort: string
+  ) => {
+    if (!sourceId || !targetId) return;
+    const key = `${sourceId}.${sourcePort}->${targetId}.${targetPort}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    list.push({
+      id: `bjt-${nanoid(8)}`,
+      source: { elementId: sourceId, portId: sourcePort },
+      target: { elementId: targetId, portId: targetPort },
+    });
+  };
+
+  const canonicalConnections: CircuitConnection[] = [];
+  const seen = new Set<string>();
+
+  addConnection(canonicalConnections, seen, baseSupply?.id, 'positive', baseResistor.id, 'port1');
+  addConnection(canonicalConnections, seen, baseResistor.id, 'port2', transistor.id, 'base');
+  addConnection(
+    canonicalConnections,
+    seen,
+    collectorSupply?.id,
+    'positive',
+    collectorResistor ? collectorResistor.id : transistor.id,
+    collectorResistor ? 'port1' : 'collector'
+  );
+  if (collectorResistor) {
+    addConnection(canonicalConnections, seen, collectorResistor.id, 'port2', transistor.id, 'collector');
+  }
+  if (emitterResistor) {
+    addConnection(canonicalConnections, seen, emitterResistor.id, 'port2', transistor.id, 'emitter');
+    addConnection(canonicalConnections, seen, emitterResistor.id, 'port1', ground.id, 'ground');
+  } else {
+    addConnection(canonicalConnections, seen, transistor.id, 'emitter', ground.id, 'ground');
+  }
+  addConnection(canonicalConnections, seen, baseSupply?.id, 'negative', ground.id, 'ground');
+  if (collectorSupply && collectorSupply.id !== baseSupply?.id) {
+    addConnection(canonicalConnections, seen, collectorSupply.id, 'negative', ground.id, 'ground');
+  }
+
+  return [...preservedConnections, ...canonicalConnections];
+};
+
+
+const applyBjtBiasLayout = (elements: CircuitElement[], connections: CircuitConnection[]) => {
+  const layoutMap = new Map<string, { x: number; y: number }>();
+  const rotationOverrides = new Map<string, number>();
+  const elementById = new Map(elements.map((element) => [element.id, element]));
+
+  const baseColumnX = 180;
+  const collectorColumnX = 440;
+  const baseSupplyY = 80;
+  const baseResistorY = 240;
+  const collectorSupplyY = 80;
+  const collectorResistorY = 210;
+  const transistorY = 360;
+  const emitterResistorY = 520;
+  const groundY = 660;
+
+  const baseResistor = elements.find(
+    (element) =>
+      element.type === CircuitElementType.RESISTOR &&
+      resistorBasePattern.test(getElementResolvedLabel(element))
+  );
+  const collectorResistor = elements.find(
+    (element) =>
+      element.type === CircuitElementType.RESISTOR &&
+      resistorCollectorPattern.test(getElementResolvedLabel(element))
+  );
+  const emitterResistor = elements.find(
+    (element) =>
+      element.type === CircuitElementType.RESISTOR &&
+      resistorEmitterPattern.test(getElementResolvedLabel(element))
+  );
+  const transistor = elements.find(
+    (element) =>
+      element.type === CircuitElementType.TRANSISTOR_NPN ||
+      element.type === CircuitElementType.TRANSISTOR_PNP
+  );
+  const ground = elements.find((element) => element.type === CircuitElementType.GROUND);
+
+  const findConnectedPowerSource = (elementId?: string, portId?: string) => {
+    if (!elementId) return undefined;
+    for (const connection of connections) {
+      const isSourceMatch =
+        connection.source.elementId === elementId &&
+        (!portId || connection.source.portId === portId);
+      const isTargetMatch =
+        connection.target.elementId === elementId &&
+        (!portId || connection.target.portId === portId);
+      if (isSourceMatch) {
+        const candidate = elementById.get(connection.target.elementId);
+        if (candidate && powerSourceElementTypes.has(candidate.type as CircuitElementType)) {
+          return candidate;
+        }
+      }
+      if (isTargetMatch) {
+        const candidate = elementById.get(connection.source.elementId);
+        if (candidate && powerSourceElementTypes.has(candidate.type as CircuitElementType)) {
+          return candidate;
+        }
+      }
+    }
+    return undefined;
+  };
+
+  const fallbackSupply = elements.find((element) =>
+    powerSourceElementTypes.has(element.type as CircuitElementType)
+  );
+  const baseSupply = findConnectedPowerSource(baseResistor?.id, 'port1') || fallbackSupply;
+  const rawCollectorSupply = findConnectedPowerSource(collectorResistor?.id, 'port1');
+  const collectorSupply =
+    rawCollectorSupply && rawCollectorSupply.id !== baseSupply?.id
+      ? rawCollectorSupply
+      : undefined;
+
+  if (baseSupply) {
+    layoutMap.set(baseSupply.id, { x: baseColumnX, y: baseSupplyY });
+  }
+  if (baseResistor) {
+    layoutMap.set(baseResistor.id, { x: baseColumnX, y: baseResistorY });
+    rotationOverrides.set(baseResistor.id, 90);
+  }
+  if (collectorSupply) {
+    layoutMap.set(collectorSupply.id, { x: collectorColumnX, y: collectorSupplyY });
+  }
+  if (collectorResistor) {
+    layoutMap.set(collectorResistor.id, { x: collectorColumnX, y: collectorResistorY });
+    rotationOverrides.set(collectorResistor.id, 90);
+  }
+  if (transistor) {
+    layoutMap.set(transistor.id, { x: collectorColumnX, y: transistorY });
+  }
+  if (emitterResistor) {
+    layoutMap.set(emitterResistor.id, { x: collectorColumnX, y: emitterResistorY });
+    rotationOverrides.set(emitterResistor.id, 90);
+  }
+  if (ground) {
+    layoutMap.set(ground.id, { x: collectorColumnX, y: groundY });
+  }
+
+  return elements.map((element) => {
+    const layout = layoutMap.get(element.id);
+    const rotationOverride = rotationOverrides.get(element.id);
+    if (!layout && rotationOverride === undefined) {
+      return element;
+    }
+    return {
+      ...element,
+      position: layout
+        ? {
+            x: layout.x,
+            y: layout.y,
+          }
+        : element.position,
+      rotation: rotationOverride !== undefined ? rotationOverride : element.rotation,
+    };
+  });
+};
+
 const normalizeElementPorts = (element: CircuitElement): Port[] => {
   const defaults = defaultPorts[element.type as keyof typeof defaultPorts];
   const existing = element.ports ? clonePorts(element.ports) : [];
@@ -849,9 +1189,10 @@ interface CircuitFlowProps {
   classId?: string | null; // 添加班级ID参数
   onModelChange?: (model: FlowModelType) => void; // 修改为使用 FlowModelType
   workspaceMode?: CircuitWorkspaceMode;
+  onUnsavedChange?: (hasUnsavedChanges: boolean) => void;
 }
 
-export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3', initialCircuitDesign, isReadOnly = false, classId = null, onModelChange, workspaceMode: workspaceModeProp = 'analog' }: CircuitFlowProps) => {
+export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3', initialCircuitDesign, isReadOnly = false, classId = null, onModelChange, workspaceMode: workspaceModeProp = 'analog', onUnsavedChange }: CircuitFlowProps) => {
   const workspaceMode = workspaceModeProp;
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
@@ -904,6 +1245,39 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
   useEffect(() => {
     designIdRef.current = persistedDesignId;
   }, [persistedDesignId]);
+  const getEmptyDesignSnapshot = () => ({
+    id: designIdRef.current ?? undefined,
+    elements: [],
+    connections: [],
+    metadata: { ...designMetadataRef.current },
+  });
+  const [, setHasUnsavedChanges] = useState(false);
+  const hasUnsavedChangesRef = useRef(false);
+  const currentDesignRef = useRef<CircuitDesign>(initialCircuitDesign ?? getEmptyDesignSnapshot());
+  const lastSavedDesignHashRef = useRef<string>(serializeCircuitDesignSnapshot(currentDesignRef.current));
+  const suppressUnsavedTrackingRef = useRef(true);
+  const updateUnsavedState = useCallback((dirty: boolean) => {
+    if (hasUnsavedChangesRef.current !== dirty) {
+      hasUnsavedChangesRef.current = dirty;
+      setHasUnsavedChanges(dirty);
+      onUnsavedChange?.(dirty);
+    }
+  }, [onUnsavedChange]);
+  const markCurrentDesignAsSaved = useCallback((snapshot?: CircuitDesign | null) => {
+    const designSnapshot = snapshot ?? currentDesignRef.current ?? getEmptyDesignSnapshot();
+    const normalizedSnapshot: CircuitDesign = {
+      ...designSnapshot,
+      metadata: {
+        ...designSnapshot.metadata,
+        title: designMetadataRef.current.title,
+        description: designMetadataRef.current.description,
+      },
+    };
+    currentDesignRef.current = normalizedSnapshot;
+    lastSavedDesignHashRef.current = serializeCircuitDesignSnapshot(normalizedSnapshot);
+    suppressUnsavedTrackingRef.current = false;
+    updateUnsavedState(false);
+  }, [updateUnsavedState]);
   const [saveModalMode, setSaveModalMode] = useState<'save' | 'saveAs'>('save');
   const [saveModalInitialValues, setSaveModalInitialValues] = useState<{ title?: string; description?: string }>({});
   const autoSaveTimerRef = useRef<number | null>(null);
@@ -1022,6 +1396,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
     if (!design) {
       return;
     }
+    suppressUnsavedTrackingRef.current = true;
 
     const applyEnhancedLayout = options.enhanceLayout ?? false;
     const safeElements = (design.elements || []).map((element) => ({
@@ -1031,21 +1406,37 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
         y: element.position?.y ?? 0
       }
     }));
-    let processedElements = safeElements;
+    let workingElements = safeElements;
+    let workingConnections: CircuitConnection[] = [...(design.connections || [])];
+
+    const sanitized = sanitizeAnalogElements(workingElements, workingConnections);
+    workingElements = sanitized.elements;
+    workingConnections = sanitized.connections;
+
+    workingConnections = removeInvalidPowerGroundShorts(workingElements, workingConnections);
+    workingConnections = autoCompleteAnalogConnections(workingElements, workingConnections);
+    workingConnections = ensurePowerNegativeGrounded(workingElements, workingConnections);
+    workingConnections = removeInvalidPowerGroundShorts(workingElements, workingConnections);
+    workingConnections = rebuildBjtBiasConnections(workingElements, workingConnections);
+    workingConnections = removeInvalidPowerGroundShorts(workingElements, workingConnections);
+
     if (applyEnhancedLayout) {
-      const containsAnalog = safeElements.some((element) =>
+      const containsAnalog = workingElements.some((element) =>
         ANALOG_ELEMENT_TYPES.has(element.type as CircuitElementType)
       );
-      const containsDigital = !containsAnalog && safeElements.some((element) =>
+      const containsDigital = !containsAnalog && workingElements.some((element) =>
         DIGITAL_ELEMENT_TYPES.has(element.type as CircuitElementType)
       );
       if (containsAnalog) {
-        processedElements = enhanceAnalogLayout(processedElements);
+        workingElements = isBjtBiasCandidate(workingElements)
+          ? applyBjtBiasLayout(workingElements, workingConnections)
+          : enhanceAnalogLayout(workingElements);
       } else if (containsDigital) {
-        processedElements = enhanceDigitalLayout(processedElements);
+        workingElements = enhanceDigitalLayout(workingElements);
       }
     }
-    const normalizedElements = processedElements.map((element) => {
+
+    const normalizedElements = workingElements.map((element) => {
       const propertyLabel = typeof element.properties?.['label'] === 'string'
         ? element.properties['label'] as string
         : undefined;
@@ -1055,13 +1446,9 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
         type: normalizeElementType(element.type as CircuitElementType, resolvedLabel),
       };
     });
-    let workingConnections: CircuitConnection[] = [...(design.connections || [])];
-    const sanitized = sanitizeAnalogElements(normalizedElements, workingConnections);
-    workingConnections = autoCompleteAnalogConnections(sanitized.elements, sanitized.connections);
-    const finalElements = sanitized.elements;
-    const elementTypeMap = new Map(finalElements.map((element) => [element.id, element.type]));
+    const elementTypeMap = new Map(normalizedElements.map((element) => [element.id, element.type]));
 
-    const newNodes: Node[] = finalElements.map((element) => {
+    const newNodes: Node[] = normalizedElements.map((element) => {
       const propertyLabel = typeof element.properties?.['label'] === 'string'
         ? element.properties['label'] as string
         : undefined;
@@ -1120,8 +1507,8 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
     setCanUndo(false);
     setCanRedo(false);
 
-    if (finalElements.length > 0) {
-      finalElements.forEach((element) => {
+    if (normalizedElements.length > 0) {
+      normalizedElements.forEach((element) => {
         registerExistingElementLabel(
           element.type as CircuitElementType,
           element.label || (typeof element.properties?.['label'] === 'string' ? element.properties['label'] as string : undefined)
@@ -1621,6 +2008,16 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
           updatedAt: metadataSnapshot.updatedAt
         }
       };
+      currentDesignRef.current = circuitDesign;
+      const serializedSnapshot = serializeCircuitDesignSnapshot(circuitDesign);
+      if (suppressUnsavedTrackingRef.current) {
+        lastSavedDesignHashRef.current = serializedSnapshot;
+        suppressUnsavedTrackingRef.current = false;
+        updateUnsavedState(false);
+      } else {
+        const isDirty = serializedSnapshot !== lastSavedDesignHashRef.current;
+        updateUnsavedState(isDirty);
+      }
       
       // 如果提供了回调函数，则调用它通知父组件电路设计已经改变
       if (onCircuitDesignChange) {
@@ -1643,7 +2040,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
         }
       };
     }
-  }, [nodes, edges, onCircuitDesignChange, getFallbackLabelFromId]);
+  }, [nodes, edges, onCircuitDesignChange, getFallbackLabelFromId, updateUnsavedState]);
 
   // 每当节点或边发生变化时，更新电路设计
   useEffect(() => {
@@ -1686,6 +2083,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
       } else {
         message.success({ content: '元件参数已自动保存', key: 'circuit-auto-save', duration: 1.5 });
       }
+      markCurrentDesignAsSaved(payload);
       return true;
     } catch (error) {
       console.error('保存电路失败:', error);
@@ -1696,7 +2094,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
       }
       return false;
     }
-  }, [convertToCircuitDesign]);
+  }, [convertToCircuitDesign, markCurrentDesignAsSaved]);
 
   const scheduleAutoSave = useCallback(() => {
     if (!designIdRef.current) {
@@ -1743,8 +2141,16 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
       updatedAt: now,
       createdAt: prev.createdAt || now,
     }));
+    designMetadataRef.current = {
+      ...designMetadataRef.current,
+      title,
+      description,
+      updatedAt: now,
+      createdAt: designMetadataRef.current.createdAt || now,
+    };
+    markCurrentDesignAsSaved();
     autoSaveInfoShownRef.current = false;
-  }, []);
+  }, [markCurrentDesignAsSaved]);
 
   // 拓扑变化时使仿真结果失效
   useEffect(() => {
@@ -2269,8 +2675,8 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
       sourceAnchor = nextAnchor;
       targetAnchor = wireAnchor;
     }
-    const resolvedSourceHandle = resolveHandleId(sourceAnchor, targetAnchor);
-    const resolvedTargetHandle = resolveHandleId(targetAnchor, sourceAnchor);
+    const resolvedSourceHandle = resolveHandleId(sourceAnchor, targetAnchor) ?? null;
+    const resolvedTargetHandle = resolveHandleId(targetAnchor, sourceAnchor) ?? null;
     const connection: Connection = {
       source: sourceAnchor.nodeId,
       sourceHandle: resolvedSourceHandle,
@@ -3025,7 +3431,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
   );
 };
 
-export const CircuitFlowWithProvider = ({ onCircuitDesignChange, selectedModel, initialCircuitDesign, isReadOnly, classId, onModelChange, workspaceMode }: CircuitFlowProps) => (
+export const CircuitFlowWithProvider = ({ onCircuitDesignChange, selectedModel, initialCircuitDesign, isReadOnly, classId, onModelChange, workspaceMode, onUnsavedChange }: CircuitFlowProps) => (
   <ReactFlowProvider>
     <CircuitFlow 
       onCircuitDesignChange={onCircuitDesignChange}
@@ -3035,6 +3441,7 @@ export const CircuitFlowWithProvider = ({ onCircuitDesignChange, selectedModel, 
       classId={classId}
       onModelChange={onModelChange}
       workspaceMode={workspaceMode}
+      onUnsavedChange={onUnsavedChange}
     />
   </ReactFlowProvider>
 );
