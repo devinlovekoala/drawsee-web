@@ -13,7 +13,10 @@ import {
   ClearOutlined,
   PoweroffOutlined,
   FileAddOutlined,
-  PictureOutlined
+  PictureOutlined,
+  NodeIndexOutlined,
+  PlusCircleOutlined,
+  ScissorOutlined
 } from '@ant-design/icons';
 import { ModelType } from '@/app/pages/flow/components/input/FlowInputPanel';
 
@@ -39,11 +42,17 @@ interface CircuitToolbarProps {
   canUndo?: boolean;
   canRedo?: boolean;
   hasSelectedNode?: boolean;
+  hasSelectedEdge?: boolean;
   hasContent?: boolean;
   onSaveAs?: () => void;
   canSaveAs?: boolean;
   onImageImport?: () => void;
   isImportingImage?: boolean;
+  onToggleWireMode?: () => void;
+  isWireModeActive?: boolean;
+  onToggleJunctionMode?: () => void;
+  isJunctionModeActive?: boolean;
+  onDeleteEdge?: () => void;
 }
 
 export const CircuitToolbar: FC<CircuitToolbarProps> = ({
@@ -63,11 +72,17 @@ export const CircuitToolbar: FC<CircuitToolbarProps> = ({
   canUndo = false,
   canRedo = false,
   hasSelectedNode = false,
+  hasSelectedEdge = false,
   hasContent = false,
   isSimulating = false,
   canSaveAs = false,
   onImageImport,
   isImportingImage = false,
+  onToggleWireMode,
+  isWireModeActive = false,
+  onToggleJunctionMode,
+  isJunctionModeActive = false,
+  onDeleteEdge,
 }) => {
 
   // 只在开发环境下输出日志
@@ -128,6 +143,26 @@ export const CircuitToolbar: FC<CircuitToolbarProps> = ({
         />
       </Tooltip>
 
+      <Tooltip title={isWireModeActive ? '退出布线模式 (Esc)' : '布线模式'}>
+        <Button
+          type={isWireModeActive ? 'primary' : 'text'}
+          onClick={onToggleWireMode}
+          disabled={!onToggleWireMode}
+          icon={<NodeIndexOutlined />}
+          className={getButtonClass(!onToggleWireMode)}
+        />
+      </Tooltip>
+
+      <Tooltip title={isJunctionModeActive ? '退出连接点模式 (Esc)' : '添加连接点'}>
+        <Button
+          type={isJunctionModeActive ? 'primary' : 'text'}
+          onClick={onToggleJunctionMode}
+          disabled={!onToggleJunctionMode}
+          icon={<PlusCircleOutlined />}
+          className={getButtonClass(!onToggleJunctionMode)}
+        />
+      </Tooltip>
+
       <Tooltip title="撤销">
         <Button
           type="text"
@@ -167,6 +202,16 @@ export const CircuitToolbar: FC<CircuitToolbarProps> = ({
           disabled={!hasSelectedNode || !onDelete}
           icon={<DeleteOutlined />}
           className={getButtonClass(!hasSelectedNode || !onDelete)}
+        />
+      </Tooltip>
+
+      <Tooltip title="删除连线">
+        <Button
+          type="text"
+          onClick={onDeleteEdge}
+          disabled={!hasSelectedEdge || !onDeleteEdge}
+          icon={<ScissorOutlined />}
+          className={getButtonClass(!hasSelectedEdge || !onDeleteEdge)}
         />
       </Tooltip>
 

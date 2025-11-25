@@ -54,6 +54,15 @@ const getElementIcon = (type: CircuitElementType) => {
           <path d="M35,20 L30,25" strokeWidth="2" />
         </svg>
       );
+    case CircuitElementType.AC_SOURCE:
+      return (
+        <svg {...svgProps}>
+          <circle cx="20" cy="20" r="15" strokeWidth="2" fill="none" />
+          <path d="M8,20 C12,12 16,28 20,20 C24,12 28,28 32,20" strokeWidth="2" fill="none" />
+          <path d="M5,20 L8,20" strokeWidth="2" />
+          <path d="M32,20 L35,20" strokeWidth="2" />
+        </svg>
+      );
     case CircuitElementType.DIODE:
       return (
         <svg {...svgProps}>

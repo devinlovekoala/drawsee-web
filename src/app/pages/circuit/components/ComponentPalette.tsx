@@ -13,8 +13,6 @@ const components = [
   { type: CircuitElementType.TRANSISTOR_PNP, name: 'PNP三极管' },
   { type: CircuitElementType.OPAMP, name: '运放' },
   { type: CircuitElementType.GROUND, name: '地' },
-  { type: CircuitElementType.WIRE, name: '导线' },
-  { type: CircuitElementType.JUNCTION, name: '节点' },
 ];
 
 // 组件面板组件

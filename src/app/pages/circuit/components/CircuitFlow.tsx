@@ -14,6 +14,7 @@ import ReactFlow, {
   applyEdgeChanges,
   useReactFlow,
   ReactFlowProvider,
+  XYPosition,
 } from 'reactflow';
 import { Button, message, Modal, Spin } from 'antd';
 import 'reactflow/dist/style.css';
@@ -24,7 +25,8 @@ import {
   CircuitElementType,
   CircuitDesign,
   Port,
-  CircuitElement
+  CircuitElement,
+  CircuitConnection
 } from '@/api/types/circuit.types';
 import { createAiTask } from '@/api/methods/flow.methods';
 import { updateCircuitDesign } from '@/api/methods/circuit.methods';
@@ -36,6 +38,7 @@ import { useHotkeys } from 'react-hotkeys-hook';
 import { ModelType as FlowModelType } from '@/app/pages/flow/components/input/FlowInputPanel';
 import ElementLibrary, { ElementCategory } from './ElementLibrary';
 import CircuitToolbar from './CircuitToolbar';
+import JunctionNode from './JunctionNode';
 import SaveCircuitModal from './SaveCircuitModal';
 import { Line } from '@ant-design/charts';
 import { simulationClient } from '../simulation/simulationClient';
@@ -53,6 +56,7 @@ import {
   HddOutlined
 } from '@ant-design/icons';
 import ImageUploader from '@/app/components/ImageUploader';
+import { nanoid } from 'nanoid';
 
 // 唯一节点ID生成
 let nodeIdCounter = 1;
@@ -61,6 +65,7 @@ const getNewNodeId = () => `node-${nodeIdCounter++}`;
 // 定义节点类型
 const nodeTypes = {
   circuitNode: CircuitNode,
+  junctionNode: JunctionNode,
 };
 
 // 定义边类型
@@ -75,6 +80,7 @@ const elementNamePrefixes: Record<CircuitElementType, string> = {
   [CircuitElementType.INDUCTOR]: 'L',
   [CircuitElementType.VOLTAGE_SOURCE]: 'V',
   [CircuitElementType.CURRENT_SOURCE]: 'I',
+  [CircuitElementType.AC_SOURCE]: 'VAC',
   [CircuitElementType.DIODE]: 'D',
   [CircuitElementType.TRANSISTOR_NPN]: 'Q',
   [CircuitElementType.TRANSISTOR_PNP]: 'Q',
@@ -100,6 +106,13 @@ const elementNamePrefixes: Record<CircuitElementType, string> = {
 
 type CircuitWorkspaceMode = 'analog' | 'digital' | 'hybrid';
 
+type WireAnchor = {
+  nodeId: string;
+  handleId: string | null;
+  handleType: 'source' | 'target';
+  autoHandle?: boolean;
+};
+
 const analogElementCategories: ElementCategory[] = [
   {
     key: 'passive',
@@ -118,7 +131,8 @@ const analogElementCategories: ElementCategory[] = [
     icon: <ThunderboltOutlined />,
     elements: [
       { type: CircuitElementType.VOLTAGE_SOURCE, name: '电压源 (V)', shortcut: 'V' },
-      { type: CircuitElementType.CURRENT_SOURCE, name: '电流源 (I)', shortcut: 'I' }
+      { type: CircuitElementType.CURRENT_SOURCE, name: '电流源 (I)', shortcut: 'I' },
+      { type: CircuitElementType.AC_SOURCE, name: '交流信号源 (AC)', shortcut: 'A' }
     ]
   },
   {
@@ -136,9 +150,7 @@ const analogElementCategories: ElementCategory[] = [
     label: '其他',
     icon: <SettingOutlined />,
     elements: [
-      { type: CircuitElementType.OPAMP, name: '运算放大器', shortcut: 'O' },
-      { type: CircuitElementType.WIRE, name: '导线', shortcut: 'W' },
-      { type: CircuitElementType.JUNCTION, name: '连接点', shortcut: 'J' }
+      { type: CircuitElementType.OPAMP, name: '运算放大器', shortcut: 'O' }
     ]
   },
   {
@@ -196,6 +208,7 @@ const analogElementMenuItems: MenuItemConfig[] = [
   { key: CircuitElementType.INDUCTOR, label: '电感器 (L)' },
   { key: CircuitElementType.VOLTAGE_SOURCE, label: '电压源 (V)' },
   { key: CircuitElementType.CURRENT_SOURCE, label: '电流源 (I)' },
+  { key: CircuitElementType.AC_SOURCE, label: '交流信号源 (AC)' },
   { key: CircuitElementType.DIODE, label: '二极管 (D)' },
   { key: CircuitElementType.TRANSISTOR_NPN, label: 'NPN 晶体管' },
   { key: CircuitElementType.TRANSISTOR_PNP, label: 'PNP 晶体管' },
@@ -251,6 +264,10 @@ const defaultPorts = {
     { id: 'negative', name: '负极', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 50, align: 'center' as const } }
   ],
   [CircuitElementType.CURRENT_SOURCE]: [
+    { id: 'positive', name: '正极', type: 'output' as const, position: { side: 'right' as const, x: 100, y: 50, align: 'center' as const } },
+    { id: 'negative', name: '负极', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 50, align: 'center' as const } }
+  ],
+  [CircuitElementType.AC_SOURCE]: [
     { id: 'positive', name: '正极', type: 'output' as const, position: { side: 'right' as const, x: 100, y: 50, align: 'center' as const } },
     { id: 'negative', name: '负极', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 50, align: 'center' as const } }
   ],
@@ -337,6 +354,12 @@ const defaultPorts = {
     { id: 'clk', name: 'CLK', type: 'input' as const, position: { side: 'bottom' as const, x: 50, y: 100, align: 'center' as const } },
     { id: 'q', name: 'Q', type: 'output' as const, position: { side: 'right' as const, x: 100, y: 40, align: 'center' as const } }
   ],
+  [CircuitElementType.JUNCTION]: [
+    { id: 'port-left', name: 'Left', type: 'bidirectional' as const, position: { side: 'left' as const, x: 0, y: 50, align: 'center' as const } },
+    { id: 'port-right', name: 'Right', type: 'bidirectional' as const, position: { side: 'right' as const, x: 100, y: 50, align: 'center' as const } },
+    { id: 'port-top', name: 'Top', type: 'bidirectional' as const, position: { side: 'top' as const, x: 50, y: 0, align: 'center' as const } },
+    { id: 'port-bottom', name: 'Bottom', type: 'bidirectional' as const, position: { side: 'bottom' as const, x: 50, y: 100, align: 'center' as const } }
+  ],
 };
 
 const DIGITAL_ELEMENT_TYPES = new Set<CircuitElementType>([
@@ -353,6 +376,50 @@ const DIGITAL_ELEMENT_TYPES = new Set<CircuitElementType>([
   CircuitElementType.DIGITAL_DFF,
 ]);
 
+const ANALOG_ELEMENT_TYPES = new Set<CircuitElementType>([
+  CircuitElementType.RESISTOR,
+  CircuitElementType.CAPACITOR,
+  CircuitElementType.INDUCTOR,
+  CircuitElementType.VOLTAGE_SOURCE,
+  CircuitElementType.CURRENT_SOURCE,
+  CircuitElementType.AC_SOURCE,
+  CircuitElementType.DIODE,
+  CircuitElementType.TRANSISTOR_NPN,
+  CircuitElementType.TRANSISTOR_PNP,
+  CircuitElementType.GROUND,
+  CircuitElementType.OPAMP,
+  CircuitElementType.AMMETER,
+  CircuitElementType.VOLTMETER,
+  CircuitElementType.OSCILLOSCOPE,
+]);
+
+const ANALOG_COLUMN_GROUPS: CircuitElementType[][] = [
+  [CircuitElementType.VOLTAGE_SOURCE, CircuitElementType.CURRENT_SOURCE, CircuitElementType.AC_SOURCE],
+  [CircuitElementType.RESISTOR, CircuitElementType.CAPACITOR, CircuitElementType.INDUCTOR, CircuitElementType.DIODE],
+  [CircuitElementType.TRANSISTOR_NPN, CircuitElementType.TRANSISTOR_PNP, CircuitElementType.OPAMP],
+  [CircuitElementType.AMMETER, CircuitElementType.VOLTMETER, CircuitElementType.OSCILLOSCOPE, CircuitElementType.GROUND],
+];
+
+const analogColumnIndexMap = ANALOG_COLUMN_GROUPS.reduce<Map<CircuitElementType, number>>((map, columnTypes, columnIndex) => {
+  columnTypes.forEach((type) => map.set(type, columnIndex));
+  return map;
+}, new Map<CircuitElementType, number>());
+
+const analogLabelHints: Array<{ keywords: RegExp; type: CircuitElementType }> = [
+  { keywords: /(VCC|VDD|VSS|VBAT|UCC|VIN|VREF|VBIAS|VDC|SUPPLY|电源)/i, type: CircuitElementType.VOLTAGE_SOURCE },
+  { keywords: /(VAC|AC\s*IN|ACIN|SINE|Sin|信号源|Vin_ac|Vsig|波形)/i, type: CircuitElementType.AC_SOURCE },
+  { keywords: /(IREF|IBIAS|ITAIL|IIN|IOUT|恒流|ISRC|CURRENT)/i, type: CircuitElementType.CURRENT_SOURCE },
+  { keywords: /(OSC|scope|示波器|Probe|CH\d+)/i, type: CircuitElementType.OSCILLOSCOPE },
+  { keywords: /(VM|Vmeter|voltmeter|电压表)/i, type: CircuitElementType.VOLTMETER },
+  { keywords: /(AM|ammeter|Imeter|电流表)/i, type: CircuitElementType.AMMETER },
+];
+
+const analogVoltageAnnotationPattern = /(Ube|Vbe|Uce|Vce|Ucb|Vcb|Ubc|Vbc)/i;
+const resistorBasePattern = /(Rb|R_b|Rbase|BiasR|Rbias)/i;
+const resistorCollectorPattern = /(Rc|R_c|Rcol|Rload)/i;
+const resistorEmitterPattern = /(Re|R_e|Remit|Ree)/i;
+const supplyUccPattern = /(UCC|VCC|VDD|VSS|VBAT|SUPPLY)/i;
+
 const labelTypeHints: Array<{ keywords: RegExp; type: CircuitElementType }> = [
   { keywords: /NAND/i, type: CircuitElementType.DIGITAL_NAND },
   { keywords: /NOR/i, type: CircuitElementType.DIGITAL_NOR },
@@ -366,8 +433,12 @@ const labelTypeHints: Array<{ keywords: RegExp; type: CircuitElementType }> = [
 
 const normalizeElementType = (type: CircuitElementType, label?: string): CircuitElementType => {
   if (!label) return type;
-  const hint = labelTypeHints.find(entry => entry.keywords.test(label));
-  return hint ? hint.type : type;
+  const analogHint = analogLabelHints.find(entry => entry.keywords.test(label));
+  if (analogHint) {
+    return analogHint.type;
+  }
+  const digitalHint = labelTypeHints.find(entry => entry.keywords.test(label));
+  return digitalHint ? digitalHint.type : type;
 };
 
 const clonePorts = (ports: Port[]) => ports.map(port => ({
@@ -377,6 +448,157 @@ const clonePorts = (ports: Port[]) => ports.map(port => ({
     align: port.position?.align || 'center'
   }
 }));
+
+const getElementResolvedLabel = (element: CircuitElement) => {
+  const propertyLabel = typeof element.properties?.['label'] === 'string'
+    ? (element.properties['label'] as string)
+    : undefined;
+  return element.label || propertyLabel || element.id;
+};
+
+const sanitizeAnalogElements = (
+  elements: CircuitElement[],
+  connections: CircuitConnection[]
+) => {
+  const removableIds = new Set<string>();
+  elements.forEach((element) => {
+    if (
+      analogVoltageAnnotationPattern.test(getElementResolvedLabel(element)) &&
+      (
+        element.type === CircuitElementType.VOLTAGE_SOURCE ||
+        element.type === CircuitElementType.AC_SOURCE ||
+        element.type === CircuitElementType.CURRENT_SOURCE ||
+        element.type === CircuitElementType.VOLTMETER
+      )
+    ) {
+      removableIds.add(element.id);
+    }
+  });
+
+  if (removableIds.size === 0) {
+    return { elements, connections };
+  }
+
+  const filteredElements = elements.filter((element) => !removableIds.has(element.id));
+  const filteredConnections = connections.filter(
+    (connection) =>
+      !removableIds.has(connection.source.elementId) &&
+      !removableIds.has(connection.target.elementId)
+  );
+  return {
+    elements: filteredElements,
+    connections: filteredConnections,
+  };
+};
+
+const autoCompleteAnalogConnections = (
+  elements: CircuitElement[],
+  connections: CircuitConnection[]
+) => {
+  const bjts = elements.filter(
+    (element) =>
+      element.type === CircuitElementType.TRANSISTOR_NPN ||
+      element.type === CircuitElementType.TRANSISTOR_PNP
+  );
+  if (bjts.length === 0) {
+    return connections;
+  }
+
+  const workingConnections = [...connections];
+  const connectionExists = (aId: string, aPort: string, bId: string, bPort: string) =>
+    workingConnections.some((connection) => {
+      const matchesForward =
+        connection.source.elementId === aId &&
+        connection.source.portId === aPort &&
+        connection.target.elementId === bId &&
+        connection.target.portId === bPort;
+      const matchesReverse =
+        connection.source.elementId === bId &&
+        connection.source.portId === bPort &&
+        connection.target.elementId === aId &&
+        connection.target.portId === aPort;
+      return matchesForward || matchesReverse;
+    });
+
+  const countPortConnections = (elementId: string, portId: string) =>
+    workingConnections.reduce((acc, connection) => {
+      if (
+        (connection.source.elementId === elementId && connection.source.portId === portId) ||
+        (connection.target.elementId === elementId && connection.target.portId === portId)
+      ) {
+        return acc + 1;
+      }
+      return acc;
+    }, 0);
+
+  const ensureConnection = (sourceId: string, sourcePort: string, targetId: string, targetPort: string) => {
+    if (connectionExists(sourceId, sourcePort, targetId, targetPort)) {
+      return;
+    }
+    workingConnections.push({
+      id: `auto-${nanoid(8)}`,
+      source: { elementId: sourceId, portId: sourcePort },
+      target: { elementId: targetId, portId: targetPort },
+    });
+  };
+
+  const findResistorByLabel = (pattern: RegExp) =>
+    elements.find(
+      (element) =>
+        element.type === CircuitElementType.RESISTOR &&
+        pattern.test(getElementResolvedLabel(element))
+    );
+
+  const findSupply = () =>
+    elements.find(
+      (element) =>
+        powerSourceElementTypes.has(element.type as CircuitElementType) &&
+        supplyUccPattern.test(getElementResolvedLabel(element))
+    );
+
+  const groundElement = elements.find((element) => element.type === CircuitElementType.GROUND);
+
+  bjts.forEach((bjt) => {
+    const baseConnected = countPortConnections(bjt.id, 'base') > 0;
+    const collectorConnected = countPortConnections(bjt.id, 'collector') > 0;
+    const emitterConnected = countPortConnections(bjt.id, 'emitter') > 0;
+
+    const baseResistor = findResistorByLabel(resistorBasePattern);
+    const collectorResistor = findResistorByLabel(resistorCollectorPattern);
+    const emitterResistor = findResistorByLabel(resistorEmitterPattern);
+    const supply = findSupply();
+
+    if (!baseConnected && baseResistor) {
+      ensureConnection(baseResistor.id, 'port2', bjt.id, 'base');
+    }
+    if (!collectorConnected) {
+      if (collectorResistor) {
+        ensureConnection(collectorResistor.id, 'port2', bjt.id, 'collector');
+      } else if (supply) {
+        ensureConnection(supply.id, 'positive', bjt.id, 'collector');
+      }
+    }
+    if (!emitterConnected) {
+      if (emitterResistor) {
+        ensureConnection(emitterResistor.id, 'port2', bjt.id, 'emitter');
+      } else if (groundElement) {
+        ensureConnection(bjt.id, 'emitter', groundElement.id, 'ground');
+      }
+    }
+
+    if (baseResistor && countPortConnections(baseResistor.id, 'port1') === 0 && supply) {
+      ensureConnection(supply.id, 'positive', baseResistor.id, 'port1');
+    }
+    if (collectorResistor && countPortConnections(collectorResistor.id, 'port1') === 0 && supply) {
+      ensureConnection(supply.id, 'positive', collectorResistor.id, 'port1');
+    }
+    if (emitterResistor && countPortConnections(emitterResistor.id, 'port1') === 0 && groundElement) {
+      ensureConnection(emitterResistor.id, 'port1', groundElement.id, 'ground');
+    }
+  });
+
+  return workingConnections;
+};
 
 const normalizeElementPorts = (element: CircuitElement): Port[] => {
   const defaults = defaultPorts[element.type as keyof typeof defaultPorts];
@@ -469,6 +691,72 @@ const enhanceDigitalLayout = (elements: CircuitElement[]) => {
   });
 };
 
+const enhanceAnalogLayout = (elements: CircuitElement[]) => {
+  if (!elements.length) return elements;
+  const analogElements = elements.filter((element) =>
+    ANALOG_ELEMENT_TYPES.has(element.type as CircuitElementType)
+  );
+  if (analogElements.length === 0) {
+    return elements;
+  }
+
+  const columnSpacing = 220;
+  const rowSpacing = 130;
+  const paddingX = 80;
+  const paddingY = 80;
+
+  const columnBuckets = new Map<number, CircuitElement[]>();
+  analogElements.forEach((element) => {
+    const type = element.type as CircuitElementType;
+    const columnIndex = analogColumnIndexMap.get(type) ?? 1;
+    const bucket = columnBuckets.get(columnIndex) ?? [];
+    bucket.push(element);
+    columnBuckets.set(columnIndex, bucket);
+  });
+
+  const positioned = new Map<string, { x: number; y: number }>();
+  columnBuckets.forEach((bucket, columnIndex) => {
+    bucket.sort((a, b) => (a.position?.y ?? 0) - (b.position?.y ?? 0));
+    bucket.forEach((element, rowIndex) => {
+      const newX = paddingX + columnIndex * columnSpacing;
+      const baseY = paddingY + rowIndex * rowSpacing;
+      const adjustedY = element.type === CircuitElementType.GROUND
+        ? baseY + rowSpacing * 0.5
+        : baseY;
+      positioned.set(element.id, {
+        x: newX,
+        y: adjustedY
+      });
+    });
+  });
+
+  return elements.map((element) => {
+    const mapped = positioned.get(element.id);
+    if (!mapped) {
+      return element;
+    }
+    return {
+      ...element,
+      position: {
+        x: mapped.x,
+        y: mapped.y,
+      }
+    };
+  });
+};
+
+const determineJunctionHandle = (from: XYPosition | undefined, to: XYPosition): string => {
+  if (!from) {
+    return 'port-right';
+  }
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    return dx >= 0 ? 'port-right' : 'port-left';
+  }
+  return dy >= 0 ? 'port-bottom' : 'port-top';
+};
+
 const measurementElementTypes = new Set<CircuitElementType>([
   CircuitElementType.AMMETER,
   CircuitElementType.VOLTMETER,
@@ -478,6 +766,7 @@ const measurementElementTypes = new Set<CircuitElementType>([
 const powerSourceElementTypes = new Set<CircuitElementType>([
   CircuitElementType.VOLTAGE_SOURCE,
   CircuitElementType.CURRENT_SOURCE,
+  CircuitElementType.AC_SOURCE,
 ]);
 
 const measurementTypeLabels: Partial<Record<CircuitElementType, string>> = {
@@ -578,6 +867,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [currentModel, setCurrentModel] = useState<FlowModelType>(selectedModel as FlowModelType);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
+  const hasSelectedEdge = !!selectedEdgeId;
   const [showElementLibrary, setShowElementLibrary] = useState<boolean>(true);
   const [canUndo, setCanUndo] = useState<boolean>(false);
   const [canRedo, setCanRedo] = useState<boolean>(false);
@@ -629,10 +919,13 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
   const paletteCategories = useMemo(() => getElementCategories(workspaceMode), [workspaceMode]);
   const elementMenuItems = useMemo(() => getElementMenuItems(workspaceMode), [workspaceMode]);
   const lastSimSignatureRef = useRef<string | null>(null);
+  const [isWireModeActive, setIsWireModeActive] = useState(false);
+  const [wireAnchor, setWireAnchor] = useState<WireAnchor | null>(null);
+  const [isJunctionModeActive, setIsJunctionModeActive] = useState(false);
   
   const getLabelPrefix = useCallback((type: CircuitElementType) => {
     return elementNamePrefixes[type] || 'X';
-  }, []);
+  }, [setNodes]);
   
   const getNextElementLabel = useCallback((type: CircuitElementType) => {
     const prefix = getLabelPrefix(type);
@@ -656,6 +949,75 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
     }
   }, [getLabelPrefix]);
 
+  const addJunctionNode = useCallback((position: XYPosition) => {
+    const junctionId = `junction-${nanoid(6)}`;
+    const junctionPorts = clonePorts(defaultPorts[CircuitElementType.JUNCTION] || []);
+    const junctionElement: CircuitElement = {
+      id: junctionId,
+      type: CircuitElementType.JUNCTION,
+      position,
+      rotation: 0,
+      properties: { label: 'Junction' },
+      ports: junctionPorts,
+    };
+    const junctionNode: Node = {
+      id: junctionId,
+      type: 'junctionNode',
+      position,
+      data: {
+        id: junctionId,
+        type: CircuitElementType.JUNCTION,
+        label: '连接点',
+        element: junctionElement,
+        ports: junctionPorts,
+      },
+    };
+    setNodes((current) => [...current, junctionNode]);
+    return junctionId;
+  }, []);
+
+  const getCanvasPosition = useCallback((event: React.MouseEvent<Element, MouseEvent>) => {
+    if (!reactFlowWrapper.current) return null;
+    const bounds = reactFlowWrapper.current.getBoundingClientRect();
+    return reactFlowInstance.project({
+      x: event.clientX - bounds.left,
+      y: event.clientY - bounds.top,
+    });
+  }, [reactFlowInstance]);
+
+  const splitEdgeWithJunction = useCallback((edge: Edge, position: XYPosition) => {
+    const junctionId = addJunctionNode(position);
+    const sourceNode = reactFlowInstance.getNode(edge.source);
+    const targetNode = reactFlowInstance.getNode(edge.target);
+    const sourcePosition = sourceNode?.positionAbsolute || sourceNode?.position;
+    const targetPosition = targetNode?.positionAbsolute || targetNode?.position;
+    const inboundHandle = determineJunctionHandle(sourcePosition, position);
+    const outboundHandle = determineJunctionHandle(position, targetPosition || position);
+    setEdges((current) => {
+      const preserved = current.filter((item) => item.id !== edge.id);
+      const baseData = edge.data ? { ...edge.data } : {};
+      const firstEdge: Edge = {
+        ...edge,
+        id: `${edge.id || 'edge'}-split-a-${junctionId}`,
+        target: junctionId,
+        targetHandle: inboundHandle,
+        sourceHandle: edge.sourceHandle,
+        data: baseData,
+      };
+      const secondEdge: Edge = {
+        ...edge,
+        id: `${edge.id || 'edge'}-split-b-${junctionId}`,
+        source: junctionId,
+        sourceHandle: outboundHandle,
+        target: edge.target,
+        targetHandle: edge.targetHandle,
+        data: baseData,
+      };
+      return [...preserved, firstEdge, secondEdge];
+    });
+    return junctionId;
+  }, [addJunctionNode, reactFlowInstance]);
+
   const loadCircuitDesign = useCallback((design: CircuitDesign, options: { fitView?: boolean; notifyChange?: boolean; enhanceLayout?: boolean } = {}) => {
     if (!design) {
       return;
@@ -669,7 +1031,20 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
         y: element.position?.y ?? 0
       }
     }));
-    const processedElements = applyEnhancedLayout ? enhanceDigitalLayout(safeElements) : safeElements;
+    let processedElements = safeElements;
+    if (applyEnhancedLayout) {
+      const containsAnalog = safeElements.some((element) =>
+        ANALOG_ELEMENT_TYPES.has(element.type as CircuitElementType)
+      );
+      const containsDigital = !containsAnalog && safeElements.some((element) =>
+        DIGITAL_ELEMENT_TYPES.has(element.type as CircuitElementType)
+      );
+      if (containsAnalog) {
+        processedElements = enhanceAnalogLayout(processedElements);
+      } else if (containsDigital) {
+        processedElements = enhanceDigitalLayout(processedElements);
+      }
+    }
     const normalizedElements = processedElements.map((element) => {
       const propertyLabel = typeof element.properties?.['label'] === 'string'
         ? element.properties['label'] as string
@@ -680,10 +1055,13 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
         type: normalizeElementType(element.type as CircuitElementType, resolvedLabel),
       };
     });
-    const safeConnections = design.connections || [];
-    const elementTypeMap = new Map(normalizedElements.map((element) => [element.id, element.type]));
+    let workingConnections: CircuitConnection[] = [...(design.connections || [])];
+    const sanitized = sanitizeAnalogElements(normalizedElements, workingConnections);
+    workingConnections = autoCompleteAnalogConnections(sanitized.elements, sanitized.connections);
+    const finalElements = sanitized.elements;
+    const elementTypeMap = new Map(finalElements.map((element) => [element.id, element.type]));
 
-    const newNodes: Node[] = normalizedElements.map((element) => {
+    const newNodes: Node[] = finalElements.map((element) => {
       const propertyLabel = typeof element.properties?.['label'] === 'string'
         ? element.properties['label'] as string
         : undefined;
@@ -711,7 +1089,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
       };
     });
 
-    const newEdges: Edge[] = safeConnections.map((connection) => {
+    const newEdges: Edge[] = workingConnections.map((connection) => {
       const edgeId = connection.id || `edge-${connection.source.elementId}-${connection.source.portId}-${connection.target.elementId}-${connection.target.portId}`;
       return {
         id: edgeId,
@@ -742,8 +1120,8 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
     setCanUndo(false);
     setCanRedo(false);
 
-    if (normalizedElements.length > 0) {
-      normalizedElements.forEach((element) => {
+    if (finalElements.length > 0) {
+      finalElements.forEach((element) => {
         registerExistingElementLabel(
           element.type as CircuitElementType,
           element.label || (typeof element.properties?.['label'] === 'string' ? element.properties['label'] as string : undefined)
@@ -934,7 +1312,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
   );
 
   // 处理连接创建
-  const onConnect = useCallback(
+  const handleConnection = useCallback(
     (connection: Connection) => {
       // 检查连接是否有效
       if (!connection.source || !connection.target || !connection.sourceHandle || !connection.targetHandle) {
@@ -1044,6 +1422,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
         [CircuitElementType.INDUCTOR]: '1mH',
         [CircuitElementType.VOLTAGE_SOURCE]: '5V',
         [CircuitElementType.CURRENT_SOURCE]: '10mA',
+        [CircuitElementType.AC_SOURCE]: '1Vpp@1kHz',
         [CircuitElementType.DIODE]: '',
         [CircuitElementType.TRANSISTOR_NPN]: '',
         [CircuitElementType.TRANSISTOR_PNP]: '',
@@ -1172,6 +1551,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
           [CircuitElementType.INDUCTOR]: '1mH',
           [CircuitElementType.VOLTAGE_SOURCE]: '5V',
           [CircuitElementType.CURRENT_SOURCE]: '10mA',
+          [CircuitElementType.AC_SOURCE]: '1Vpp@1kHz',
           [CircuitElementType.DIODE]: '',
           [CircuitElementType.TRANSISTOR_NPN]: '',
           [CircuitElementType.TRANSISTOR_PNP]: '',
@@ -1720,23 +2100,84 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
     
     message.success('元件已删除');
   }, [selectedNodeId]);
+
+  const deleteSelectedEdge = useCallback(() => {
+    if (!selectedEdgeId) {
+      message.info('请先选择需要删除的连线');
+      return;
+    }
+    setEdges((eds) => eds.filter((edge) => edge.id !== selectedEdgeId));
+    setSelectedEdgeId(null);
+    message.success('连线已删除');
+  }, [selectedEdgeId]);
   
   // 处理边点击
   const onEdgeClick = useCallback((e: React.MouseEvent, edge: Edge) => {
+    if (isWireModeActive) {
+      if (!reactFlowWrapper.current) return;
+      const bounds = reactFlowWrapper.current.getBoundingClientRect();
+      const position = reactFlowInstance.project({
+        x: e.clientX - bounds.left,
+        y: e.clientY - bounds.top,
+      });
+      const junctionId = splitEdgeWithJunction(edge, position);
+      setWireAnchor({
+        nodeId: junctionId,
+        handleId: null,
+        handleType: 'source',
+        autoHandle: true,
+      });
+      setSelectedEdgeId(null);
+      setSelectedNodeId(null);
+      message.info('已创建连接点，选择另一个端点继续布线');
+      return;
+    }
+    if (isJunctionModeActive) {
+      if (!reactFlowWrapper.current) return;
+      const bounds = reactFlowWrapper.current.getBoundingClientRect();
+      const position = reactFlowInstance.project({
+        x: e.clientX - bounds.left,
+        y: e.clientY - bounds.top,
+      });
+      const junctionId = splitEdgeWithJunction(edge, position);
+      setSelectedEdgeId(null);
+      setSelectedNodeId(junctionId);
+      message.success('连接点已插入');
+      return;
+    }
     setSelectedEdgeId(edge.id);
-    // 取消选中节点
     setSelectedNodeId(null);
     e.stopPropagation();
-  }, []);
+  }, [isJunctionModeActive, isWireModeActive, reactFlowInstance, splitEdgeWithJunction]);
   
   // 处理删除键按下
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if ((e.key === 'Delete' || e.key === 'Backspace') && selectedEdgeId) {
-      setEdges((eds) => eds.filter((edge) => edge.id !== selectedEdgeId));
-      setSelectedEdgeId(null);
-      message.info('连线已删除');
+      deleteSelectedEdge();
+      return;
     }
-  }, [selectedEdgeId]);
+    if (e.key === 'Escape') {
+      let handled = false;
+      if (isWireModeActive) {
+        if (wireAnchor) {
+          setWireAnchor(null);
+          message.info('已取消当前布线起点');
+        } else {
+          setIsWireModeActive(false);
+          message.info('已退出布线模式');
+        }
+        handled = true;
+      }
+      if (isJunctionModeActive) {
+        setIsJunctionModeActive(false);
+        message.info('已退出连接点模式');
+        handled = true;
+      }
+      if (handled) {
+        setWireAnchor(null);
+      }
+    }
+  }, [isJunctionModeActive, isWireModeActive, selectedEdgeId, wireAnchor]);
   
   // 添加键盘事件监听
   useEffect(() => {
@@ -1747,11 +2188,37 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
   }, [handleKeyDown]);
   
   // 添加画布点击处理以取消选择
-  const onPaneClick = useCallback(() => {
-    console.log('取消选择节点');
+  const onPaneClick = useCallback((event?: React.MouseEvent<Element, MouseEvent>) => {
+    if (isWireModeActive && event) {
+      const position = getCanvasPosition(event);
+      if (!position) return;
+      const junctionId = addJunctionNode(position);
+      setWireAnchor({
+        nodeId: junctionId,
+        handleId: null,
+        handleType: 'source',
+        autoHandle: true,
+      });
+      message.info('已放置连接点，选择另一个端点完成布线');
+      return;
+    }
+    if (isJunctionModeActive && event) {
+      const position = getCanvasPosition(event);
+      if (!position) return;
+      const junctionId = addJunctionNode(position);
+      setSelectedNodeId(junctionId);
+      setSelectedEdgeId(null);
+      message.success('连接点已添加');
+      return;
+    }
+    if (isWireModeActive && wireAnchor) {
+      setWireAnchor(null);
+      message.info('已取消当前布线起点');
+      return;
+    }
     setSelectedNodeId(null);
     setSelectedEdgeId(null);
-  }, []);
+  }, [addJunctionNode, getCanvasPosition, isJunctionModeActive, isWireModeActive, wireAnchor]);
 
   // 处理节点点击
   const handleNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
@@ -1763,6 +2230,137 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
     // 阻止事件冒泡
     event.stopPropagation();
   }, []);
+
+  const resolveHandleId = useCallback((anchor: WireAnchor, opposite: WireAnchor) => {
+    if (!anchor.autoHandle) {
+      return anchor.handleId || undefined;
+    }
+    const anchorNode = reactFlowInstance.getNode(anchor.nodeId);
+    const oppositeNode = reactFlowInstance.getNode(opposite.nodeId);
+    const anchorPos = anchorNode?.positionAbsolute || anchorNode?.position;
+    const oppositePos = oppositeNode?.positionAbsolute || oppositeNode?.position;
+    if (!anchorPos || !oppositePos) {
+      return anchor.handleId || 'port-right';
+    }
+    return determineJunctionHandle(anchorPos, oppositePos);
+  }, [reactFlowInstance]);
+
+  const handleWireHandleClick = useCallback((nextAnchor: WireAnchor) => {
+    if (!isWireModeActive) {
+      return;
+    }
+    setSelectedEdgeId(null);
+    setSelectedNodeId(null);
+    if (!wireAnchor) {
+      setWireAnchor(nextAnchor);
+      message.info('已选择起点，请选择终点');
+      return;
+    }
+    if (wireAnchor.nodeId === nextAnchor.nodeId && wireAnchor.handleId === nextAnchor.handleId) {
+      setWireAnchor(null);
+      return;
+    }
+    let sourceAnchor = wireAnchor;
+    let targetAnchor = nextAnchor;
+    if (sourceAnchor.handleType === 'target' && targetAnchor.handleType === 'source') {
+      sourceAnchor = nextAnchor;
+      targetAnchor = wireAnchor;
+    } else if (sourceAnchor.handleType === 'target' && targetAnchor.handleType === 'target') {
+      sourceAnchor = nextAnchor;
+      targetAnchor = wireAnchor;
+    }
+    const resolvedSourceHandle = resolveHandleId(sourceAnchor, targetAnchor);
+    const resolvedTargetHandle = resolveHandleId(targetAnchor, sourceAnchor);
+    const connection: Connection = {
+      source: sourceAnchor.nodeId,
+      sourceHandle: resolvedSourceHandle,
+      target: targetAnchor.nodeId,
+      targetHandle: resolvedTargetHandle,
+    };
+    handleConnection(connection);
+    setWireAnchor(null);
+  }, [handleConnection, isWireModeActive, resolveHandleId, wireAnchor]);
+
+  const toggleWireMode = useCallback(() => {
+    setIsWireModeActive((prev) => {
+      const next = !prev;
+      if (!next) {
+        setWireAnchor(null);
+        message.info('已退出布线模式');
+      } else {
+        setIsJunctionModeActive(false);
+        message.info('布线模式已启用，点击端点或导线开始布线，按 Esc 退出');
+      }
+      return next;
+    });
+  }, []);
+
+  const toggleJunctionMode = useCallback(() => {
+    setIsJunctionModeActive((prev) => {
+      const next = !prev;
+      if (!next) {
+        message.info('已退出连接点模式');
+      } else {
+        setIsWireModeActive(false);
+        setWireAnchor(null);
+        message.info('连接点模式已启用，点击导线或画布以添加连接点，按 Esc 退出');
+      }
+      return next;
+    });
+  }, []);
+
+  const handleEdgeDoubleClick = useCallback((event: React.MouseEvent, edge: Edge) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!reactFlowWrapper.current) return;
+    const bounds = reactFlowWrapper.current.getBoundingClientRect();
+    const position = reactFlowInstance.project({
+      x: event.clientX - bounds.left,
+      y: event.clientY - bounds.top,
+    });
+    const junctionId = splitEdgeWithJunction(edge, position);
+    setSelectedEdgeId(null);
+    setSelectedNodeId(junctionId);
+    message.success('已插入连接点，可继续布线');
+  }, [reactFlowInstance, splitEdgeWithJunction]);
+
+  useEffect(() => {
+    if (!isWireModeActive || !reactFlowWrapper.current) return;
+    const container = reactFlowWrapper.current;
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as HTMLElement;
+      const handleEl = target?.closest('.react-flow__handle');
+      if (!handleEl) return;
+      const nodeId = handleEl.getAttribute('data-nodeid');
+      const handleId = handleEl.getAttribute('data-handleid');
+      if (!nodeId || !handleId) return;
+      const handleType: 'source' | 'target' = handleEl.classList.contains('react-flow__handle-target') ? 'target' : 'source';
+      event.preventDefault();
+      event.stopPropagation();
+      handleWireHandleClick({
+        nodeId,
+        handleId,
+        handleType,
+      });
+    };
+    container.addEventListener('pointerdown', handlePointerDown, true);
+    return () => {
+      container.removeEventListener('pointerdown', handlePointerDown, true);
+    };
+  }, [handleWireHandleClick, isWireModeActive]);
+
+  useEffect(() => {
+    if (!reactFlowWrapper.current) return;
+    const pane = reactFlowWrapper.current.querySelector('.react-flow__pane') as HTMLElement | null;
+    if (pane) {
+      pane.style.cursor = (isWireModeActive || isJunctionModeActive) ? 'crosshair' : '';
+    }
+    return () => {
+      if (pane) {
+        pane.style.cursor = '';
+      }
+    };
+  }, [isJunctionModeActive, isWireModeActive]);
   
   // 注册快捷键
   useHotkeys('ctrl+r', (event) => {
@@ -1775,16 +2373,32 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
     deleteSelectedNode();
   }, [deleteSelectedNode]);
 
+  useEffect(() => {
+    if (isReadOnly) {
+      if (isWireModeActive) {
+        setIsWireModeActive(false);
+        setWireAnchor(null);
+      }
+      if (isJunctionModeActive) {
+        setIsJunctionModeActive(false);
+      }
+    }
+  }, [isJunctionModeActive, isReadOnly, isWireModeActive]);
+
   // 添加边缘选中状态的更新逻辑
   useEffect(() => {
-    if (selectedEdgeId) {
-      setEdges((eds) =>
-        eds.map((edge) => ({
+    setEdges((eds) =>
+      eds.map((edge) => {
+        const isSelected = !!selectedEdgeId && edge.id === selectedEdgeId;
+        if (edge.selected === isSelected) {
+          return edge;
+        }
+        return {
           ...edge,
-          selected: edge.id === selectedEdgeId,
-        }))
-      );
-    }
+          selected: isSelected,
+        };
+      })
+    );
   }, [selectedEdgeId]);
 
   // 处理元件配置更新
@@ -2043,7 +2657,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
   const hasPersistedDesign = Boolean(persistedDesignId);
 
   return (
-    <div ref={reactFlowWrapper} className="flex flex-row w-full h-full bg-white">
+    <div ref={reactFlowWrapper} className="flex flex-row w-full h-full min-h-0 bg-white">
       {/* 左侧元件库面板 */}
       {!isReadOnly && showElementLibrary && (
         <div className="w-64 h-full overflow-auto border-r border-gray-200">
@@ -2055,7 +2669,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
       )}
       
       {/* 主画布区域 */}
-      <div className="flex-1 flex flex-col h-full">
+      <div className="flex-1 flex flex-col h-full min-h-0">
         {/* 工具栏 */}
         {!isReadOnly && (
           <div className="flex justify-between items-center">
@@ -2092,10 +2706,16 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
               canUndo={canUndo}
               canRedo={canRedo}
               hasSelectedNode={!!selectedNodeId}
+              hasSelectedEdge={hasSelectedEdge}
               hasContent={nodes.length > 0 || edges.length > 0}
               canSaveAs={hasPersistedDesign && (nodes.length > 0 || edges.length > 0)}
               onImageImport={handleImageImportClick}
               isImportingImage={isImportingFromImage}
+              onToggleWireMode={isReadOnly ? undefined : toggleWireMode}
+              isWireModeActive={isWireModeActive}
+              onToggleJunctionMode={isReadOnly ? undefined : toggleJunctionMode}
+              isJunctionModeActive={isJunctionModeActive}
+              onDeleteEdge={isReadOnly ? undefined : deleteSelectedEdge}
             />
           </div>
         )}
@@ -2107,7 +2727,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
             edges={edges}
             onNodesChange={isReadOnly ? undefined : onNodesChange}
             onEdgesChange={isReadOnly ? undefined : onEdgesChange}
-            onConnect={isReadOnly ? undefined : onConnect}
+            onConnect={isReadOnly ? undefined : handleConnection}
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
             connectionLineComponent={ConnectionPreview}
@@ -2121,7 +2741,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
             // @ts-ignore
             connectionMode="loose"
             defaultMarkerColor="#3B82F6"
-            connectOnClick={!isReadOnly}
+            connectOnClick={!isReadOnly && !isWireModeActive && !isJunctionModeActive}
             connectionRadius={20}
             isValidConnection={() => !isReadOnly}
             onNodeClick={isReadOnly ? undefined : handleNodeClick}
@@ -2137,6 +2757,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
               document.dispatchEvent(doubleClickEvent);
             }}
             onEdgeClick={isReadOnly ? undefined : onEdgeClick}
+            onEdgeDoubleClick={isReadOnly ? undefined : handleEdgeDoubleClick}
             onPaneClick={onPaneClick}
             elementsSelectable={!isReadOnly}
             selectNodesOnDrag={!isReadOnly}
@@ -2168,6 +2789,14 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
           <div className="flex items-center gap-3">
             {simulationStale && (
               <span className="text-amber-600">仿真结果已失效，请重新运行</span>
+            )}
+            {isWireModeActive && (
+              <span className="text-blue-600">
+                布线模式{wireAnchor ? '：已选起点' : ''}
+              </span>
+            )}
+            {isJunctionModeActive && (
+              <span className="text-blue-600">连接点模式</span>
             )}
             <button 
               className="text-gray-500 hover:text-gray-800 transition-colors"

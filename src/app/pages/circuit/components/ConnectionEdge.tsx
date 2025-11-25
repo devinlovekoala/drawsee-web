@@ -322,6 +322,7 @@ export function ConnectionEdge({
       className={`react-flow__edge ${selected ? 'selected' : ''} ${isHovered ? 'hovered' : ''}`}
       data-testid={`edge-${id}`}
       data-type={`${connectionType}-edge`}
+      style={{ pointerEvents: 'visibleStroke' }}
     >
       <path
         id={id}
@@ -334,6 +335,7 @@ export function ConnectionEdge({
         data-source-handle={sourceHandleId}
         data-target-handle={targetHandleId}
         data-connection-type={connectionType}
+        pointerEvents="visibleStroke"
       />
       
       {animated && (

@@ -64,6 +64,10 @@ const defaultPorts: Record<string, Port[]> = {
     { id: 'positive', name: '正极', type: 'output', position: { side: 'left', x: 0, y: 50 } },
     { id: 'negative', name: '负极', type: 'input', position: { side: 'right', x: 120, y: 50 } }
   ],
+  [CircuitElementType.AC_SOURCE]: [
+    { id: 'positive', name: '正极', type: 'output', position: { side: 'left', x: 0, y: 50 } },
+    { id: 'negative', name: '负极', type: 'input', position: { side: 'right', x: 120, y: 50 } }
+  ],
   [CircuitElementType.DIODE]: [
     { id: 'anode', name: '阳极', type: 'input', position: { side: 'left', x: 0, y: 50 } },
     { id: 'cathode', name: '阴极', type: 'output', position: { side: 'right', x: 120, y: 50 } }
@@ -185,6 +189,15 @@ const SVGComponents: Record<CircuitElementType, React.FC<React.SVGProps<SVGSVGEl
       <path d="M12,20 L28,20" stroke="currentColor" strokeWidth="2" />
       <path d="M25,15 L28,20 L25,25" stroke="currentColor" strokeWidth="2" fill="none" />
       <text x="12" y="16" fontSize="7" fill="currentColor">I</text>
+    </svg>
+  ),
+  [CircuitElementType.AC_SOURCE]: (props: React.SVGProps<SVGSVGElement>) => (
+    <svg {...props} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="20" cy="20" r="15" stroke="currentColor" strokeWidth="2" fill="#F0F9FF" fillOpacity="0.7" />
+      <path d="M8,20 C12,12 16,28 20,20 C24,12 28,28 32,20" stroke="currentColor" strokeWidth="2" fill="none" />
+      <path d="M5,20 L8,20" stroke="currentColor" strokeWidth="2" />
+      <path d="M32,20 L35,20" stroke="currentColor" strokeWidth="2" />
+      <text x="14" y="12" fontSize="7" fill="currentColor">AC</text>
     </svg>
   ),
   [CircuitElementType.DIODE]: (props: React.SVGProps<SVGSVGElement>) => (

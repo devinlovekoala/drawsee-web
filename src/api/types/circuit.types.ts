@@ -6,7 +6,8 @@ export enum CircuitElementType {
   CAPACITOR = 'capacitor',
   INDUCTOR = 'inductor',
   VOLTAGE_SOURCE = 'dc_source',
-  CURRENT_SOURCE = 'ac_source',
+  CURRENT_SOURCE = 'current_source',
+  AC_SOURCE = 'ac_source',
   DIODE = 'diode',
   TRANSISTOR_NPN = 'bjt',
   TRANSISTOR_PNP = 'bjt_pnp',
@@ -140,6 +141,10 @@ export const ComponentVisualConfig: Record<CircuitElementType, ComponentVisualCo
     height: 40
   },
   [CircuitElementType.CURRENT_SOURCE]: {
+    width: 40,
+    height: 40
+  },
+  [CircuitElementType.AC_SOURCE]: {
     width: 40,
     height: 40
   },
