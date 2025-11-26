@@ -62,20 +62,61 @@ export function AgentMenu() {
       toast.info(`${agent.name}功能即将上线，敬请期待！`);
       return;
     }
-
     // 根据不同的agent类型导航到相应页面，并携带参数
-    if (agent.type === 'CIRCUIT_ANALYSIS') {
-      // 电路分析模式直接导航到电路分析页面
-      navigate('/circuit');
-    } else {
-      // 其他模式导航到blank页面
-      navigate('/blank', {
-        state: {
-          agentType: agent.type,
-          agentName: agent.name
+    const targetPath = agent.type === 'CIRCUIT_ANALYSIS' ? '/circuit' : '/blank';
+    const targetState = agent.type === 'CIRCUIT_ANALYSIS' ? undefined : { agentType: agent.type, agentName: agent.name };
+
+    // 优先做同步的全局检查，避免在事件监听器尚未就绪时跳转丢失更改
+    let preConfirmed = false;
+    try {
+      const globalChecker = (window as any).drawsee_hasUnsavedCircuitChanges;
+      if (typeof globalChecker === 'function' && globalChecker()) {
+        const ok = window.confirm('您有尚未保存的电路设计，确定要离开并放弃更改吗？');
+        if (!ok) return;
+        preConfirmed = true;
+        try { (window as any).drawsee_preConfirmedNavigation = true; } catch (err) {}
+        try { (window as any).drawsee_suppressBeforeUnload = true; } catch (err) {}
+      }
+    } catch (err) {}
+
+    // Dispatch a navigation request so pages (like circuit editor) can intercept unsaved changes
+    (async () => {
+      const result = await new Promise<boolean>((resolve) => {
+        let resolved = false;
+        const cb = (canProceed: boolean) => {
+          if (resolved) return;
+          resolved = true;
+          resolve(Boolean(canProceed));
+        };
+
+        const navigationEvent = new CustomEvent('app:navigation-request', {
+          detail: { path: targetPath, state: targetState, callback: cb, preConfirmed } as any,
+          cancelable: true,
+        });
+
+        const dispatched = document.dispatchEvent(navigationEvent);
+        if (dispatched) {
+          if (!resolved) {
+            resolved = true;
+            resolve(true);
+          }
+          return;
         }
+
+        const fallback = window.setTimeout(() => {
+          if (!resolved) {
+            resolved = true;
+            resolve(true);
+          }
+        }, 500);
       });
-    }
+
+      if (result) {
+        navigate(targetPath, { state: targetState });
+        try { (window as any).drawsee_preConfirmedNavigation = false; } catch (err) {}
+        try { (window as any).drawsee_suppressBeforeUnload = false; } catch (err) {}
+      }
+    })();
   };
   
   const handleLearningToolClick = (tool: typeof learningTools[0]) => {
@@ -83,8 +124,43 @@ export function AgentMenu() {
       toast.info(`${tool.name}功能即将上线，敬请期待！`);
       return;
     }
-    
-    navigate(tool.path);
+    (async () => {
+      const result = await new Promise<boolean>((resolve) => {
+        let resolved = false;
+        const cb = (canProceed: boolean) => {
+          if (resolved) return;
+          resolved = true;
+          resolve(Boolean(canProceed));
+        };
+
+        const navigationEvent = new CustomEvent('app:navigation-request', {
+          detail: { path: tool.path, state: undefined, callback: cb } as any,
+          cancelable: true,
+        });
+
+        const dispatched = document.dispatchEvent(navigationEvent);
+        if (dispatched) {
+          if (!resolved) {
+            resolved = true;
+            resolve(true);
+          }
+          return;
+        }
+
+        const fallback = window.setTimeout(() => {
+          if (!resolved) {
+            resolved = true;
+            resolve(true);
+          }
+        }, 500);
+      });
+
+      if (result) {
+        navigate(tool.path);
+        try { (window as any).drawsee_preConfirmedNavigation = false; } catch (err) {}
+        try { (window as any).drawsee_suppressBeforeUnload = false; } catch (err) {}
+      }
+    })();
   };
 
   return (

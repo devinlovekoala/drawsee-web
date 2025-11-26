@@ -40,50 +40,91 @@ function AppSideBar({activeConversationId, setActiveConversationId, className}: 
     const {conversations, isLogin} = useAppContext();
     const [circuitMenuOpen, setCircuitMenuOpen] = useState(true);
 
-    // 从location中获取当前会话ID
-    useEffect(() => {
-      if (location.pathname === '/flow' && location.state) {
-        const { convId } = location.state as FlowLocationState;
-        setActiveConversationId(convId);
-      } else {
-        setActiveConversationId(null);
-      }
-    }, [location, setActiveConversationId]);
+		// 从location中获取当前会话ID
+		useEffect(() => {
+			if (location.pathname === '/flow' && location.state) {
+				const { convId } = location.state as FlowLocationState;
+				setActiveConversationId(convId);
+			} else {
+				setActiveConversationId(null);
+			}
+		}, [location, setActiveConversationId]);
 
-    // 创建自定义导航处理函数
-    const handleCustomNavigation = useCallback((path: string, state?: any) => {
-      // 检查当前是否在电路编辑页面
-      const isCircuitEditPage = location.pathname.includes('/circuit/edit/');
-      
-      if (isCircuitEditPage) {
-        // 创建并分发导航事件
-        const navigationEvent = new CustomEvent('app:navigation-request', {
-          detail: {
-            path,
-            state,
-            callback: (canProceed: boolean) => {
-              if (canProceed) {
-                navigate(path, { state });
-              }
-            }
-          } as NavigationEvent
-        });
-        
-        // 分发事件，让电路编辑页面有机会拦截
-        const handled = document.dispatchEvent(navigationEvent);
-        
-        // 如果事件没有被处理（preventDefault），则直接导航
-        if (handled) {
-          // 设置一个短暂的延迟，给电路编辑页面时间来处理事件
-          setTimeout(() => {
-            navigate(path, { state });
-          }, 50);
-        }
-      } else {
-        // 不在电路编辑页面，直接导航
-        navigate(path, { state });
-      }
-    }, [location.pathname, navigate]);
+		// 创建自定义导航处理函数
+		const handleCustomNavigation = useCallback(async (path: string, state?: any) => {
+			// 检查当前是否在电路编辑页面
+			const isCircuitEditPage = location.pathname.includes('/circuit/edit/');
+
+			const confirmMsg = '您有尚未保存的电路设计，确定要离开并放弃更改吗？';
+
+			// 优先做一个同步的全局检查（避免事件监听尚未就绪时丢失拦截）
+			let preConfirmed = false;
+			try {
+				const globalChecker = (window as any).drawsee_hasUnsavedCircuitChanges;
+				if (typeof globalChecker === 'function' && globalChecker()) {
+					const ok = window.confirm(confirmMsg);
+					if (!ok) return; // 取消导航
+					preConfirmed = true;
+					try { (window as any).drawsee_preConfirmedNavigation = true; } catch (err) {}
+					try { (window as any).drawsee_suppressBeforeUnload = true; } catch (err) {}
+				}
+			} catch (err) {
+				// continue
+			}
+
+			if (isCircuitEditPage) {
+				// 使用 Promise 等待编辑页通过回调决定是否继续导航
+				const result = await new Promise<boolean>((resolve) => {
+					let resolved = false;
+					const cb = (canProceed: boolean) => {
+						if (resolved) return;
+						resolved = true;
+						resolve(Boolean(canProceed));
+					};
+
+					const navigationEvent = new CustomEvent('app:navigation-request', {
+						detail: {
+							path,
+							state,
+							callback: cb,
+							preConfirmed,
+						} as any,
+						cancelable: true,
+					});
+
+					// dispatch 同步触发监听器
+					  console.log('[AppSideBar] dispatching app:navigation-request', path);
+					  document.dispatchEvent(navigationEvent);
+					  console.log('[AppSideBar] dispatched app:navigation-request', path);
+
+					// 后备：如果没有监听者响应（例如非编辑页或监听尚未挂载），在 500ms 后默认允许导航
+					const fallback = window.setTimeout(() => {
+						if (!resolved) {
+							resolved = true;
+							try { (window as any).drawsee_preConfirmedNavigation = false; } catch (err) {}
+							try { (window as any).drawsee_suppressBeforeUnload = false; } catch (err) {}
+							resolve(true);
+						}
+					}, 500);
+
+					// 当 resolve 调用后清理定时器
+					const wrappedResolve = (v: boolean) => {
+						if (fallback) window.clearTimeout(fallback);
+						resolve(v);
+					};
+				});
+
+					console.log('[AppSideBar] navigation decision for', path, '=>', result);
+					if (result) {
+						navigate(path, { state });
+						try { (window as any).drawsee_preConfirmedNavigation = false; } catch (err) {}
+						try { (window as any).drawsee_suppressBeforeUnload = false; } catch (err) {}
+					}
+			} else {
+				// 不在电路编辑页面，直接导航
+				navigate(path, { state });
+			}
+		}, [location.pathname, navigate]);
 
     const handleConversationClick = useCallback((convId: number) => {
       setActiveConversationId(convId);

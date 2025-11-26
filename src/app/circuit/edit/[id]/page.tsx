@@ -95,17 +95,36 @@ export default function CircuitEditPage() {
   // 监听来自AppSideBar的导航事件
   useEffect(() => {
     const handleAppNavigation = (event: CustomEvent<NavigationEvent>) => {
-      const { path, state, callback } = event.detail;
-      
-      // 如果有未保存的更改，拦截导航
+      const { path, state, callback, preConfirmed } = event.detail as any;
+      console.log('[CircuitEditPage] received navigation request', path, 'hasUnsavedChanges=', hasUnsavedChanges, 'preConfirmed=', preConfirmed);
+
+      // 优先检查全局预确认标志（以防事件中未携带 preConfirmed 或事件错过）
+      try {
+        const globalPre = (window as any).drawsee_preConfirmedNavigation;
+        if (globalPre) {
+          console.log('[CircuitEditPage] global preConfirmed flag set -> allowing navigation and clearing flag');
+          try { (window as any).drawsee_preConfirmedNavigation = false; } catch (err) {}
+          if (callback) callback(true);
+          return;
+        }
+      } catch (err) {}
+
+      // 如果编辑页被预先确认（通过事件携带），则直接允许导航
+      if (preConfirmed) {
+        console.log('[CircuitEditPage] preConfirmed -> allowing navigation');
+        if (callback) callback(true);
+        return;
+      }
+
+      // 如果有未保存的更改，拦截导航并弹窗
       if (hasUnsavedChanges) {
         // 阻止默认行为
-        event.preventDefault();
-        
+        try { event.preventDefault(); } catch (err) {}
         // 使用我们自己的导航处理逻辑
         handleNavigation(path, state, callback);
       } else if (callback) {
         // 如果没有未保存的更改，通知可以继续导航
+        console.log('[CircuitEditPage] no unsaved changes, calling callback(true)');
         callback(true);
       }
     };
@@ -122,7 +141,7 @@ export default function CircuitEditPage() {
   // 确认导航离开
   const confirmNavigation = useCallback(() => {
     setShowConfirmModal(false);
-    
+    console.log('[CircuitEditPage] confirmNavigation -> proceed');
     if (navigationCallback) {
       // 如果有回调函数，通知可以继续导航
       navigationCallback(true);
@@ -140,7 +159,7 @@ export default function CircuitEditPage() {
   // 取消导航离开
   const cancelNavigation = useCallback(() => {
     setShowConfirmModal(false);
-    
+    console.log('[CircuitEditPage] cancelNavigation -> cancel');
     if (navigationCallback) {
       // 通知不能继续导航
       navigationCallback(false);

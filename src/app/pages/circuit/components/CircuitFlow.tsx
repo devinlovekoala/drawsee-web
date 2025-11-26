@@ -2791,6 +2791,14 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
     }
   }, [isJunctionModeActive, isReadOnly, isWireModeActive]);
 
+  // 将未保存状态检查暴露到全局，以便侧栏可以进行同步阻塞检查
+  useEffect(() => {
+    (window as any).drawsee_hasUnsavedCircuitChanges = () => !!hasUnsavedChangesRef.current;
+    return () => {
+      try { delete (window as any).drawsee_hasUnsavedCircuitChanges; } catch (err) {}
+    };
+  }, []);
+
   // 添加边缘选中状态的更新逻辑
   useEffect(() => {
     setEdges((eds) =>
@@ -3062,6 +3070,115 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
   }, [activeWaveform]);
   const hasPersistedDesign = Boolean(persistedDesignId);
 
+  // 离开页面/导航拦截：在用户有未保存更改时给出提示
+  useEffect(() => {
+    const confirmMsg = '您有尚未保存的电路设计，确定要离开并放弃更改吗？';
+
+    const beforeUnloadHandler = (e: BeforeUnloadEvent) => {
+      try {
+        // 如果存在侧栏/菜单设置的预确认或抑制标志，则跳过浏览器 beforeunload 提示
+        const pre = (window as any).drawsee_preConfirmedNavigation;
+        const suppress = (window as any).drawsee_suppressBeforeUnload;
+        if (pre || suppress) {
+          try { (window as any).drawsee_preConfirmedNavigation = false; } catch (err) {}
+          try { (window as any).drawsee_suppressBeforeUnload = false; } catch (err) {}
+          return undefined;
+        }
+      } catch (err) {}
+
+      if (hasUnsavedChangesRef.current) {
+        e.preventDefault();
+        // 某些浏览器需要设置 returnValue
+        e.returnValue = confirmMsg;
+        return confirmMsg;
+      }
+      return undefined;
+    };
+
+    const originalPush = history.pushState;
+    const originalReplace = history.replaceState;
+
+    // 同步阻塞式提示（使用原生 confirm）以便能够阻止同步的 pushState/replaceState
+    (history as any).pushState = function (...args: any[]) {
+      try {
+        const pre = (window as any).drawsee_preConfirmedNavigation;
+        const suppress = (window as any).drawsee_suppressBeforeUnload;
+        if (pre || suppress) {
+          try { (window as any).drawsee_preConfirmedNavigation = false; } catch (err) {}
+          try { (window as any).drawsee_suppressBeforeUnload = false; } catch (err) {}
+          return (originalPush as any).apply(history, args);
+        }
+      } catch (err) {}
+
+      if (hasUnsavedChangesRef.current) {
+        const ok = window.confirm(confirmMsg);
+        if (!ok) {
+          return; // 取消导航
+        }
+      }
+      return (originalPush as any).apply(history, args);
+    };
+
+    (history as any).replaceState = function (...args: any[]) {
+      try {
+        const pre = (window as any).drawsee_preConfirmedNavigation;
+        const suppress = (window as any).drawsee_suppressBeforeUnload;
+        if (pre || suppress) {
+          try { (window as any).drawsee_preConfirmedNavigation = false; } catch (err) {}
+          try { (window as any).drawsee_suppressBeforeUnload = false; } catch (err) {}
+          return (originalReplace as any).apply(history, args);
+        }
+      } catch (err) {}
+
+      if (hasUnsavedChangesRef.current) {
+        const ok = window.confirm(confirmMsg);
+        if (!ok) {
+          return; // 取消导航
+        }
+      }
+      return (originalReplace as any).apply(history, args);
+    };
+
+    const onPopState = () => {
+      try {
+        const pre = (window as any).drawsee_preConfirmedNavigation;
+        const suppress = (window as any).drawsee_suppressBeforeUnload;
+        if (pre || suppress) {
+          try { (window as any).drawsee_preConfirmedNavigation = false; } catch (err) {}
+          try { (window as any).drawsee_suppressBeforeUnload = false; } catch (err) {}
+          return;
+        }
+      } catch (err) {}
+
+      if (hasUnsavedChangesRef.current) {
+        const ok = window.confirm(confirmMsg);
+        if (!ok) {
+          // 用户取消后，恢复到当前地址（使用原始 pushState 避免再次触发拦截）
+          try {
+            (originalPush as any).apply(history, [window.history.state, document.title, window.location.href]);
+          } catch (err) {
+            // fallback: 尝试前进以撤销后退
+            history.go(1);
+          }
+        }
+      }
+    };
+
+    window.addEventListener('beforeunload', beforeUnloadHandler);
+    window.addEventListener('popstate', onPopState);
+
+    return () => {
+      window.removeEventListener('beforeunload', beforeUnloadHandler);
+      window.removeEventListener('popstate', onPopState);
+      // 恢复原始方法
+      try {
+        (history as any).pushState = originalPush;
+        (history as any).replaceState = originalReplace;
+      } catch (err) {
+        // ignore
+      }
+    };
+  }, []);
   return (
     <div ref={reactFlowWrapper} className="flex flex-row w-full h-full min-h-0 bg-white">
       {/* 左侧元件库面板 */}

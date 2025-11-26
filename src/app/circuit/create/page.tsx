@@ -77,6 +77,15 @@ export default function CircuitCreatePage() {
 
   useEffect(() => {
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      try {
+        const pre = (window as any).drawsee_preConfirmedNavigation;
+        const suppress = (window as any).drawsee_suppressBeforeUnload;
+        if (pre || suppress) {
+          try { (window as any).drawsee_preConfirmedNavigation = false; } catch (err) {}
+          try { (window as any).drawsee_suppressBeforeUnload = false; } catch (err) {}
+          return;
+        }
+      } catch (err) {}
       if (!hasUnsavedChanges) return;
       event.preventDefault();
       event.returnValue = '';
