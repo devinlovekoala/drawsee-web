@@ -1008,27 +1008,119 @@ const mapToGridPosition = (value: number, centers: number[], spacing: number, pa
   return padding + bestIndex * spacing;
 };
 
-const enhanceDigitalLayout = (elements: CircuitElement[]) => {
-  if (!elements.length) return elements;
-  const xValues = elements.map(el => el.position?.x ?? 0);
-  const yValues = elements.map(el => el.position?.y ?? 0);
-  const xCenters = clusterCenters(xValues, 140);
-  const yCenters = clusterCenters(yValues, 90);
-  const columnSpacing = 200;
-  const rowSpacing = 130;
-  const paddingX = 60;
-  const paddingY = 60;
+const enhanceDigitalLayout = (elements: CircuitElement[], connections: CircuitConnection[]) => {
+  const digitalElements = elements.filter((element) =>
+    DIGITAL_ELEMENT_TYPES.has(element.type as CircuitElementType)
+  );
+  if (!digitalElements.length) {
+    return elements;
+  }
 
-  return elements.map(element => {
-    const currentPos = element.position || { x: 0, y: 0 };
-    return {
-      ...element,
-      position: {
-        x: mapToGridPosition(currentPos.x, xCenters, columnSpacing, paddingX),
-        y: mapToGridPosition(currentPos.y, yCenters, rowSpacing, paddingY)
-      }
-    };
+  const elementMap = new Map(elements.map((element) => [element.id, element]));
+  const adjacency = new Map<string, Set<string>>();
+  const inDegree = new Map<string, number>();
+
+  digitalElements.forEach((element) => {
+    adjacency.set(element.id, new Set());
+    inDegree.set(element.id, 0);
   });
+
+  connections.forEach((connection) => {
+    if (
+      adjacency.has(connection.source.elementId) &&
+      adjacency.has(connection.target.elementId)
+    ) {
+      if (!adjacency.get(connection.source.elementId)!.has(connection.target.elementId)) {
+        adjacency.get(connection.source.elementId)!.add(connection.target.elementId);
+        inDegree.set(
+          connection.target.elementId,
+          (inDegree.get(connection.target.elementId) || 0) + 1
+        );
+      }
+    }
+  });
+
+  const queue: string[] = [];
+  inDegree.forEach((count, elementId) => {
+    if (count === 0) {
+      queue.push(elementId);
+    }
+  });
+
+  if (queue.length === 0) {
+    queue.push(...digitalElements.map((element) => element.id));
+  }
+
+  const columnIndex = new Map<string, number>();
+  const visited = new Set<string>();
+  while (queue.length) {
+    const currentId = queue.shift()!;
+    visited.add(currentId);
+    const currentColumn = columnIndex.get(currentId) ?? 0;
+
+    adjacency.get(currentId)?.forEach((targetId) => {
+      if (!columnIndex.has(targetId) || (columnIndex.get(targetId) ?? 0) <= currentColumn) {
+        columnIndex.set(targetId, currentColumn + 1);
+      }
+      const degree = (inDegree.get(targetId) || 0) - 1;
+      inDegree.set(targetId, degree);
+      if (degree === 0 && !visited.has(targetId)) {
+        queue.push(targetId);
+      }
+    });
+  }
+
+  digitalElements.forEach((element) => {
+    if (!columnIndex.has(element.id)) {
+      columnIndex.set(element.id, 0);
+    }
+  });
+
+  const columns = new Map<number, string[]>();
+  columnIndex.forEach((col, elementId) => {
+    const column = columns.get(col) ?? [];
+    column.push(elementId);
+    columns.set(col, column);
+  });
+
+  columns.forEach((ids) => {
+    ids.sort((a, b) => {
+      const typeA = elementMap.get(a)?.type;
+      const typeB = elementMap.get(b)?.type;
+      if (typeA === typeB) {
+        return a.localeCompare(b);
+      }
+      if (typeA === CircuitElementType.DIGITAL_INPUT) return -1;
+      if (typeB === CircuitElementType.DIGITAL_INPUT) return 1;
+      if (typeA === CircuitElementType.DIGITAL_OUTPUT) return 1;
+      if (typeB === CircuitElementType.DIGITAL_OUTPUT) return -1;
+      return a.localeCompare(b);
+    });
+  });
+
+  const columnSpacing = 220;
+  const rowSpacing = 140;
+  const paddingX = 80;
+  const paddingY = 80;
+
+  const positionedElements = new Map<string, CircuitElement>();
+  elements.forEach((element) => positionedElements.set(element.id, element));
+
+  columns.forEach((ids, columnIdx) => {
+    ids.forEach((elementId, rowIdx) => {
+      const existing = positionedElements.get(elementId);
+      if (!existing) return;
+      positionedElements.set(elementId, {
+        ...existing,
+        position: {
+          x: paddingX + columnIdx * columnSpacing,
+          y: paddingY + rowIdx * rowSpacing,
+        },
+      });
+    });
+  });
+
+  return Array.from(positionedElements.values());
 };
 
 const enhanceAnalogLayout = (elements: CircuitElement[]) => {
@@ -1428,11 +1520,13 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
         DIGITAL_ELEMENT_TYPES.has(element.type as CircuitElementType)
       );
       if (containsAnalog) {
-        workingElements = isBjtBiasCandidate(workingElements)
-          ? applyBjtBiasLayout(workingElements, workingConnections)
-          : enhanceAnalogLayout(workingElements);
+        if (isBjtBiasCandidate(workingElements)) {
+          workingElements = applyBjtBiasLayout(workingElements, workingConnections);
+        } else {
+          workingElements = enhanceAnalogLayout(workingElements);
+        }
       } else if (containsDigital) {
-        workingElements = enhanceDigitalLayout(workingElements);
+        workingElements = enhanceDigitalLayout(workingElements, workingConnections);
       }
     }
 
