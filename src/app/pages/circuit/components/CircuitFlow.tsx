@@ -16,7 +16,7 @@ import ReactFlow, {
   ReactFlowProvider,
   XYPosition,
 } from 'reactflow';
-import { Button, message, Modal, Spin } from 'antd';
+import { Button, message, Modal, Spin, Drawer } from 'antd';
 import 'reactflow/dist/style.css';
 import { CircuitNode } from './CircuitNode';
 import ConnectionEdge, { ConnectionPreview } from './ConnectionEdge';
@@ -3773,26 +3773,25 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
         )}
       </Modal>
 
-      <Modal
+      <Drawer
         title="数字仿真波形"
+        placement="right"
+        width={520}
+        mask={false}
         open={digitalSimModalVisible}
-        onCancel={() => setDigitalSimModalVisible(false)}
-        footer={(
-          <div className="flex w-full flex-wrap items-center justify-between gap-2">
-            <div className="text-xs text-gray-500">
-              {digitalSimResult?.warnings?.length ? digitalSimResult.warnings.join(' / ') : '仿真完成，可下载 VCD 查看完整波形'}
-            </div>
-            <div className="flex gap-2">
-              <Button onClick={handleDownloadDigitalVcd} disabled={!digitalSimResult?.rawVcd}>
-                下载 VCD
-              </Button>
-              <Button type="primary" onClick={() => setDigitalSimModalVisible(false)}>
-                关闭
-              </Button>
-            </div>
+        onClose={() => setDigitalSimModalVisible(false)}
+        destroyOnClose={false}
+        extra={(
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Button onClick={handleDownloadDigitalVcd} disabled={!digitalSimResult?.rawVcd}>
+              下载 VCD
+            </Button>
+            <Button type="primary" onClick={() => setDigitalSimModalVisible(false)}>
+              收起
+            </Button>
           </div>
         )}
-        width={760}
+        rootClassName="digital-sim-drawer"
       >
         {digitalSimResult ? (
           <div className="space-y-4">
@@ -3843,7 +3842,24 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
             暂无仿真结果。
           </div>
         )}
-      </Modal>
+      </Drawer>
+
+      {digitalSimResult && !digitalSimModalVisible && (
+        <div className="fixed bottom-6 right-6 z-[1200] flex flex-col items-end gap-2">
+          <div className="rounded bg-white/90 px-3 py-1 text-xs text-gray-600 shadow">
+            最新仿真完成，点击查看波形
+          </div>
+          <Button
+            type="primary"
+            size="large"
+            shape="round"
+            onClick={() => setDigitalSimModalVisible(true)}
+            className="shadow-lg"
+          >
+            打开数字波形
+          </Button>
+        </div>
+      )}
 
       {isAnalyzing && (
         <div style={{ 
