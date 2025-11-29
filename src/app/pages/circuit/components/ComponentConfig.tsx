@@ -79,6 +79,10 @@ const ComponentConfig: React.FC<ComponentConfigProps> = ({
   const [rawValueInput, setRawValueInput] = useState('');
   // 添加一个状态来跟踪组件是否已经初始化
   const [initialized, setInitialized] = useState(false);
+  const elementType = element?.element?.type as CircuitElementType | undefined;
+  const isDigitalInput = elementType === CircuitElementType.DIGITAL_INPUT;
+  const isDigitalOutput = elementType === CircuitElementType.DIGITAL_OUTPUT;
+  const isDigitalClock = elementType === CircuitElementType.DIGITAL_CLOCK;
 
   // 记录接收到的数据 - 只在开发模式下记录日志
   useEffect(() => {
@@ -98,9 +102,9 @@ const ComponentConfig: React.FC<ComponentConfigProps> = ({
   }, [visible]);
 
   const unitOptions = useMemo(() => {
-    if (!element?.element?.type) return [];
-    return UNIT_OPTIONS_MAP[element.element.type] || [];
-  }, [element?.element?.type]);
+    if (!elementType) return [];
+    return UNIT_OPTIONS_MAP[elementType] || [];
+  }, [elementType]);
 
   const resolveElementValue = useCallback(() => {
     if (!element) return '';
@@ -116,8 +120,12 @@ const ComponentConfig: React.FC<ComponentConfigProps> = ({
     if (element) {
       setLabelInput(element.label || element.element?.properties?.label || element.element?.label || '');
       const resolvedValue = resolveElementValue();
-      setRawValueInput(resolvedValue);
-      if (unitOptions.length > 0) {
+      if (isDigitalInput) {
+        setRawValueInput(resolvedValue.replace(/[^01]/g, ''));
+      } else {
+        setRawValueInput(resolvedValue);
+      }
+      if (unitOptions.length > 0 && !isDigitalInput && !isDigitalClock) {
         const parsed = splitValueAndUnit(resolvedValue);
         setValueNumberInput(parsed?.numeric || '');
         setValueUnitInput(getMatchingUnit(parsed?.unit, unitOptions));
@@ -126,7 +134,7 @@ const ComponentConfig: React.FC<ComponentConfigProps> = ({
         setValueUnitInput('');
       }
     }
-  }, [element, unitOptions, resolveElementValue]);
+  }, [element, unitOptions, resolveElementValue, isDigitalInput, isDigitalClock]);
 
   const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
@@ -141,9 +149,16 @@ const ComponentConfig: React.FC<ComponentConfigProps> = ({
       return;
     }
 
-    const structuredValue = unitOptions.length > 0
-      ? (valueNumberInput ? `${valueNumberInput}${valueUnitInput || ''}` : element.value || '')
-      : rawValueInput;
+    let structuredValue = '';
+    if (isDigitalOutput) {
+      structuredValue = '';
+    } else if (unitOptions.length > 0 && !isDigitalInput && !isDigitalClock) {
+      structuredValue = valueNumberInput
+        ? `${valueNumberInput}${valueUnitInput || ''}`
+        : (element.value || element.element?.properties?.value || '');
+    } else {
+      structuredValue = rawValueInput;
+    }
     
     const updates: Partial<CircuitNodeData> = {
       label: labelInput,
@@ -162,8 +177,116 @@ const ComponentConfig: React.FC<ComponentConfigProps> = ({
     return null;
   }
 
-  const elementTypeName = element.element?.type ? getElementTypeName(element.element.type) : '元件';
-  const elementUnit = element.element?.type ? getElementUnit(element.element.type) : '';
+  const elementTypeName = elementType ? getElementTypeName(elementType) : '元件';
+  const elementUnit = elementType ? getElementUnit(elementType) : '';
+  const labelPlaceholder = (isDigitalInput || isDigitalOutput || isDigitalClock)
+    ? '例如：IN_A'
+    : '例如: R1, C1';
+  const labelFieldLabel = (isDigitalInput || isDigitalOutput || isDigitalClock)
+    ? '通道/元件标签'
+    : '元件标签';
+  const labelHelperText = isDigitalInput
+    ? '标签将作为输入端名称显示在波形中'
+    : isDigitalOutput
+      ? '标签会出现在波形与观测表格中，便于区分多个输出'
+      : isDigitalClock
+        ? '用于在波形列表中识别时钟信号'
+        : '';
+
+  const renderValueSection = () => {
+    if (!element) return null;
+    if (isDigitalOutput) {
+      return (
+        <>
+          <label className="block text-sm font-medium text-gray-700 mb-1">输出说明</label>
+          <div className="rounded-md border border-dashed border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600">
+            数字输出无需设置固定值。双击仿真波形时将以该输出标签作为通道名称。
+          </div>
+        </>
+      );
+    }
+    if (isDigitalInput) {
+      return (
+        <>
+          <label className="block text-sm font-medium text-gray-700 mb-1">输入波形/序列</label>
+          <input
+            type="text"
+            value={rawValueInput}
+            onChange={(e) => setRawValueInput(e.target.value.replace(/[^01]/g, ''))}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            style={{ borderColor: theme.border }}
+            placeholder="例如：0011（留空代表自动真值表）"
+          />
+          <p className="mt-1 text-xs text-gray-500">
+            仅输入 0/1，系统会以 10ns 步长依次施加；留空时仿真会自动遍历所有输入组合。
+          </p>
+        </>
+      );
+    }
+    if (isDigitalClock) {
+      return (
+        <>
+          <label className="block text-sm font-medium text-gray-700 mb-1">时钟周期</label>
+          <input
+            type="text"
+            value={rawValueInput}
+            onChange={(e) => setRawValueInput(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            style={{ borderColor: theme.border }}
+            placeholder="例如：10ns、50 或 0.5us"
+          />
+          <p className="mt-1 text-xs text-gray-500">
+            支持 ns / μs / ms 等单位，仿真会按照填写的周期自动翻转高低电平。
+          </p>
+        </>
+      );
+    }
+    if (unitOptions.length > 0) {
+      return (
+        <>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            元件值 {elementUnit && `(${elementUnit})`}
+          </label>
+          <div className="flex gap-2">
+            <input
+              type="number"
+              step="any"
+              value={valueNumberInput}
+              onChange={(e) => setValueNumberInput(e.target.value)}
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              style={{ borderColor: theme.border }}
+              placeholder="请输入数值"
+            />
+            <select
+              value={valueUnitInput || unitOptions[0]}
+              onChange={(e) => setValueUnitInput(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              style={{ borderColor: theme.border }}
+            >
+              {unitOptions.map((option) => (
+                <option key={option} value={option}>{option}</option>
+              ))}
+            </select>
+          </div>
+        </>
+      );
+    }
+    return (
+      <>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          元件值 {elementUnit && `(${elementUnit})`}
+        </label>
+        <input
+          type="text"
+          value={rawValueInput}
+          onChange={(e) => setRawValueInput(e.target.value)}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          style={{ borderColor: theme.border }}
+          placeholder={elementUnit ? `例如: 1k${elementUnit}` : '输入值'}
+        />
+      </>
+    );
+  };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-[9999]" onClick={onClose}>
@@ -187,53 +310,22 @@ const ComponentConfig: React.FC<ComponentConfigProps> = ({
         
         <form onSubmit={handleSubmit} className="p-6">
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">元件标签</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{labelFieldLabel}</label>
             <input 
               type="text" 
               value={labelInput} 
               onChange={(e) => setLabelInput(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               style={{ borderColor: theme.border }}
-              placeholder="例如: R1, C1"
+              placeholder={labelPlaceholder}
             />
+            {labelHelperText && (
+              <p className="mt-1 text-xs text-gray-500">{labelHelperText}</p>
+            )}
           </div>
           
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              元件值 {elementUnit && `(${elementUnit})`}
-            </label>
-            {unitOptions.length > 0 ? (
-              <div className="flex gap-2">
-                <input
-                  type="number"
-                  step="any"
-                  value={valueNumberInput}
-                  onChange={(e) => setValueNumberInput(e.target.value)}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  style={{ borderColor: theme.border }}
-                  placeholder="请输入数值"
-                />
-                <select
-                  value={valueUnitInput || unitOptions[0]}
-                  onChange={(e) => setValueUnitInput(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  style={{ borderColor: theme.border }}
-                >
-                  {unitOptions.map((option) => (
-                    <option key={option} value={option}>{option}</option>
-                  ))}
-                </select>
-              </div>
-            ) : (
-              <input 
-                type="text" 
-                value={rawValueInput} 
-                onChange={(e) => setRawValueInput(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                style={{ borderColor: theme.border }}
-                placeholder={elementUnit ? `例如: 1k${elementUnit}` : '输入值'}
-              />
-            )}
+          <div className="mb-6 space-y-2">
+            {renderValueSection()}
           </div>
           
           <div className="flex justify-end space-x-3">

@@ -44,7 +44,7 @@ import { Line } from '@ant-design/charts';
 import { simulationClient } from '../simulation/simulationClient';
 import { SimulationMeasurementResult } from '../simulation/types';
 import { runDigitalSimulation } from '@/app/pages/digital/simulation/digitalSimulationClient';
-import { DigitalSimulationResult } from '@/app/pages/digital/simulation/types';
+import { DigitalSimulationResult, DigitalWaveformTrace } from '@/app/pages/digital/simulation/types';
 import {
   ExperimentOutlined,
   ThunderboltOutlined,
@@ -1195,6 +1195,17 @@ const measurementElementTypes = new Set<CircuitElementType>([
   CircuitElementType.OSCILLOSCOPE,
 ]);
 
+const nonConfigurableDigitalTypes = new Set<CircuitElementType>([
+  CircuitElementType.DIGITAL_AND,
+  CircuitElementType.DIGITAL_OR,
+  CircuitElementType.DIGITAL_NOT,
+  CircuitElementType.DIGITAL_NAND,
+  CircuitElementType.DIGITAL_NOR,
+  CircuitElementType.DIGITAL_XOR,
+  CircuitElementType.DIGITAL_XNOR,
+  CircuitElementType.DIGITAL_DFF,
+]);
+
 const powerSourceElementTypes = new Set<CircuitElementType>([
   CircuitElementType.VOLTAGE_SOURCE,
   CircuitElementType.CURRENT_SOURCE,
@@ -1273,6 +1284,15 @@ const formatMeasurementValue = (value: number, unit?: string) => {
 };
 
 // 在文件顶部添加接口定义
+const determineWorkspaceMode = (types?: CircuitElementType[]): CircuitWorkspaceMode => {
+  if (!types || types.length === 0) return 'analog';
+  const hasDigital = types.some((type) => DIGITAL_ELEMENT_TYPES.has(type));
+  const hasAnalog = types.some((type) => ANALOG_ELEMENT_TYPES.has(type));
+  if (hasDigital && !hasAnalog) return 'digital';
+  if (hasDigital && hasAnalog) return 'hybrid';
+  return 'analog';
+};
+
 interface CircuitFlowProps {
   onCircuitDesignChange?: (design: CircuitDesign) => void;
   selectedModel?: string;
@@ -1280,12 +1300,19 @@ interface CircuitFlowProps {
   isReadOnly?: boolean; // 是否为只读模式，禁用编辑功能
   classId?: string | null; // 添加班级ID参数
   onModelChange?: (model: FlowModelType) => void; // 修改为使用 FlowModelType
-  workspaceMode?: CircuitWorkspaceMode;
+  workspaceMode?: CircuitWorkspaceMode | 'auto';
   onUnsavedChange?: (hasUnsavedChanges: boolean) => void;
 }
 
-export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3', initialCircuitDesign, isReadOnly = false, classId = null, onModelChange, workspaceMode: workspaceModeProp = 'analog', onUnsavedChange }: CircuitFlowProps) => {
-  const workspaceMode = workspaceModeProp;
+export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3', initialCircuitDesign, isReadOnly = false, classId = null, onModelChange, workspaceMode: workspaceModeProp = 'auto', onUnsavedChange }: CircuitFlowProps) => {
+  const initialWorkspaceMode = useMemo(() => {
+    if (workspaceModeProp && workspaceModeProp !== 'auto') {
+      return workspaceModeProp;
+    }
+    const initialTypes = initialCircuitDesign?.elements?.map((el) => el.type as CircuitElementType);
+    return determineWorkspaceMode(initialTypes);
+  }, [initialCircuitDesign, workspaceModeProp]);
+  const [workspaceMode, setWorkspaceMode] = useState<CircuitWorkspaceMode>(initialWorkspaceMode);
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -1343,16 +1370,25 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
     connections: [],
     metadata: { ...designMetadataRef.current },
   });
-  const [, setHasUnsavedChanges] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const hasUnsavedChangesRef = useRef(false);
   const currentDesignRef = useRef<CircuitDesign>(initialCircuitDesign ?? getEmptyDesignSnapshot());
   const lastSavedDesignHashRef = useRef<string>(serializeCircuitDesignSnapshot(currentDesignRef.current));
   const suppressUnsavedTrackingRef = useRef<boolean>(!!initialCircuitDesign);
   const updateUnsavedState = useCallback((dirty: boolean) => {
-    if (hasUnsavedChangesRef.current !== dirty) {
+    const previouslyDirty = hasUnsavedChangesRef.current;
+    if (previouslyDirty !== dirty) {
       hasUnsavedChangesRef.current = dirty;
       setHasUnsavedChanges(dirty);
       onUnsavedChange?.(dirty);
+    }
+    if (
+      dirty &&
+      !previouslyDirty &&
+      !suppressUnsavedTrackingRef.current &&
+      designIdRef.current
+    ) {
+      scheduleAutoSaveRef.current?.();
     }
   }, [onUnsavedChange]);
   const markCurrentDesignAsSaved = useCallback((snapshot?: CircuitDesign | null) => {
@@ -1374,10 +1410,27 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
   const [saveModalInitialValues, setSaveModalInitialValues] = useState<{ title?: string; description?: string }>({});
   const autoSaveTimerRef = useRef<number | null>(null);
   const autoSaveInfoShownRef = useRef(false);
+  const scheduleAutoSaveRef = useRef<(() => void) | null>(null);
   const [isImportingFromImage, setIsImportingFromImage] = useState(false);
   const [isImportModalVisible, setIsImportModalVisible] = useState(false);
   const [hasUploadedImage, setHasUploadedImage] = useState(false);
   const imageUploaderRef = useRef<{ triggerRecognition: () => void; hasImage: () => boolean }>(null);
+
+  useEffect(() => {
+    if (workspaceModeProp && workspaceModeProp !== 'auto') {
+      if (workspaceMode !== workspaceModeProp) {
+        setWorkspaceMode(workspaceModeProp);
+      }
+      return;
+    }
+    const elementTypesFromNodes = nodes.length
+      ? nodes.map((node) => node.data.type as CircuitElementType)
+      : initialCircuitDesign?.elements?.map((element) => element.type as CircuitElementType);
+    const detectedMode = determineWorkspaceMode(elementTypesFromNodes);
+    if (detectedMode !== workspaceMode) {
+      setWorkspaceMode(detectedMode);
+    }
+  }, [workspaceModeProp, nodes, initialCircuitDesign, workspaceMode]);
 
   const reactFlowInstance = useReactFlow();
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
@@ -1866,6 +1919,11 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
       }
       return;
     }
+
+    if (nonConfigurableDigitalTypes.has(nodeType)) {
+      message.info('该数字逻辑元件无需配置属性');
+      return;
+    }
     
     // 创建一个完整的数据对象，只包含 CircuitNodeData 支持的属性
     const nodeData = {
@@ -2207,6 +2265,10 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
     }, 600);
   }, [quickSaveExistingCircuit]);
 
+  useEffect(() => {
+    scheduleAutoSaveRef.current = scheduleAutoSave;
+  }, [scheduleAutoSave]);
+
   const openSaveModal = useCallback((mode: 'save' | 'saveAs', snapshot: CircuitDesign) => {
     const designForModal: CircuitDesign = {
       ...snapshot,
@@ -2523,6 +2585,122 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
     URL.revokeObjectURL(link.href);
   }, [digitalSimResult]);
 
+  const digitalWaveDurationNs = useMemo(() => {
+    if (!digitalSimResult) return 0;
+    const traceMax = digitalSimResult.waveforms.reduce((maxTrace, trace) => {
+      const localMax = trace.samples.reduce((acc, sample) => Math.max(acc, sample.time), 0);
+      return Math.max(maxTrace, localMax);
+    }, 0);
+    return Math.max(digitalSimResult.durationNs || 0, traceMax, 1);
+  }, [digitalSimResult]);
+
+  const renderDigitalWaveform = useCallback((trace: DigitalWaveformTrace) => {
+    if (!digitalWaveDurationNs) return null;
+    const width = 560;
+    const height = 48;
+    const baselineY = height / 2;
+    const sanitizeValue = (value: string) => {
+      if (!value) return 'x';
+      const normalized = value.trim().toLowerCase();
+      if (normalized === '1' || normalized.endsWith('1')) return '1';
+      if (normalized === '0' || normalized.endsWith('0')) return '0';
+      if (normalized.includes('z')) return 'z';
+      return 'x';
+    };
+    const valueToY = (value: string) => {
+      const v = sanitizeValue(value);
+      if (v === '1') return 10;
+      if (v === '0') return height - 10;
+      return baselineY;
+    };
+    const colorMap: Record<string, string> = {
+      input: '#2563eb',
+      output: '#059669',
+      clock: '#7c3aed',
+      probe: '#0f172a',
+      internal: '#475569',
+    };
+    const stroke = colorMap[trace.role || 'internal'] || '#334155';
+
+    const samples = [...trace.samples].sort((a, b) => a.time - b.time);
+    if (!samples.length) {
+      samples.push({ time: 0, value: '0' });
+    }
+    if (samples[0].time > 0) {
+      samples.unshift({ time: 0, value: samples[0].value });
+    }
+    const lastSample = samples[samples.length - 1];
+    if (lastSample.time < digitalWaveDurationNs) {
+      samples.push({ time: digitalWaveDurationNs, value: lastSample.value });
+    }
+
+    const toX = (time: number) => Math.max(0, Math.min(width, (time / digitalWaveDurationNs) * width));
+
+    const pathCommands: string[] = [`M ${toX(samples[0].time)} ${valueToY(samples[0].value)}`];
+    let prevValue = samples[0].value;
+    samples.slice(1).forEach(sample => {
+      const x = toX(sample.time);
+      const prevY = valueToY(prevValue);
+      const nextY = valueToY(sample.value);
+      pathCommands.push(`L ${x} ${prevY}`);
+      pathCommands.push(`L ${x} ${nextY}`);
+      prevValue = sample.value;
+    });
+    pathCommands.push(`L ${width} ${valueToY(prevValue)}`);
+
+    const tickCount = 4;
+    const ticks = Array.from({ length: tickCount + 1 }).map((_, idx) => {
+      const ratio = idx / tickCount;
+      const x = ratio * width;
+      const labelTime = Math.round(digitalWaveDurationNs * ratio);
+      return (
+        <g key={`tick-${idx}`}>
+          <line
+            x1={x}
+            y1={height}
+            x2={x}
+            y2={height + 4}
+            stroke="#cbd5f5"
+            strokeWidth={1}
+          />
+          <text
+            x={x}
+            y={height + 14}
+            textAnchor="middle"
+            fontSize="10"
+            fill="#64748b"
+          >
+            {`${labelTime}ns`}
+          </text>
+        </g>
+      );
+    });
+
+    const hasUnknown = samples.some(sample => {
+      const normalized = sanitizeValue(sample.value);
+      return normalized !== '0' && normalized !== '1';
+    });
+
+    return (
+      <svg
+        key={`${trace.signal}-wave`}
+        viewBox={`0 0 ${width} ${height + 16}`}
+        className="w-full text-slate-600"
+      >
+        <rect x={0} y={0} width={width} height={height} fill="white" rx={4} stroke="#e2e8f0" />
+        <line x1={0} y1={baselineY} x2={width} y2={baselineY} stroke="#f1f5f9" strokeDasharray="4 4" />
+        <path
+          d={pathCommands.join(' ')}
+          fill="none"
+          stroke={stroke}
+          strokeWidth={2}
+          strokeDasharray={hasUnknown ? '6 3' : undefined}
+        />
+        {ticks}
+      </svg>
+    );
+  }, [digitalWaveDurationNs]);
+
   // 节点旋转功能
   const handleRotate = useCallback(() => {
     console.log('执行旋转操作，selectedNodeId:', selectedNodeId);
@@ -2688,8 +2866,42 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
   }, [handleKeyDown]);
   
   // 添加画布点击处理以取消选择
+  const tryInsertJunctionOnEdge = useCallback((event: React.MouseEvent<Element, MouseEvent>, mode: 'wire' | 'junction') => {
+    if (!reactFlowWrapper.current) return null;
+    const elementsAtPoint = document.elementsFromPoint(event.clientX, event.clientY);
+    const edgePathElement = elementsAtPoint.find((el) => el.classList?.contains('react-flow__edge-path')) as SVGPathElement | undefined;
+    if (!edgePathElement) return null;
+    const targetEdge = edges.find((edge) => edge.id === edgePathElement.id);
+    if (!targetEdge) return null;
+    const bounds = reactFlowWrapper.current.getBoundingClientRect();
+    const position = reactFlowInstance.project({
+      x: event.clientX - bounds.left,
+      y: event.clientY - bounds.top,
+    });
+    const junctionId = splitEdgeWithJunction(targetEdge, position);
+    if (mode === 'wire') {
+      setWireAnchor({
+        nodeId: junctionId,
+        handleId: null,
+        handleType: 'source',
+        autoHandle: true,
+      });
+      setSelectedNodeId(null);
+      setSelectedEdgeId(null);
+      message.success('已在导线上插入连接点，可继续布线');
+    } else {
+      setSelectedNodeId(junctionId);
+      setSelectedEdgeId(null);
+      message.success('连接点已插入导线');
+    }
+    return junctionId;
+  }, [edges, reactFlowInstance, splitEdgeWithJunction]);
+
   const onPaneClick = useCallback((event?: React.MouseEvent<Element, MouseEvent>) => {
     if (isWireModeActive && event) {
+      if (tryInsertJunctionOnEdge(event, 'wire')) {
+        return;
+      }
       const position = getCanvasPosition(event);
       if (!position) return;
       const junctionId = addJunctionNode(position);
@@ -2703,6 +2915,9 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
       return;
     }
     if (isJunctionModeActive && event) {
+      if (tryInsertJunctionOnEdge(event, 'junction')) {
+        return;
+      }
       const position = getCanvasPosition(event);
       if (!position) return;
       const junctionId = addJunctionNode(position);
@@ -2718,7 +2933,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
     }
     setSelectedNodeId(null);
     setSelectedEdgeId(null);
-  }, [addJunctionNode, getCanvasPosition, isJunctionModeActive, isWireModeActive, wireAnchor]);
+  }, [addJunctionNode, getCanvasPosition, isJunctionModeActive, isWireModeActive, tryInsertJunctionOnEdge, wireAnchor]);
 
   // 处理节点点击
   const handleNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
@@ -2953,9 +3168,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
     setSelectedElement(null);
     
     console.log('元件更新完成');
-
-    scheduleAutoSave();
-  }, [scheduleAutoSave]);
+  }, []);
   
   // 处理撤销
   const handleUndo = useCallback(() => {
@@ -3583,7 +3796,9 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
       >
         {digitalSimResult ? (
           <div className="space-y-4">
-            {digitalSimResult.waveforms.length ? digitalSimResult.waveforms.map((trace) => (
+            {digitalSimResult.waveforms.length ? digitalSimResult.waveforms.map((trace) => {
+              const waveformSvg = renderDigitalWaveform(trace);
+              return (
               <div key={trace.signal} className="rounded-md border border-slate-200 bg-white p-3 shadow-sm">
                 <div className="flex items-center justify-between text-sm font-medium text-slate-700">
                   <div>
@@ -3608,8 +3823,16 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
                     <span className="text-slate-400">暂无波形数据</span>
                   )}
                 </div>
+                {waveformSvg && (
+                  <div className="mt-3 rounded-md border border-slate-100 bg-slate-50 p-2">
+                    {waveformSvg}
+                    <div className="mt-1 text-[10px] text-slate-400">
+                      内置波形示意图仅用于快速判别逻辑，可继续下载 VCD 获取完整精度。
+                    </div>
+                  </div>
+                )}
               </div>
-            )) : (
+            ); }) : (
               <div className="rounded border border-dashed border-slate-200 p-6 text-center text-sm text-slate-500">
                 未捕获任何波形信号，请检查是否添加了数字输入/输出。
               </div>

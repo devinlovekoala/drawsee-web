@@ -126,6 +126,28 @@ export function getElementTypeName(type?: CircuitElementType | string): string {
       return '运算放大器';
     case EXTENDED_ELEMENT_TYPES.CONNECTOR:
       return '连接器';
+    case CircuitElementType.DIGITAL_INPUT:
+      return '数字输入';
+    case CircuitElementType.DIGITAL_OUTPUT:
+      return '数字输出';
+    case CircuitElementType.DIGITAL_CLOCK:
+      return '时钟源';
+    case CircuitElementType.DIGITAL_AND:
+      return '与门 (AND)';
+    case CircuitElementType.DIGITAL_OR:
+      return '或门 (OR)';
+    case CircuitElementType.DIGITAL_NOT:
+      return '非门 (NOT)';
+    case CircuitElementType.DIGITAL_NAND:
+      return '与非门 (NAND)';
+    case CircuitElementType.DIGITAL_NOR:
+      return '或非门 (NOR)';
+    case CircuitElementType.DIGITAL_XOR:
+      return '异或门 (XOR)';
+    case CircuitElementType.DIGITAL_XNOR:
+      return '同或门 (XNOR)';
+    case CircuitElementType.DIGITAL_DFF:
+      return 'D 触发器';
     case CircuitElementType.WIRE:
       return '导线';
     case CircuitElementType.JUNCTION:

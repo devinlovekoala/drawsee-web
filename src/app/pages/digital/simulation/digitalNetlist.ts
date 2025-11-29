@@ -81,6 +81,17 @@ const parseStimulusSequence = (value: string | undefined) => {
   return { initial: initial === '1' ? 1 : 0, events, span };
 };
 
+const MAX_AUTO_TRUTH_TABLE_INPUTS = 6;
+
+type DigitalInputMeta = {
+  elementId: string;
+  signal: string;
+  label: string;
+  hasManualWaveform: boolean;
+  inputPort: { name: string; width?: number; default?: number };
+  lastValue: number;
+};
+
 const getEndpointKey = (elementId: string, portId: string) => `${elementId}:${portId}`;
 
 class UnionFind {
@@ -177,7 +188,8 @@ export const buildDigitalSimulationPlan = (design: CircuitDesign): DigitalSimula
     return netNameByRoot.get(root)!;
   };
 
-  const inputs: Array<{ name: string; width?: number }> = [];
+  const inputs: Array<{ name: string; width?: number; default?: number }> = [];
+  const digitalInputMetas: DigitalInputMeta[] = [];
   const outputs: Array<{ name: string; width?: number }> = [];
   const clocks: DigitalClockConfig[] = [];
   const stimuliEvents: DigitalStimulusEvent[] = [];
@@ -187,8 +199,8 @@ export const buildDigitalSimulationPlan = (design: CircuitDesign): DigitalSimula
   const regAssignments: string[] = [];
   const wireNames = new Set<string>();
 
-const inputStepNs = DEFAULT_INPUT_STEP_NS;
-let suggestedDuration = 200;
+  const inputStepNs = DEFAULT_INPUT_STEP_NS;
+  let suggestedDuration = 200;
 
   design.elements.forEach((element) => {
     const type = element.type as CircuitElementType;
@@ -199,11 +211,22 @@ let suggestedDuration = 200;
       const root = uf.getOrCreateRoot(key);
       const portName = registerPortName(root, elementLabel(element.id, element.label || 'din'));
       endpointSignalMap[key] = portName;
-      const stimulus = parseStimulusSequence(
-        (element.value as string) ||
-        ((element.properties?.value as string) ?? '')
-      );
-      inputs.push({ name: portName, default: stimulus.initial });
+      const rawValue =
+        (typeof element.value === 'string' ? element.value : '') ||
+        (typeof element.properties?.value === 'string' ? element.properties.value : '');
+      const stimulus = parseStimulusSequence(rawValue);
+      const inputPort = { name: portName, default: stimulus.initial };
+      inputs.push(inputPort);
+      const sanitizedBits = rawValue.replace(/[^01]/g, '');
+      const hasManualWaveform = sanitizedBits.length > 0;
+      digitalInputMetas.push({
+        elementId: element.id,
+        signal: portName,
+        label: elementLabel(element.id, element.label),
+        hasManualWaveform,
+        inputPort,
+        lastValue: stimulus.initial,
+      });
       if (stimulus.events.length) {
         stimulus.events.forEach((event) => {
           stimuliEvents.push({
@@ -214,9 +237,10 @@ let suggestedDuration = 200;
         });
         suggestedDuration = Math.max(suggestedDuration, stimulus.span + inputStepNs);
       }
+      const labelForProbe = elementLabel(element.id, element.label);
       probes.push({
         elementId: element.id,
-        label: elementLabel(element.id, element.label),
+        label: labelForProbe,
         signal: portName,
         role: 'input',
       });
@@ -256,6 +280,40 @@ let suggestedDuration = 200;
       });
     }
   });
+
+  if (digitalInputMetas.length > 0) {
+    const allInputsUnconfigured = digitalInputMetas.every((meta) => !meta.hasManualWaveform);
+    if (allInputsUnconfigured) {
+      if (digitalInputMetas.length > MAX_AUTO_TRUTH_TABLE_INPUTS) {
+        warnings.push(`检测到 ${digitalInputMetas.length} 个数字输入，超出自动真值表模式的上限 (${MAX_AUTO_TRUTH_TABLE_INPUTS} 个)。请在每个输入的属性中自行设置波形。`);
+      } else {
+        const totalCombinations = 1 << digitalInputMetas.length;
+        // 初始组合默认全部为 0
+        digitalInputMetas.forEach((meta, idx) => {
+          const initialBit = (0 >> (digitalInputMetas.length - idx - 1)) & 1;
+          meta.inputPort.default = initialBit;
+          meta.lastValue = initialBit;
+        });
+        stimuliEvents.length = 0;
+        for (let comboIndex = 1; comboIndex < totalCombinations; comboIndex += 1) {
+          const eventTime = comboIndex * inputStepNs;
+          digitalInputMetas.forEach((meta, idx) => {
+            const bit = (comboIndex >> (digitalInputMetas.length - idx - 1)) & 1;
+            if (bit !== meta.lastValue) {
+              stimuliEvents.push({
+                signal: meta.signal,
+                at: eventTime,
+                value: bit.toString(),
+              });
+              meta.lastValue = bit;
+            }
+          });
+        }
+        const autoSpan = Math.max(totalCombinations * inputStepNs, inputStepNs);
+        suggestedDuration = Math.max(suggestedDuration, autoSpan + inputStepNs);
+      }
+    }
+  }
 
   const getNetForElementPort = (element: CircuitDesign['elements'][number], portId: string) => {
     const key = getEndpointKey(element.id, portId);

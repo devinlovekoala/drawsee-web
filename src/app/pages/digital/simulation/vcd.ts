@@ -67,8 +67,8 @@ export const parseVcdToWaveforms = (
       return;
     }
     if (inDefinitions) {
-      if (line.startsWith('var ')) {
-        const match = line.match(/^var\s+\S+\s+(\d+)\s+(\S+)\s+(.+?)\s+\$end$/);
+      if (line.startsWith('var ') || line.startsWith('$var ')) {
+        const match = line.match(/^\$?var\s+\S+\s+(\d+)\s+(\S+)\s+(.+?)\s+\$end$/);
         if (match) {
           const size = Number(match[1]) || 1;
           const symbol = match[2];
