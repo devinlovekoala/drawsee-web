@@ -17,7 +17,11 @@ import {
   NodeIndexOutlined,
   PlusCircleOutlined,
   ScissorOutlined
+  ,
+  MenuFoldOutlined,
+  MenuUnfoldOutlined
 } from '@ant-design/icons';
+import { AppstoreOutlined } from '@ant-design/icons';
 import { ModelType } from '@/app/pages/flow/components/input/FlowInputPanel';
 
 interface CircuitToolbarProps {
@@ -53,6 +57,10 @@ interface CircuitToolbarProps {
   onToggleJunctionMode?: () => void;
   isJunctionModeActive?: boolean;
   onDeleteEdge?: () => void;
+  onToggleSidebar?: () => void;
+  isSidebarOpen?: boolean;
+  onToggleElementLibrary?: () => void;
+  isElementLibraryOpen?: boolean;
 }
 
 export const CircuitToolbar: FC<CircuitToolbarProps> = ({
@@ -83,6 +91,10 @@ export const CircuitToolbar: FC<CircuitToolbarProps> = ({
   onToggleJunctionMode,
   isJunctionModeActive = false,
   onDeleteEdge,
+  onToggleSidebar,
+  isSidebarOpen = true,
+  onToggleElementLibrary,
+  isElementLibraryOpen = true,
 }) => {
 
   // 只在开发环境下输出日志
@@ -106,9 +118,7 @@ export const CircuitToolbar: FC<CircuitToolbarProps> = ({
   };
   
   // 检查操作功能是否可用
-  const isOperationEnabled = (operation: (() => void) | undefined, condition: boolean): boolean => {
-    return !!operation && condition;
-  };
+  
 
   return (
     <div className="flex items-center gap-2 bg-white p-2 border border-gray-200 rounded-md shadow-sm">
@@ -129,6 +139,24 @@ export const CircuitToolbar: FC<CircuitToolbarProps> = ({
           disabled={!canSaveAs || !onSaveAs}
           icon={<FileAddOutlined />}
           className={getButtonClass(!canSaveAs || !onSaveAs)}
+        />
+      </Tooltip>
+
+      <Tooltip title={isSidebarOpen ? '收起侧栏' : '展开侧栏'}>
+        <Button
+          type="text"
+          onClick={onToggleSidebar}
+          icon={isSidebarOpen ? <MenuFoldOutlined /> : <MenuUnfoldOutlined />}
+          className={onToggleSidebar ? 'hover:bg-gray-100 cursor-pointer' : 'cursor-not-allowed opacity-50'}
+        />
+      </Tooltip>
+
+      <Tooltip title={isElementLibraryOpen ? '隐藏元件库' : '显示元件库'}>
+        <Button
+          type="text"
+          onClick={onToggleElementLibrary}
+          icon={<AppstoreOutlined />}
+          className={onToggleElementLibrary ? 'hover:bg-gray-100 cursor-pointer' : 'cursor-not-allowed opacity-50'}
         />
       </Tooltip>
 

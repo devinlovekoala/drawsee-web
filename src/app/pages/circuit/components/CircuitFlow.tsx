@@ -1434,7 +1434,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
 
   const reactFlowInstance = useReactFlow();
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
-  const { handleBlankQuery, handleAiTaskCountPlus } = useAppContext();
+  const { handleBlankQuery, handleAiTaskCountPlus, toggleSideBar, openSideBar } = useAppContext();
   const paletteCategories = useMemo(() => getElementCategories(workspaceMode), [workspaceMode]);
   const elementMenuItems = useMemo(() => getElementMenuItems(workspaceMode), [workspaceMode]);
   const lastSimSignatureRef = useRef<string | null>(null);
@@ -3524,6 +3524,8 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
               onAnalysis={handleAnalyzeCircuit}
               onRunSimulation={handleRunSimulation}
               onClear={handleClearCircuit}
+              onToggleSidebar={toggleSideBar}
+              isSidebarOpen={openSideBar}
               isAnalyzing={isAnalyzing}
               isSimulating={isSimulating}
               selectedModel={currentModel}
@@ -3546,6 +3548,8 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
               onToggleJunctionMode={isReadOnly ? undefined : toggleJunctionMode}
               isJunctionModeActive={isJunctionModeActive}
               onDeleteEdge={isReadOnly ? undefined : deleteSelectedEdge}
+              onToggleElementLibrary={() => setShowElementLibrary(prev => !prev)}
+              isElementLibraryOpen={showElementLibrary}
             />
           </div>
         )}
