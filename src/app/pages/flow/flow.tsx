@@ -38,6 +38,13 @@ import FlowLeftToolBar from "./components/FlowLeftToolBar";
 import { TASK_KEY_PREFIX } from "@/common/constant/storage-key.constant";
 import { useViewportChange } from "./hooks/useViewportChange";
 
+type CircuitReturnInfo = {
+  designId?: string;
+  path?: string;
+  from?: string;
+  ts?: number;
+};
+
 // 创建紧凑模式的节点类型
 const CompactRootNode = (props: any) => <RootNode {...props} compactMode={true} />;
 const CompactQueryNode = (props: any) => <QueryNode {...props} compactMode={true} />;
@@ -152,7 +159,24 @@ function Flow() {
     setElements,
     addChatTask
   } = useFlowState(convId, selectedNode, protectedSetSelectedNode);
-  
+  const circuitReturnInfo = useMemo<CircuitReturnInfo | null>(() => {
+    if (!convId) return null;
+    const stored = sessionStorage.getItem(`circuit_return_info_${convId}`);
+    if (!stored) return null;
+    try {
+      const parsed = JSON.parse(stored) as CircuitReturnInfo;
+      if (parsed && (parsed.path || parsed.designId)) {
+        if (parsed.designId) {
+          parsed.designId = String(parsed.designId);
+        }
+        return parsed;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }, [convId]);
+
   const handleApplySuggestion = useCallback((suggestion: string) => {
     if (!suggestion || !suggestion.trim()) {
       return;
@@ -170,6 +194,12 @@ function Flow() {
       navigate('/');
     }
   }, [navigate, classId]);
+
+  const handleReturnToCircuit = useCallback(() => {
+    if (!circuitReturnInfo) return;
+    const targetPath = circuitReturnInfo.path || (circuitReturnInfo.designId ? `/circuit/edit/${circuitReturnInfo.designId}` : '/circuit');
+    navigate(targetPath, { state: { convId, fromFlow: true } });
+  }, [circuitReturnInfo, navigate, convId]);
   
   // 使用临时查询节点Hook
   const {
@@ -921,6 +951,8 @@ function Flow() {
                 onRelayout={() => handleRelayout(true)} 
                 showDetailPanel={showDetailPanel}
                 onToggleDetailPanel={toggleDetailPanel}
+                canReturnToCircuit={Boolean(circuitReturnInfo)}
+                onReturnToCircuit={handleReturnToCircuit}
               />
             </Panel>
             {/* 顶部左侧工具栏 */}

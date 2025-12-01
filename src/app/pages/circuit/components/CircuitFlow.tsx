@@ -2340,6 +2340,12 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
     try {
       // 开始分析，设置状态为正在分析
       setIsAnalyzing(true);
+
+      if (!persistedDesignId) {
+        message.warning('请先保存当前电路后再进行分析');
+        setIsAnalyzing(false);
+        return;
+      }
       
       const circuitDesign = convertToCircuitDesign();
       
@@ -2407,6 +2413,19 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
       if (classId) {
         sessionStorage.setItem(`circuit_class_id_${response.conversation.id}`, classId);
       }
+
+      // 存储返回电路所需的信息
+      if (persistedDesignId) {
+        sessionStorage.setItem(
+          `circuit_return_info_${response.conversation.id}`,
+          JSON.stringify({
+            designId: persistedDesignId,
+            path: `/circuit/edit/${persistedDesignId}`,
+            from: window.location.pathname,
+            ts: Date.now()
+          })
+        );
+      }
       
       // 更新loading消息内容
       message.loading({
@@ -2460,7 +2479,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
       }
       setIsAnalyzing(false);
     }
-  }, [convertToCircuitDesign, currentModel, handleBlankQuery, handleAiTaskCountPlus, classId]);
+  }, [convertToCircuitDesign, currentModel, handleBlankQuery, handleAiTaskCountPlus, classId, persistedDesignId]);
   
   // 运行模拟仿真
   const handleRunSimulation = useCallback(async () => {

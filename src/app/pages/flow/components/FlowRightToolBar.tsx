@@ -1,4 +1,4 @@
-import { RefreshCcw, PanelRight, PanelRightClose, ZoomIn, ZoomOut, Eye } from 'lucide-react';
+import { RefreshCcw, PanelRight, PanelRightClose, ZoomIn, ZoomOut, Eye, ArrowLeft } from 'lucide-react';
 import { useReactFlow } from '@xyflow/react';
 import { useAdaptiveZoom } from '../hooks/useAdaptiveZoom';
 
@@ -6,12 +6,16 @@ interface FlowToolBarProps {
   onRelayout: () => void;
   showDetailPanel: boolean;
   onToggleDetailPanel: () => void;
+  canReturnToCircuit?: boolean;
+  onReturnToCircuit?: () => void;
 }
 
 function FlowRightToolBar({ 
   onRelayout, 
   showDetailPanel,
-  onToggleDetailPanel
+  onToggleDetailPanel,
+  canReturnToCircuit = false,
+  onReturnToCircuit
 }: FlowToolBarProps) {
   const { zoomIn, zoomOut, getNodes } = useReactFlow();
   const { switchToOverviewMode, switchToDetailMode } = useAdaptiveZoom();
@@ -85,6 +89,17 @@ function FlowRightToolBar({
         {showDetailPanel ? <PanelRightClose className="mr-2" size={16} /> : <PanelRight className="mr-2" size={16} />}
         {showDetailPanel ? '关闭详情' : '节点详情'}
       </button>
+
+      {/* 返回电路 */}
+      {canReturnToCircuit && (
+        <button
+          onClick={onReturnToCircuit}
+          className="flex items-center text-emerald-700 bg-white hover:bg-emerald-50 active:bg-emerald-100 transition duration-200 rounded-lg px-2 py-1 shadow-[0_0_0_1px_rgba(16,185,129,0.4)] transform hover:scale-105 h-8"
+        >
+          <ArrowLeft className="mr-2" size={16} />
+          返回电路
+        </button>
+      )}
       
     </div>
   );
