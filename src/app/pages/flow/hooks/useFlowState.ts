@@ -92,10 +92,6 @@ function useFlowState(convId: number, selectedNode?: Node | null, setSelectedNod
           const normalizedType = normalizeNodeType(nodeVO.type as unknown as string);
           console.log(`[SSE] 接收到节点，ID: ${nodeVO.id}, 原始类型: ${nodeVO.type}, 归一化类型: ${normalizedType}, parentId: ${nodeVO.parentId}`);
 
-          if (normalizedType === 'circuit-point') {
-            console.log('忽略旧版电路节点，ID:', nodeVO.id);
-            break;
-          }
           // 设置节点为正在生成状态
           if (normalizedType === 'answer' || normalizedType === 'knowledge-detail') {
             lastFocusNodeId.current = nodeVO.id.toString();

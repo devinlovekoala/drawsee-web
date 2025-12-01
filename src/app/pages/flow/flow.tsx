@@ -1,4 +1,4 @@
-import {Background, BackgroundVariant, ReactFlow, type Node, Panel, OnNodesChange, applyNodeChanges, applyEdgeChanges, OnEdgesChange, MiniMap} from "@xyflow/react";
+import {Background, BackgroundVariant, ReactFlow, type Node, Panel, OnNodesChange, applyNodeChanges, applyEdgeChanges, OnEdgesChange} from "@xyflow/react";
 import RootNode from "@/app/pages/flow/components/node/RootNode";
 import QueryNode from "@/app/pages/flow/components/node/QueryNode";
 import AnswerNode from "@/app/pages/flow/components/node/AnswerNode";
@@ -13,7 +13,7 @@ import PdfDocumentNode from "./components/node/PdfDocumentNode";
 import PdfAnalysisPointNode from "./components/node/PdfAnalysisPointNode";
 import PdfAnalysisDetailNode from "./components/node/PdfAnalysisDetailNode";
 import NodeDetailPanel from "./components/NodeDetailPanel";
-import {useCallback, useState, useEffect, useRef} from "react";
+import {useCallback, useState, useEffect, useRef, useMemo} from "react";
 import {useLocation, useNavigate} from "react-router-dom";
 import {useWatcher} from "alova/client";
 import {getNodesByConvId, updateNodesPositionAndHeight} from "@/api/methods/flow.methods.ts";
@@ -109,8 +109,6 @@ function Flow() {
   // 用户输入
   const [userInput, setUserInput] = useState<string>('');
   const flowInputRef = useRef<FlowInputPanelHandle>(null);
-  // 展示小地图
-  const [showMiniMap, setShowMiniMap] = useState<boolean>(true);
   // 显示详情面板
   const [showDetailPanel, setShowDetailPanel] = useState<boolean>(true);
   // 强制会话切换标记 - 最高优先级标记，用于bypass所有保护机制
@@ -475,17 +473,8 @@ function Flow() {
         console.log('✅ 空会话加载完成，恢复正常操作模式');
         return;
       }
-      const filteredApiNodes = apiNodes.filter(node => {
-        const normalizedType = normalizeNodeType(node.type as unknown as string);
-        if (normalizedType === 'circuit-point') {
-          console.log('初始加载: 忽略旧版电路分点节点:', node.id);
-          return false;
-        }
-        return true;
-      });
-
       // 将apiNodes转换为flowNodes
-      const flowNodes = filteredApiNodes.map((node) => {
+      const flowNodes = apiNodes.map((node) => {
         const normalizedType = normalizeNodeType(node.type as unknown as string);
         const data = {
           parentId: node.parentId,
@@ -500,7 +489,7 @@ function Flow() {
   
         // 如果节点是knowledge-head或者solver-first或者solver-continue，则判断是否已经生成
         if (normalizedType === 'knowledge-head') {
-          filteredApiNodes.forEach(apiNode => {
+          apiNodes.forEach(apiNode => {
             if (apiNode.parentId === node.id && normalizeNodeType(apiNode.type as unknown as string) === 'knowledge-detail') {
               data.isGenerated = true;
             }
@@ -508,7 +497,7 @@ function Flow() {
         }
         // 处理answer-point节点
         if (normalizedType === 'answer-point' || normalizedType === 'ANSWER_POINT') {
-          filteredApiNodes.forEach(apiNode => {
+          apiNodes.forEach(apiNode => {
             const t = normalizeNodeType(apiNode.type as unknown as string);
             if (apiNode.parentId === node.id && (t === 'answer-detail' || t === 'ANSWER_DETAIL')) {
               data.isGenerated = true;
@@ -518,7 +507,7 @@ function Flow() {
 
         // 处理PDF_ANALYSIS_POINT节点
         if (normalizedType === 'PDF_ANALYSIS_POINT') {
-          filteredApiNodes.forEach(apiNode => {
+          apiNodes.forEach(apiNode => {
             if (apiNode.parentId === node.id && normalizeNodeType(apiNode.type as unknown as string) === 'PDF_ANALYSIS_DETAIL') {
               data.isGenerated = true;
             }
@@ -535,7 +524,7 @@ function Flow() {
           data.process = 'completed';
         }
         if (node.data.subtype === 'solver-first' || node.data.subtype === 'solver-continue') {
-          filteredApiNodes.forEach(apiNode => {
+          apiNodes.forEach(apiNode => {
             if (
               apiNode.parentId === node.id && 
               (apiNode.data.subtype === 'solver-continue' || apiNode.data.subtype === 'solver-summary')
@@ -909,14 +898,11 @@ function Flow() {
                 strokeOpacity: 0.85, // 线条的透明度，范围从0（完全透明）到1（完全不透明），这里是完全不透明
               }
             }}
+            proOptions={{ hideAttribution: true }}
           >
             {/* 背景 */}
             <Background variant={BackgroundVariant.Lines} size={10}/>
-            {/* 小地图 */}
-            {showMiniMap && (
-              <MiniMap nodeStrokeWidth={3} nodeColor={'#b8b8b8'} style={{borderRadius: '10px'}} />
-            )}
-            {/* 底部输入框 */}
+            {/* 底部输入框以及悬浮追问推荐 */}
             <Panel position={"bottom-center"}>
               <FlowInputPanel
                 ref={flowInputRef}
@@ -932,8 +918,6 @@ function Flow() {
             {/* 顶部右侧工具栏 */}
             <Panel position={"top-right"}>
               <FlowRightToolBar
-                showMiniMap={showMiniMap}
-                setShowMiniMap={setShowMiniMap}
                 onRelayout={() => handleRelayout(true)} 
                 showDetailPanel={showDetailPanel}
                 onToggleDetailPanel={toggleDetailPanel}
@@ -955,6 +939,7 @@ function Flow() {
               selectedNode={selectedNode}
               onClose={handleCloseDetailPanel}
               getLatestNodeData={getLatestNodeData}
+              onApplySuggestion={handleApplySuggestion}
             />
           </div>
         )}

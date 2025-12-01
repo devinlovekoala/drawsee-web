@@ -3604,6 +3604,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
             zoomOnDoubleClick={false}
             disableKeyboardA11y={true}
             className="circuit-flow-canvas"
+            proOptions={{ hideAttribution: true }}
           >
             <Background />
             <Controls />

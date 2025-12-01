@@ -1,19 +1,15 @@
-import { MapPin, RefreshCcw, PanelRight, PanelRightClose, ZoomIn, ZoomOut, Eye } from 'lucide-react';
+import { RefreshCcw, PanelRight, PanelRightClose, ZoomIn, ZoomOut, Eye } from 'lucide-react';
 import { useReactFlow } from '@xyflow/react';
 import { useAdaptiveZoom } from '../hooks/useAdaptiveZoom';
 
 interface FlowToolBarProps {
   onRelayout: () => void;
-  showMiniMap: boolean;
-  setShowMiniMap: (show: boolean) => void;
   showDetailPanel: boolean;
   onToggleDetailPanel: () => void;
 }
 
 function FlowRightToolBar({ 
   onRelayout, 
-  showMiniMap, 
-  setShowMiniMap,
   showDetailPanel,
   onToggleDetailPanel
 }: FlowToolBarProps) {
@@ -90,14 +86,6 @@ function FlowRightToolBar({
         {showDetailPanel ? '关闭详情' : '节点详情'}
       </button>
       
-      {/* 小地图 */}
-      <button
-        onClick={() => setShowMiniMap(!showMiniMap)}
-        className="flex items-center text-gray-800 bg-white hover:bg-gray-100 active:bg-gray-200 transition duration-200 rounded-lg px-2 py-1 shadow-[0_0_0_1px_rgba(0,0,0,0.1)] transform hover:scale-105 h-8"
-      >
-        <MapPin className="" size={16} />
-        小地图
-      </button>
     </div>
   );
 }

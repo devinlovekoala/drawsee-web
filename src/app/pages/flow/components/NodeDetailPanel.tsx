@@ -1,10 +1,10 @@
 import React, { useMemo, useEffect, useState, useRef, useCallback } from 'react';
 import { Node } from '@xyflow/react';
 import { format } from 'date-fns';
-import { X, Clock, Tag, MessageSquare, Circle, CheckCircle, AlertCircle, FileText, Zap, Brain, Search, Image, BookOpen } from 'lucide-react';
+import { X, Clock, Tag, MessageSquare, Circle, CheckCircle, AlertCircle, FileText, Zap, Brain, Search, Image, BookOpen, Sparkles } from 'lucide-react';
 import MarkdownWithLatex from './markdown/MarkdownWithLatex';
 import { NodeData } from './node/types/node.types';
-import { NodeType } from '@/api/types/flow.types';
+import { NodeType, FollowUpSuggestionData } from '@/api/types/flow.types';
 
 // 动态导入电路组件，避免循环依赖
 const CircuitFlowWithProvider = React.lazy(() => 
@@ -18,6 +18,7 @@ interface NodeDetailPanelProps {
   onClose: () => void;
   // 添加获取最新节点数据的函数
   getLatestNodeData?: (nodeId: string) => Node | null;
+  onApplySuggestion?: (text: string) => void;
 }
 
 // 节点类型图标映射
@@ -80,7 +81,7 @@ const getNumberField = (obj: any, field: string): number | undefined => {
   return obj && typeof obj[field] === 'number' ? obj[field] : undefined;
 };
 
-export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeData }: NodeDetailPanelProps) {
+export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeData, onApplySuggestion }: NodeDetailPanelProps) {
   const nodeData = selectedNode?.data as NodeData<NodeType>;
   const [nodeContentKey, setNodeContentKey] = useState(0); // 用于强制重新渲染
   const [lastTextContent, setLastTextContent] = useState<string>(''); // 跟踪上次的文本内容
@@ -547,6 +548,26 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
     );
   }, [isCircuitNode, circuitInfo?.circuitDesign, nodeData]);
 
+  const followUpInfo = useMemo(() => {
+    const latestNode = selectedNode?.id && getLatestNodeData ? 
+      getLatestNodeData(selectedNode.id) : selectedNode;
+    const currentNodeData = latestNode?.data as NodeData<NodeType> | undefined;
+    if (!currentNodeData) {
+      return { suggestions: [] as FollowUpSuggestionData[], contextTitle: undefined as string | undefined };
+    }
+    const rawFollowUps = getArrayField(currentNodeData, 'followUps') as FollowUpSuggestionData[] | undefined;
+    const suggestions = rawFollowUps?.filter((item) => {
+      if (!item) return false;
+      const source = (typeof item.followUp === 'string' && item.followUp.trim().length > 0 && item.followUp) ||
+        (typeof item.hint === 'string' && item.hint.trim().length > 0 && item.hint) ||
+        (typeof item.title === 'string' && item.title.trim().length > 0 && item.title) ||
+        '';
+      return source.trim().length > 0;
+    }) ?? [];
+    const contextTitle = getStringField(currentNodeData, 'contextTitle');
+    return { suggestions, contextTitle };
+  }, [selectedNode?.id, nodeData, getLatestNodeData, forceRefresh, lastUpdatedAt]);
+
   // 早期返回：当没有选中节点时
   if (!selectedNode || !nodeData) {
     return (
@@ -690,6 +711,75 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
             )}
           </div>
         </div>
+
+        {/* 追问推荐 */}
+        {followUpInfo.suggestions.length > 0 && (
+          <div className="border-t border-gray-100 pt-4">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <p className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-emerald-500" />
+                  AI 追问推荐
+                </p>
+                {followUpInfo.contextTitle && (
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    基于「{followUpInfo.contextTitle}」
+                  </p>
+                )}
+              </div>
+              <span className="text-[11px] text-emerald-500">点击条目即可填入输入框</span>
+            </div>
+            <div className="flex flex-col gap-2">
+              {followUpInfo.suggestions.map((item, index) => {
+                const followUpText = typeof item.followUp === 'string' ? item.followUp.trim() : '';
+                const hintText = typeof item.hint === 'string' ? item.hint.trim() : '';
+                const titleText = typeof item.title === 'string' ? item.title.trim() : '';
+                const primary = followUpText || hintText || titleText;
+                const secondary = hintText && hintText !== primary ? hintText : '';
+                const payload = primary;
+                return (
+                  <button
+                    key={`${item.title || 'suggestion'}-${index}`}
+                    type="button"
+                    disabled={!payload}
+                    onClick={() => payload && onApplySuggestion?.(payload)}
+                    className={`text-left rounded-2xl border px-3 py-2 transition-all ${
+                      payload
+                        ? 'bg-emerald-50/60 border-emerald-100 hover:border-emerald-300 hover:bg-white'
+                        : 'bg-gray-50 border-gray-100 text-gray-300 cursor-not-allowed'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 text-[12px] font-medium text-emerald-800">
+                      <span className="rounded-full bg-white px-2 py-0.5 text-[11px] text-emerald-600 shadow-sm">
+                        追问 {index + 1}
+                      </span>
+                      {item.intent && (
+                        <span className="text-[10px] uppercase tracking-wide text-emerald-500">
+                          {item.intent}
+                        </span>
+                      )}
+                      {typeof item.confidence === 'number' && (
+                        <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full bg-white text-emerald-600 shadow-sm">
+                          {(item.confidence * 100).toFixed(0)}%
+                        </span>
+                      )}
+                    </div>
+                    {primary && (
+                      <p className="mt-1 text-sm leading-snug text-slate-800">
+                        {primary}
+                      </p>
+                    )}
+                    {secondary && (
+                      <p className="mt-1 text-xs text-slate-500">
+                        洞察：{secondary}
+                      </p>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* 特殊属性 */}
         {(subtype || angle || objectName || urls || circuitInfo?.pointDescription || circuitInfo?.detailContent) && (
