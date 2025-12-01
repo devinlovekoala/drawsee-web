@@ -32,7 +32,7 @@ const nodeTypeIcons: Record<NodeType, React.ReactNode> = {
   'knowledge-head': <Brain className="w-4 h-4" />,
   'knowledge-detail': <BookOpen className="w-4 h-4" />,
   'circuit-canvas': <Zap className="w-4 h-4" />,
-  'circuit-point': <Search className="w-4 h-4" />,
+  'circuit-analyze': <Search className="w-4 h-4" />,
   'circuit-detail': <FileText className="w-4 h-4" />,
   'resource': <Image className="w-4 h-4" />,
   'PDF_DOCUMENT': <FileText className="w-4 h-4" />,
@@ -52,7 +52,7 @@ const nodeTypeNames: Record<NodeType, string> = {
   'knowledge-head': '知识要点',
   'knowledge-detail': '知识详情',
   'circuit-canvas': '电路画布',
-  'circuit-point': '电路分析点',
+  'circuit-analyze': '电路分析',
   'circuit-detail': '电路详情',
   'resource': '资源节点',
   'PDF_DOCUMENT': 'PDF文档',
@@ -315,7 +315,7 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
     
     // 对于分点节点，优先检查是否已有子节点完成
     if (nodeType === 'answer-point' || nodeType === 'ANSWER_POINT' || 
-        nodeType === 'knowledge-head' || nodeType === 'circuit-point' ||
+        nodeType === 'knowledge-head' || nodeType === 'circuit-analyze' ||
         nodeType === 'PDF_ANALYSIS_POINT') {
       
       // 如果明确标记为已生成且process为completed，显示已完成
@@ -423,7 +423,7 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
   // 检查是否为电路节点类型
   const isCircuitNode = useMemo(() => {
     const nodeType = selectedNode?.type as NodeType;
-    return nodeType === 'circuit-canvas' || nodeType === 'circuit-point' || nodeType === 'circuit-detail';
+    return nodeType === 'circuit-canvas' || nodeType === 'circuit-analyze' || nodeType === 'circuit-detail';
   }, [selectedNode?.type]);
 
   // 获取文本内容和其他字段信息 - 使用最新的节点数据
@@ -467,10 +467,10 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
       return true;
     }
     
-    // 对于分点节点（answer-point, knowledge-head, circuit-point, PDF_ANALYSIS_POINT等），
+    // 对于分析节点（answer-point, knowledge-head, circuit-analyze, PDF_ANALYSIS_POINT等），
     // 如果明确标记为已生成，则认为不再生成中
     if (nodeType === 'answer-point' || nodeType === 'ANSWER_POINT' || 
-        nodeType === 'knowledge-head' || nodeType === 'circuit-point' ||
+        nodeType === 'knowledge-head' || nodeType === 'circuit-analyze' ||
         nodeType === 'PDF_ANALYSIS_POINT') {
       return !isGenerated && process === 'generating'; // 只有在明确生成中状态才显示生成中
     }
@@ -658,7 +658,7 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
                         nodeType === 'PDF_ANALYSIS_DETAIL') {
                       return '内容生成中...';
                     } else if (nodeType === 'answer-point' || nodeType === 'ANSWER_POINT' || 
-                               nodeType === 'knowledge-head' || nodeType === 'circuit-point' ||
+                               nodeType === 'knowledge-head' || nodeType === 'circuit-analyze' ||
                                nodeType === 'PDF_ANALYSIS_POINT') {
                       return '分析中...';
                     } else {

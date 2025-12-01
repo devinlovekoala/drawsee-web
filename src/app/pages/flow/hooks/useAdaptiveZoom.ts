@@ -21,7 +21,7 @@ export function useAdaptiveZoom() {
     
     // 如果指定了目标节点类型，优先考虑该类型的最佳显示
     if (targetNodeType) {
-      const isDetailNode = ['answer-detail', 'ANSWER_DETAIL', 'circuit-detail', 'knowledge-detail', 'PDF_ANALYSIS_POINT'].includes(targetNodeType);
+      const isDetailNode = ['answer-detail', 'ANSWER_DETAIL', 'circuit-analyze', 'circuit-detail', 'knowledge-detail', 'PDF_ANALYSIS_POINT'].includes(targetNodeType);
       if (isDetailNode) {
         return { maxZoom: 1.8, minZoom: 0.9, padding: 0.12 }; // 稍微降低最大缩放，减少padding
       }

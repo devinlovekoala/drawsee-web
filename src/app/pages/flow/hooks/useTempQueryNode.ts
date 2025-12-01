@@ -20,9 +20,10 @@ const ALLOWED_PARENT_TYPES: NodeType[] = [
   'knowledge-detail', 
   'answer-detail', 
   'ANSWER_DETAIL',
-  'circuit-point',
   'circuit-detail',
-  'circuit-canvas'
+  'circuit-canvas',
+  'circuit-analyze',
+  'answer'
 ];
 
 // 防抖函数
@@ -105,7 +106,7 @@ function useTempQueryNode(
     
     // 明确拒绝的节点类型
     if (
-      nodeType === 'answer' || 
+      (nodeType === 'answer' && nodeSubtype !== 'circuit-analyze') || 
       nodeType === 'knowledge-head' || 
       nodeType === 'answer-point' || 
       nodeType === 'ANSWER_POINT'
@@ -114,8 +115,10 @@ function useTempQueryNode(
       return false;
     }
     
-    // 特殊处理circuit-detail类型
-    if (nodeType === 'circuit-detail' || nodeSubtype === 'circuit-detail') {
+    const isCircuitAnswer = nodeType === 'answer' && nodeSubtype === 'circuit-analyze';
+    
+    // 特殊处理circuit分析类型
+    if (nodeType === 'circuit-analyze' || nodeSubtype === 'circuit-analyze' || nodeType === 'circuit-detail' || nodeSubtype === 'circuit-detail' || isCircuitAnswer) {
       setCanNotInputReason(null);
       return true;
     }
@@ -146,8 +149,10 @@ function useTempQueryNode(
     const isTypeAllowed = ALLOWED_PARENT_TYPES.includes(nodeType);
     const isSubtypeAllowed = nodeSubtype && ALLOWED_PARENT_TYPES.includes(nodeSubtype as NodeType);
     
-    // 特殊处理circuit-detail类型
-    if (nodeType === 'circuit-detail' || nodeSubtype === 'circuit-detail') {
+    const isCircuitAnswer = nodeType === 'answer' && nodeSubtype === 'circuit-analyze';
+    
+    // 特殊处理circuit分析类型
+    if (nodeType === 'circuit-analyze' || nodeSubtype === 'circuit-analyze' || nodeType === 'circuit-detail' || nodeSubtype === 'circuit-detail' || isCircuitAnswer) {
       return selectedNode.id;
     }
     

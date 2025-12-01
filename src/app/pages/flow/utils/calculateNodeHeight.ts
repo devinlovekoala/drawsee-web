@@ -137,29 +137,15 @@ export function calculateNodeHeight(node: Node<NodeData<NodeType>>, nodeWidth?: 
     return 350; // 电路画布需要足够的空间来显示电路设计
   }
   
-  // 电路分析点节点
-  if (type === 'circuit-point') {
+  // 电路分析节点
+  if (type === 'circuit-analyze') {
     const text = data.text as string || '';
-    const pointDescription = data.pointDescription as string || '';
-    // 使用文本或者点描述中较长的一个计算高度
-    const contentText = pointDescription.length > text.length ? pointDescription : text;
-    
-    // 根据是否已生成详情调整高度
-    const { isGenerated } = data;
-    let additionalHeight = isGenerated ? 0 : 50; // 未生成详情时需要额外的高度用于显示按钮
-    
-    // 如果有pointType属性，需要增加一点高度
-    additionalHeight += data.pointType ? 25 : 0;
-    
-    const textLength = contentText.length;
-    // 根据文本长度和宽度调整高度计算
-    const charsPerLine = Math.floor(width / 8.5); // 平均每行能容纳的字符数，基于宽度调整
-    const lines = Math.ceil(textLength / charsPerLine);
-    const titleHeight = 40; // 标题高度
-    const padding = 32; // 上下内边距
-    const lineHeight = 20; // 每行文本高度
-    
-    return titleHeight + padding + lines * lineHeight + additionalHeight;
+    const followUps = Array.isArray(data.followUps) ? data.followUps.length : 0;
+    const charsPerLine = Math.floor(width / 8.5);
+    const lines = Math.ceil(text.length / charsPerLine);
+    const base = 40 + 32 + lines * 20;
+    const followUpHeight = followUps > 0 ? 60 + followUps * 36 : 0;
+    return Math.max(220, base + followUpHeight);
   }
   
   // 电路分析详情节点

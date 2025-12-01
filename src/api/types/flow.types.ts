@@ -1,4 +1,4 @@
-export type NodeType = "root" | "query" | "answer" | "answer-point" | "answer-detail" | "ANSWER_POINT" | "ANSWER_DETAIL" | "knowledge-head" | "knowledge-detail" | "resource" | "circuit-canvas" | "circuit-point" | "circuit-detail" | "PDF_DOCUMENT" | "PDF_ANALYSIS_POINT" | "PDF_ANALYSIS_DETAIL";
+export type NodeType = "root" | "query" | "answer" | "answer-point" | "answer-detail" | "ANSWER_POINT" | "ANSWER_DETAIL" | "knowledge-head" | "knowledge-detail" | "resource" | "circuit-canvas" | "circuit-analyze" | "circuit-detail" | "PDF_DOCUMENT" | "PDF_ANALYSIS_POINT" | "PDF_ANALYSIS_DETAIL";
 
 export interface ConversationVO {
   id: number;
@@ -25,9 +25,18 @@ interface QueryNodeData extends BaseNodeData {
   mode: AiTaskType;
 }
 
+export interface FollowUpSuggestionData {
+  title?: string;
+  hint?: string;
+  followUp?: string;
+  intent?: string;
+  confidence?: number;
+}
+
 interface AnswerNodeData extends BaseNodeData {
   subtype?: string;
   isDone?: boolean;
+  followUps?: FollowUpSuggestionData[];
 };
 
 type KnowledgeHeadNodeData = BaseNodeData;
@@ -43,13 +52,11 @@ interface CircuitCanvasNodeData extends BaseNodeData {
   mode?: string;
 }
 
-interface CircuitPointNodeData extends BaseNodeData {
-  subtype: 'circuit-point';
-}
-
-interface CircuitDetailNodeData extends BaseNodeData {
-  subtype: 'circuit-detail';
-  angle?: string; // 分析角度
+interface CircuitAnalyzeNodeData extends BaseNodeData {
+  subtype: 'circuit-analyze';
+  contextTitle?: string;
+  followUp?: string;
+  followUps?: FollowUpSuggestionData[];
 }
 
 export type ResourceSubType = "bilibili" | "animation" | "generated-animation";
@@ -104,8 +111,8 @@ export type NodeData = {
   'animation': AnimationNodeData;
   'resource': ResourceNodeData;
   'circuit-canvas': CircuitCanvasNodeData;
-  'circuit-point': CircuitPointNodeData;
-  'circuit-detail': CircuitDetailNodeData;
+  'circuit-analyze': CircuitAnalyzeNodeData;
+  'circuit-detail': AnswerNodeData;
   'PDF_DOCUMENT': PdfDocumentNodeData;
   'PDF_ANALYSIS_POINT': PdfAnalysisPointNodeData;
   'PDF_ANALYSIS_DETAIL': PdfAnalysisDetailNodeData;

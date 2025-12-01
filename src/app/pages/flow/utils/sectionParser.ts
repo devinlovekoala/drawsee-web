@@ -236,6 +236,11 @@ export function processCompletedNode(
     return { nodes, edges, newNodeIds: [] };
   }
   
+  // 新的电路分析节点不再进行二级标题分裂
+  if (targetNode.type === 'circuit-canvas' || targetNode.type === 'circuit-analyze') {
+    return { nodes, edges, newNodeIds: [] };
+  }
+  
   // 检查节点内容是否包含二级标题
   if (hasH2Headings(targetNode.data.text)) {
     // 执行节点拆分

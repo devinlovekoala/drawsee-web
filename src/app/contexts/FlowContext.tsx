@@ -1,4 +1,4 @@
-import React, { createContext, useContext } from "react";
+import { createContext, useContext } from "react";
 import { ChatTask } from "../pages/flow/types/ChatTask.types";
 
 export interface FlowLocationState {
@@ -13,6 +13,7 @@ export interface FlowContextType {
   convId: number | null;
   isChatting: boolean;
   addChatTask: (task: ChatTask) => void;
+  applySuggestion?: (text: string) => void;
 }
 
 export const FlowContext = createContext<FlowContextType>({
@@ -20,6 +21,7 @@ export const FlowContext = createContext<FlowContextType>({
   convId: null,
   isChatting: false,
   addChatTask: () => {},
+  applySuggestion: () => {},
 });
 
 export const useFlowContext = () => {

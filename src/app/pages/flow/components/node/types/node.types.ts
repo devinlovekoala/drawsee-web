@@ -33,7 +33,7 @@ type AnswerSubType =
   | 'ANSWER_POINT' 
   | 'ANSWER_DETAIL'
   | 'circuit-canvas'
-  | 'circuit-point'
+  | 'circuit-analyze'
   | 'circuit-detail';
 
 export interface AnswerNodeData extends BaseNodeData {
@@ -68,7 +68,7 @@ export type NodeData<T extends string> =
   T extends 'knowledge-detail' ? KnowledgeDetailNodeData :
   T extends 'resource' ? ResourceNodeData :
   T extends 'circuit-canvas' ? AnswerNodeData :
-  T extends 'circuit-point' ? AnswerNodeData :
+  T extends 'circuit-analyze' ? AnswerNodeData :
   T extends 'circuit-detail' ? AnswerNodeData :
   T extends 'PDF_DOCUMENT' ? BaseNodeData :
   T extends 'PDF_ANALYSIS_POINT' ? BaseNodeData :

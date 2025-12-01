@@ -11,6 +11,14 @@ import AnswerPointNode from './AnswerPointNode';
 import AnswerDetailNode from './AnswerDetailNode';
 import { useLocation } from 'react-router-dom';
 
+type FollowUpSuggestion = {
+  title?: string;
+  hint?: string;
+  followUp?: string;
+  intent?: string;
+  confidence?: number;
+};
+
 function AnswerNode({ data, ...props }: ExtendedNodeProps<'answer'>) {
   // 根据subtype渲染不同的节点组件
   if (data.subtype === 'ANSWER_POINT') {
@@ -21,11 +29,20 @@ function AnswerNode({ data, ...props }: ExtendedNodeProps<'answer'>) {
     return <AnswerDetailNode data={data} {...props} />;
   }
   
-  const {chat, convId, isChatting, addChatTask} = useFlowContext();
+  const {chat, convId, isChatting, addChatTask, applySuggestion} = useFlowContext();
   const {handleAiTaskCountPlus} = useAppContext();
   const { subtype, isDone } = data;
   const [isGenerated, setIsGenerated] = useState(data.isGenerated || false);
   const [selectedModel, setSelectedModel] = useState<ModelType>('deepseekV3'); // 默认使用DeepSeekV3模型
+  const followUps = useMemo<FollowUpSuggestion[]>(() => {
+    if (!Array.isArray((data as Record<string, unknown>).followUps)) {
+      return [];
+    }
+    return ((data as Record<string, unknown>).followUps as FollowUpSuggestion[]).filter(item => {
+      const content = item.followUp || item.hint || item.title;
+      return Boolean(content && content.trim().length > 0);
+    });
+  }, [data]);
 
   const location = useLocation();
   const classId = location.state?.classId as string || null;
@@ -111,7 +128,7 @@ function AnswerNode({ data, ...props }: ExtendedNodeProps<'answer'>) {
   }, [subtype, modelSelectorElement]);
 
   // 底部按钮内容
-  const footerContent = useMemo(() => {
+  const actionFooterContent = useMemo(() => {
     if (subtype === 'solver-first' || (subtype === 'solver-continue' && isDone !== undefined)) {
       return (
         <button
@@ -154,6 +171,59 @@ function AnswerNode({ data, ...props }: ExtendedNodeProps<'answer'>) {
     
     return undefined;
   }, [subtype, isDone, isGenerated, handleSolverChat]);
+  
+  const followUpsElement = useMemo(() => {
+    if (followUps.length === 0) return null;
+    return (
+      <div className="flex flex-col gap-2">
+        <div className="text-xs font-semibold text-gray-500 flex items-center gap-1">
+          推荐追问
+          <span className="text-gray-400 text-[10px]">(点击可填入下方输入框)</span>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {followUps.map((item, index) => {
+            const label = item.title || `追问 ${index + 1}`;
+            const description = item.hint;
+            const payload = item.followUp || item.hint || item.title || '';
+            return (
+              <button
+                key={`${label}-${index}`}
+                type="button"
+                onClick={() => applySuggestion?.(payload)}
+                className="group px-3 py-2 rounded-xl bg-white/80 border border-emerald-200 shadow-sm text-left hover:border-emerald-400 hover:shadow-md transition-all duration-200 text-sm"
+              >
+                <div className="font-medium text-emerald-700 flex items-center gap-2">
+                  <span>{label}</span>
+                  {typeof item.confidence === 'number' && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-600">
+                      {(item.confidence * 100).toFixed(0)}%
+                    </span>
+                  )}
+                </div>
+                {description && (
+                  <p className="text-xs text-gray-500 mt-1 leading-snug">
+                    {description}
+                  </p>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }, [followUps, applySuggestion]);
+  
+  const footerContent = useMemo(() => {
+    if (!actionFooterContent && !followUpsElement) {
+      return undefined;
+    }
+    return (
+      <div className="flex flex-col gap-3 w-full">
+        {actionFooterContent}
+        {followUpsElement}
+      </div>
+    );
+  }, [actionFooterContent, followUpsElement]);
 
   // 创建增强的数据对象，包含自定义内容
   const enhancedData = {

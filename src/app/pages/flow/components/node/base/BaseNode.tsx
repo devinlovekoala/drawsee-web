@@ -27,7 +27,7 @@ const NODE_TYPE_STYLES: Record<string, { bgColor: string; textColor: string; bor
   'knowledge-head': { bgColor: 'bg-amber-50', textColor: 'text-amber-700', borderColor: 'border-amber-200', label: '知识点' },
   'knowledge-detail': { bgColor: 'bg-orange-50', textColor: 'text-orange-700', borderColor: 'border-orange-200', label: '知识详情' },
   'circuit-canvas': { bgColor: 'bg-pink-50', textColor: 'text-pink-700', borderColor: 'border-pink-200', label: '电路画布' },
-  'circuit-point': { bgColor: 'bg-rose-50', textColor: 'text-rose-700', borderColor: 'border-rose-200', label: '电路分点' },
+  'circuit-analyze': { bgColor: 'bg-rose-50', textColor: 'text-rose-700', borderColor: 'border-rose-200', label: '电路分析' },
   'circuit-detail': { bgColor: 'bg-red-50', textColor: 'text-red-700', borderColor: 'border-red-200', label: '电路详情' },
   'PDF_DOCUMENT': { bgColor: 'bg-indigo-50', textColor: 'text-indigo-700', borderColor: 'border-indigo-200', label: 'PDF文档' },
   'PDF_ANALYSIS_POINT': { bgColor: 'bg-violet-50', textColor: 'text-violet-700', borderColor: 'border-violet-200', label: 'PDF分点' },

@@ -5,7 +5,7 @@ import AnswerNode from "@/app/pages/flow/components/node/AnswerNode";
 import KnowledgeHeadNode from "@/app/pages/flow/components/node/KnowledgeHeadNode";
 import KnowledgeDetailNode from "@/app/pages/flow/components/node/KnowledgeDetailNode";
 import CircuitCanvasNode from "@/app/pages/flow/components/node/CircuitCanvasNode";
-import CircuitPointNode from "@/app/pages/flow/components/node/CircuitPointNode";
+import CircuitAnalyzeNode from "@/app/pages/flow/components/node/CircuitAnalyzeNode";
 import CircuitDetailNode from "@/app/pages/flow/components/node/CircuitDetailNode";
 import AnswerPointNode from "@/app/pages/flow/components/node/AnswerPointNode";
 import AnswerDetailNode from "@/app/pages/flow/components/node/AnswerDetailNode";
@@ -20,7 +20,7 @@ import {getNodesByConvId, updateNodesPositionAndHeight} from "@/api/methods/flow
 import type { NodeVO as ApiNodeVO, NodeToUpdate, NodeType } from '@/api/types/flow.types';
 import { LoadingSpinner } from './components/loading/LoadingSpinner';
 import useFlowState from './hooks/useFlowState';
-import { FlowInputPanel } from './components/input/FlowInputPanel';
+import { FlowInputPanel, type FlowInputPanelHandle } from './components/input/FlowInputPanel';
 import '@xyflow/react/dist/style.css';
 import useTempQueryNode from "./hooks/useTempQueryNode";
 import useFlowTools from "./hooks/useFlowTools";
@@ -47,7 +47,7 @@ const CompactAnswerDetailNode = (props: any) => <AnswerDetailNode {...props} com
 const CompactKnowledgeHeadNode = (props: any) => <KnowledgeHeadNode {...props} compactMode={true} />;
 const CompactKnowledgeDetailNode = (props: any) => <KnowledgeDetailNode {...props} compactMode={true} />;
 const CompactCircuitCanvasNode = (props: any) => <CircuitCanvasNode {...props} compactMode={true} />;
-const CompactCircuitPointNode = (props: any) => <CircuitPointNode {...props} compactMode={true} />;
+const CompactCircuitAnalyzeNode = (props: any) => <CircuitAnalyzeNode {...props} compactMode={true} />;
 const CompactCircuitDetailNode = (props: any) => <CircuitDetailNode {...props} compactMode={true} />;
 const CompactResourceNode = (props: any) => <ResourceNode {...props} compactMode={true} />;
 const CompactPdfDocumentNode = (props: any) => <PdfDocumentNode {...props} compactMode={true} />;
@@ -67,8 +67,8 @@ const nodeTypes = {
   'resource': CompactResourceNode,
   // 电路分析节点类型 - 统一使用小写中划线形式
   'circuit-canvas': CompactCircuitCanvasNode,   // 电路画布节点
-  'circuit-point': CompactCircuitPointNode,     // 电路分析点节点
-  'circuit-detail': CompactCircuitDetailNode,   // 电路分析详情节点
+  'circuit-analyze': CompactCircuitAnalyzeNode,   // 电路分析节点
+  'circuit-detail': CompactCircuitDetailNode,   // (legacy) 电路分析详情节点
   // PDF相关节点类型
   'PDF_DOCUMENT': CompactPdfDocumentNode,       // PDF文档节点
   'PDF_ANALYSIS_POINT': CompactPdfAnalysisPointNode, // PDF分析点节点
@@ -93,6 +93,8 @@ function normalizeNodeType(apiType: string | undefined | null): string {
       return 'PDF_ANALYSIS_POINT';
     case 'PDF_ANALYSIS_DETAIL':
       return 'PDF_ANALYSIS_DETAIL';
+    case 'CIRCUIT-ANALYZE':
+      return 'circuit-analyze';
     default:
       // 对于已是前端支持的小写类型，原样返回，例如 answer / answer-point / knowledge-detail 等
       return String(apiType);
@@ -106,6 +108,7 @@ function Flow() {
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   // 用户输入
   const [userInput, setUserInput] = useState<string>('');
+  const flowInputRef = useRef<FlowInputPanelHandle>(null);
   // 展示小地图
   const [showMiniMap, setShowMiniMap] = useState<boolean>(true);
   // 显示详情面板
@@ -151,6 +154,13 @@ function Flow() {
     setElements,
     addChatTask
   } = useFlowState(convId, selectedNode, protectedSetSelectedNode);
+  
+  const handleApplySuggestion = useCallback((suggestion: string) => {
+    if (!suggestion || !suggestion.trim()) {
+      return;
+    }
+    flowInputRef.current?.applySuggestion(suggestion.trim());
+  }, []);
   
   // 处理返回班级列表
   const handleBackToCourses = useCallback(() => {
@@ -314,7 +324,7 @@ function Flow() {
           console.log(`检测到选中节点内容变化，立即同步更新: ${selectedNode.id}`);
           
           // 检查是否是受保护的详情节点
-          const detailTypes = ['answer-detail', 'ANSWER_DETAIL', 'circuit-detail', 'knowledge-detail', 'PDF_ANALYSIS_DETAIL'];
+        const detailTypes = ['answer-detail', 'ANSWER_DETAIL', 'circuit-analyze', 'circuit-detail', 'knowledge-detail', 'PDF_ANALYSIS_DETAIL'];
           if (updatedSelectedNode.type && detailTypes.includes(updatedSelectedNode.type) && 
               updatedSelectedNode.data.process === 'completed') {
             console.log(`详情节点 ${updatedSelectedNode.id} 已完成，确保保持选中状态`);
@@ -465,8 +475,17 @@ function Flow() {
         console.log('✅ 空会话加载完成，恢复正常操作模式');
         return;
       }
+      const filteredApiNodes = apiNodes.filter(node => {
+        const normalizedType = normalizeNodeType(node.type as unknown as string);
+        if (normalizedType === 'circuit-point') {
+          console.log('初始加载: 忽略旧版电路分点节点:', node.id);
+          return false;
+        }
+        return true;
+      });
+
       // 将apiNodes转换为flowNodes
-      const flowNodes = apiNodes.map((node) => {
+      const flowNodes = filteredApiNodes.map((node) => {
         const normalizedType = normalizeNodeType(node.type as unknown as string);
         const data = {
           parentId: node.parentId,
@@ -481,7 +500,7 @@ function Flow() {
   
         // 如果节点是knowledge-head或者solver-first或者solver-continue，则判断是否已经生成
         if (normalizedType === 'knowledge-head') {
-          apiNodes.forEach(apiNode => {
+          filteredApiNodes.forEach(apiNode => {
             if (apiNode.parentId === node.id && normalizeNodeType(apiNode.type as unknown as string) === 'knowledge-detail') {
               data.isGenerated = true;
             }
@@ -489,26 +508,17 @@ function Flow() {
         }
         // 处理answer-point节点
         if (normalizedType === 'answer-point' || normalizedType === 'ANSWER_POINT') {
-          apiNodes.forEach(apiNode => {
+          filteredApiNodes.forEach(apiNode => {
             const t = normalizeNodeType(apiNode.type as unknown as string);
             if (apiNode.parentId === node.id && (t === 'answer-detail' || t === 'ANSWER_DETAIL')) {
               data.isGenerated = true;
             }
           });
         }
-        
-        // 处理circuit-point节点
-        if (normalizedType === 'circuit-point') {
-          apiNodes.forEach(apiNode => {
-            if (apiNode.parentId === node.id && normalizeNodeType(apiNode.type as unknown as string) === 'circuit-detail') {
-              data.isGenerated = true;
-            }
-          });
-        }
-        
+
         // 处理PDF_ANALYSIS_POINT节点
         if (normalizedType === 'PDF_ANALYSIS_POINT') {
-          apiNodes.forEach(apiNode => {
+          filteredApiNodes.forEach(apiNode => {
             if (apiNode.parentId === node.id && normalizeNodeType(apiNode.type as unknown as string) === 'PDF_ANALYSIS_DETAIL') {
               data.isGenerated = true;
             }
@@ -517,7 +527,7 @@ function Flow() {
         
         // 对于详情节点，如果有文本内容，设置为已完成状态
         if ((normalizedType === 'answer-detail' || normalizedType === 'ANSWER_DETAIL' || 
-             normalizedType === 'circuit-detail' || normalizedType === 'knowledge-detail' ||
+             normalizedType === 'circuit-analyze' || normalizedType === 'circuit-detail' || normalizedType === 'knowledge-detail' ||
              normalizedType === 'PDF_ANALYSIS_DETAIL') && 
             node.data.text && typeof node.data.text === 'string' && node.data.text.length > 0) {
           console.log(`初始化详情节点 ${node.id} 状态为已完成，类型: ${normalizedType}`);
@@ -525,7 +535,7 @@ function Flow() {
           data.process = 'completed';
         }
         if (node.data.subtype === 'solver-first' || node.data.subtype === 'solver-continue') {
-          apiNodes.forEach(apiNode => {
+          filteredApiNodes.forEach(apiNode => {
             if (
               apiNode.parentId === node.id && 
               (apiNode.data.subtype === 'solver-continue' || apiNode.data.subtype === 'solver-summary')
@@ -623,7 +633,7 @@ function Flow() {
       
       // 检查当前是否有被保护的详情节点
       if (detailNodeRef.current && selectedNode?.id === detailNodeRef.current) {
-        const detailTypes = ['answer-detail', 'ANSWER_DETAIL', 'circuit-detail', 'knowledge-detail', 'PDF_ANALYSIS_DETAIL'];
+        const detailTypes = ['answer-detail', 'ANSWER_DETAIL', 'circuit-analyze', 'circuit-detail', 'knowledge-detail', 'PDF_ANALYSIS_DETAIL'];
         if (selectedNode.type && detailTypes.includes(selectedNode.type) && 
             selectedNode.data?.process === 'completed') {
           console.log(`当前详情节点 ${selectedNode.id} 已完成且被保护，忽略自动选择事件`);
@@ -700,7 +710,7 @@ function Flow() {
   useEffect(() => {
     // 检查是否有正在生成的详情节点
     const hasGeneratingDetailNode = elements.nodes.some(node => {
-      const isDetailNode = node.type && ['answer-detail', 'ANSWER_DETAIL', 'circuit-detail', 'knowledge-detail', 'PDF_ANALYSIS_DETAIL'].includes(node.type);
+      const isDetailNode = node.type && ['answer-detail', 'ANSWER_DETAIL', 'circuit-analyze', 'circuit-detail', 'knowledge-detail', 'PDF_ANALYSIS_DETAIL'].includes(node.type);
       const isGenerating = node.data?.process === 'generating';
       return isDetailNode && isGenerating;
     });
@@ -798,7 +808,7 @@ function Flow() {
     if (!selectedNode) return;
     
     // 详情节点类型
-    const detailTypes = ['answer-detail', 'ANSWER_DETAIL', 'circuit-detail', 'knowledge-detail', 'PDF_ANALYSIS_DETAIL'];
+    const detailTypes = ['answer-detail', 'ANSWER_DETAIL', 'circuit-analyze', 'circuit-detail', 'knowledge-detail', 'PDF_ANALYSIS_DETAIL'];
     
     // 如果当前节点是详情节点
     if (selectedNode.type && detailTypes.includes(selectedNode.type)) {
@@ -840,7 +850,8 @@ function Flow() {
       isChatting,
       convId,
       chat: flowChat,
-      addChatTask
+      addChatTask,
+      applySuggestion: handleApplySuggestion
     }}>
       <div className="flex w-full overflow-hidden" style={{ height: 'calc(100vh - 80px)' }}>
         {/* 左侧React Flow区域 */}
@@ -908,6 +919,7 @@ function Flow() {
             {/* 底部输入框 */}
             <Panel position={"bottom-center"}>
               <FlowInputPanel
+                ref={flowInputRef}
                 selectedNode={selectedNode}
                 prompt={userInput}
                 setPrompt={setUserInput}

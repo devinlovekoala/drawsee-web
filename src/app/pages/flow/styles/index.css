@@ -182,7 +182,7 @@
 }
 
 .base-node[data-type="circuit-canvas"] .compact-node-content::before,
-.base-node[data-type="circuit-point"] .compact-node-content::before,
+.base-node[data-type="circuit-analyze"] .compact-node-content::before,
 .base-node[data-type="circuit-detail"] .compact-node-content::before {
   content: '';
   position: absolute;

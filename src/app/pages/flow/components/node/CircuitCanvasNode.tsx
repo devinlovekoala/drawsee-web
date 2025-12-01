@@ -27,7 +27,6 @@ function CircuitCanvasNode({ data, ...props }: ExtendedNodeProps<'circuit-canvas
     return nodeData.circuitDesign || null;
   }, [nodeData.circuitDesign]);
   
-  // 自定义展示内容 - 电路图渲染
   const circuitContent = useMemo(() => {
     if (circuitDesign) {
       // 检查设计数据完整性

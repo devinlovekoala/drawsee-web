@@ -1,4 +1,4 @@
-import { useCallback, useState, useRef, useEffect, useMemo } from "react";
+import { useCallback, useState, useRef, useEffect, useMemo, forwardRef, useImperativeHandle } from "react";
 import { toast } from "sonner";
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { createAiTask } from "@/api/methods/flow.methods.ts";
@@ -10,7 +10,6 @@ import '@/app/components/text-selection/TextSelectionToolbar.css';
 import { Node as FlowNode } from "@xyflow/react";
 import { DeepSeek, Doubao } from "./ModelIcons";
 import { DropdownOption, SelectDropdown } from "./SelectDropdown";
-import { Switch } from "@/app/components/ui/switch";
 import { useLocation } from 'react-router-dom';
 
 interface FlowInputPanelProps {
@@ -25,14 +24,21 @@ interface FlowInputPanelProps {
 
 export type ModelType = 'deepseekV3' | 'doubao';
 
-export function FlowInputPanel({
+export interface FlowInputPanelHandle {
+  applySuggestion: (text: string) => void;
+}
+
+export const FlowInputPanel = forwardRef<FlowInputPanelHandle, FlowInputPanelProps>(function FlowInputPanel(
+{
   prompt,
   setPrompt,
   canInput, 
   canNotInputReason,
   addTempQueryNodeTask,
-  parentIdOfTempQueryNode
-}: FlowInputPanelProps) {
+  parentIdOfTempQueryNode,
+  selectedNode
+}: FlowInputPanelProps,
+ref) {
 
   // 新增模型选项
   const modelOptions = useMemo<DropdownOption[]>(() => [
@@ -66,6 +72,22 @@ export function FlowInputPanel({
   
   const [isProcessing, setIsProcessing] = useState(false);
   
+  const determineTaskType = useCallback((): AiTaskType => {
+    if (!selectedNode) return 'GENERAL';
+    const nodeType = selectedNode.type as string | undefined;
+    const nodeSubtype = (selectedNode.data as Record<string, unknown> | undefined)?.subtype as string | undefined;
+    if (nodeType === 'answer' && nodeSubtype === 'circuit-analyze') {
+      return 'CIRCUIT_DETAIL';
+    }
+    if (nodeSubtype === 'circuit-canvas' || nodeSubtype === 'circuit-analyze') {
+      return 'CIRCUIT_DETAIL';
+    }
+    if (nodeType === 'circuit-canvas' || nodeType === 'circuit-analyze') {
+      return 'CIRCUIT_DETAIL';
+    }
+    return 'GENERAL';
+  }, [selectedNode]);
+  
   // 处理输入变化
   const handlePromptChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newText = e.target.value;
@@ -76,11 +98,11 @@ export function FlowInputPanel({
       
       // 创建临时查询节点
       if (canInput) {
-        addTempQueryNodeTask({type: 'create', text: newText, mode: 'GENERAL'});
+        addTempQueryNodeTask({type: 'create', text: newText, mode: determineTaskType()});
       }
     } else if (newText.length > 0) {
       // 更新临时节点文本
-      addTempQueryNodeTask({type: 'update', text: newText});
+      addTempQueryNodeTask({type: 'update', text: newText, mode: determineTaskType()});
     } else if (newText.length === 0) {
       // 如果清空了输入，删除临时节点并重置输入框状态
       addTempQueryNodeTask({type: 'delete'});
@@ -130,7 +152,7 @@ export function FlowInputPanel({
     }
     
     // 使用统一的GENERAL任务类型，由后端决定是否为知识问答
-    const taskType: AiTaskType = 'GENERAL';
+    const taskType: AiTaskType = determineTaskType();
     
     // 最终选择的模型
     let finalModel = selectedModel; // 所有模式都使用选择的模型
@@ -140,7 +162,7 @@ export function FlowInputPanel({
       prompt: finalPrompt,
       promptParams: {},
       convId: convId,
-      parentId: parseInt(parentIdOfTempQueryNode),
+      parentId: parseInt(parentIdOfTempQueryNode!, 10),
       model: finalModel, // 使用选择的模型
       classId: classId // 传递班级ID
     } as CreateAiTaskDTO;
@@ -166,7 +188,9 @@ export function FlowInputPanel({
       
       // 发送聊天请求
       setTimeout(() => {
-        handleNewChat(convId);
+        if (convId != null) {
+          handleNewChat(convId);
+        }
         chat(response.taskId);
       }, 300);
     }).catch((error) => {
@@ -199,6 +223,28 @@ export function FlowInputPanel({
   const clearQuoteText = useCallback(() => {
     setQuoteText(null);
   }, [setQuoteText]);
+
+  useImperativeHandle(ref, () => ({
+    applySuggestion: (text: string) => {
+      const trimmed = text.trim();
+      if (!trimmed) return;
+      const hadText = prompt.trim().length > 0;
+      setPrompt(trimmed);
+      setIsExpanded(true);
+      requestAnimationFrame(() => {
+        textareaRef.current?.focus();
+      });
+      if (!canInput) {
+        return;
+      }
+      const taskType = determineTaskType();
+      if (hadText) {
+        addTempQueryNodeTask({type: 'update', text: trimmed, mode: taskType});
+      } else {
+        addTempQueryNodeTask({type: 'create', text: trimmed, mode: taskType});
+      }
+    }
+  }), [addTempQueryNodeTask, canInput, determineTaskType, prompt, setPrompt]);
 
   return (
     <div ref={containerRef} className="input-panel-container"
@@ -284,4 +330,4 @@ export function FlowInputPanel({
       </div>
     </div>
   );
-} 
+});

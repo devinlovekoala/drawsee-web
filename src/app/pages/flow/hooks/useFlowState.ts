@@ -78,17 +78,24 @@ function useFlowState(convId: number, selectedNode?: Node | null, setSelectedNod
               case 'PDF_CIRCUIT_DOCUMENT':
               case 'PDF_DOCUMENT':
                 return 'PDF_DOCUMENT';
-              case 'PDF_ANALYSIS_POINT':
-                return 'PDF_ANALYSIS_POINT';
-              case 'PDF_ANALYSIS_DETAIL':
-                return 'PDF_ANALYSIS_DETAIL';
-              default:
-                return String(apiType);
-            }
+            case 'PDF_ANALYSIS_POINT':
+              return 'PDF_ANALYSIS_POINT';
+            case 'PDF_ANALYSIS_DETAIL':
+              return 'PDF_ANALYSIS_DETAIL';
+            case 'CIRCUIT-ANALYZE':
+              return 'circuit-analyze';
+            default:
+              return String(apiType);
+          }
           };
 
           const normalizedType = normalizeNodeType(nodeVO.type as unknown as string);
+          console.log(`[SSE] 接收到节点，ID: ${nodeVO.id}, 原始类型: ${nodeVO.type}, 归一化类型: ${normalizedType}, parentId: ${nodeVO.parentId}`);
 
+          if (normalizedType === 'circuit-point') {
+            console.log('忽略旧版电路节点，ID:', nodeVO.id);
+            break;
+          }
           // 设置节点为正在生成状态
           if (normalizedType === 'answer' || normalizedType === 'knowledge-detail') {
             lastFocusNodeId.current = nodeVO.id.toString();
@@ -98,7 +105,7 @@ function useFlowState(convId: number, selectedNode?: Node | null, setSelectedNod
           
           // 如果是详情节点，也添加到活跃节点列表，并准备自动选中
       if (normalizedType === 'answer-detail' || normalizedType === 'ANSWER_DETAIL' || 
-        normalizedType === 'circuit-detail' || normalizedType === 'knowledge-detail' ||
+        normalizedType === 'circuit-analyze' || normalizedType === 'knowledge-detail' ||
         normalizedType === 'PDF_ANALYSIS_DETAIL') {
             console.log(`创建详情节点 ${nodeVO.id}，准备自动选中并开始流式显示`);
             lastFocusNodeId.current = nodeVO.id.toString();
@@ -185,18 +192,6 @@ function useFlowState(convId: number, selectedNode?: Node | null, setSelectedNod
               }
             }
             
-            // 如果节点类型是circuit-detail，则修改其父节点(circuit-point)的isGenerated为true
-            if (normalizedType === 'circuit-detail') {
-              const circuitPointNode = layoutedNodes.find(node => 
-                node.type === 'circuit-point' && 
-                nodeVO.parentId && 
-                node.id === nodeVO.parentId.toString()
-              );
-              if (circuitPointNode) {
-                circuitPointNode.data.isGenerated = true;
-              }
-            }
-            
             // 如果节点类型是PDF_ANALYSIS_DETAIL，则修改其父节点(PDF_ANALYSIS_POINT)的isGenerated为true
             if (normalizedType === 'PDF_ANALYSIS_DETAIL') {
               const pdfAnalysisPointNode = layoutedNodes.find(node => 
@@ -211,7 +206,7 @@ function useFlowState(convId: number, selectedNode?: Node | null, setSelectedNod
 
             // 如果是详情节点，自动选中该节点以便在右侧面板显示
             if ((normalizedType === 'answer-detail' || normalizedType === 'ANSWER_DETAIL' || 
-                 normalizedType === 'circuit-detail' || normalizedType === 'knowledge-detail' ||
+                 normalizedType === 'circuit-analyze' || normalizedType === 'knowledge-detail' ||
                  normalizedType === 'PDF_ANALYSIS_DETAIL') && 
                 setSelectedNode) {
               const newDetailNode = layoutedNodes.find(node => node.id === newNode.id);
@@ -306,13 +301,27 @@ function useFlowState(convId: number, selectedNode?: Node | null, setSelectedNod
           
           // 验证nodeId是否存在
           if (!data || typeof data.nodeId === 'undefined') {
-            console.error('处理data任务时nodeId不存在:', task);
-            toast.error('处理数据时发生错误');
             break;
           }
           
           const nodeId = data.nodeId.toString();
           console.log(`处理节点数据更新，nodeId: ${nodeId}`, data);
+          
+          // 如果标记为删除，则移除节点
+          if (data.isDeleted === true) {
+            setElements(({nodes, edges}) => {
+              const updatedNodes = nodes.filter(node => node.id !== nodeId);
+              const updatedEdges = edges.filter(edge => edge.source !== nodeId && edge.target !== nodeId);
+              if (selectedNode && selectedNode.id === nodeId && setSelectedNode) {
+                setSelectedNode(null);
+              }
+              return {
+                nodes: updatedNodes,
+                edges: updatedEdges
+              };
+            });
+            break;
+          }
           
           // 更新对应id节点的data
           setElements(({nodes, edges}) => {
