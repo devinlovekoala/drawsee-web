@@ -30,7 +30,7 @@ import { calculateNodeHeight } from './utils/calculateNodeHeight';
 import type { NodeData } from './components/node/types/node.types';
 // 导入优化后的CSS样式
 import './styles/index.css';
-import { TEMP_QUERY_NODE_ID_PREFIX } from "./constants";
+import { COMPACT_NODE_HEIGHT, COMPACT_NODE_WIDTH, TEMP_QUERY_NODE_ID_PREFIX } from "./constants";
 import { FlowContext, FlowLocationState } from "@/app/contexts/FlowContext";
 import FlowRightToolBar from "./components/FlowRightToolBar";
 import ResourceNode from "./components/node/resource/ResourceNode";
@@ -516,6 +516,10 @@ function Flow() {
           ...(node.height !== null ? { height: node.height } : {}),
           ...(normalizedType !== 'root' ? node.data : {})
         } as any;
+        if (normalizedType !== 'root') {
+          data.layoutWidth = COMPACT_NODE_WIDTH;
+          data.layoutHeight = COMPACT_NODE_HEIGHT;
+        }
   
         // 如果节点是knowledge-head或者solver-first或者solver-continue，则判断是否已经生成
         if (normalizedType === 'knowledge-head') {

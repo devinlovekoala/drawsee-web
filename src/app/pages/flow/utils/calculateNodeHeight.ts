@@ -1,7 +1,7 @@
 import { Node } from '@xyflow/react';
 import { NodeType } from '@/api/types/flow.types';
 import { NodeData } from '../components/node/types/node.types';
-import { TEMP_QUERY_NODE_HEIGHT, NODE_WIDTH } from '../constants';
+import { TEMP_QUERY_NODE_HEIGHT, NODE_WIDTH, TEMP_QUERY_NODE_ID_PREFIX } from '../constants';
 
 /**
  * 根据节点类型和内容计算节点高度
@@ -10,14 +10,15 @@ import { TEMP_QUERY_NODE_HEIGHT, NODE_WIDTH } from '../constants';
  * @returns 计算出的节点高度
  */
 export function calculateNodeHeight(node: Node<NodeData<NodeType>>, nodeWidth?: number): number {
-  // 使用传入的节点宽度，如果未传入则使用常量NODE_WIDTH
-  const width = nodeWidth || NODE_WIDTH;
+  const data = node.data || {};
+  const widthFromData = typeof data.layoutWidth === 'number' ? data.layoutWidth : undefined;
+  const width = nodeWidth || widthFromData || NODE_WIDTH;
   
-  if (node.id.toString().startsWith('temp-query-node')) {
+  if (node.id.toString().startsWith(TEMP_QUERY_NODE_ID_PREFIX)) {
     return TEMP_QUERY_NODE_HEIGHT;
   }
   
-  const { type, data } = node;
+  const { type } = node;
   
   if (type === 'root') {
     return 50;

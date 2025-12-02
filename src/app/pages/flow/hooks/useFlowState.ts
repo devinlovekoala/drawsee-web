@@ -8,7 +8,7 @@ import { BASE_URL } from "@/api";
 import {SSE} from "sse.js";
 import { TOKEN_KEY } from "@/common/constant/storage-key.constant";
 import useFlowTools from "./useFlowTools";
-import { TEMP_QUERY_NODE_ID_PREFIX } from "../constants";
+import { COMPACT_NODE_HEIGHT, COMPACT_NODE_WIDTH, TEMP_QUERY_NODE_ID_PREFIX } from "../constants";
 import { processTextUpdate } from "../utils/sectionParser";
 
 /**
@@ -127,6 +127,10 @@ function useFlowState(convId: number, selectedNode?: Node | null, setSelectedNod
                 createdAt: nodeVO.createdAt,
                 updatedAt: nodeVO.updatedAt,
                 ...(nodeVO.height !== null ? { height: nodeVO.height } : {}),
+                ...(normalizedType !== 'root' ? {
+                  layoutWidth: COMPACT_NODE_WIDTH,
+                  layoutHeight: COMPACT_NODE_HEIGHT
+                } : {})
               },
             } as any;
             

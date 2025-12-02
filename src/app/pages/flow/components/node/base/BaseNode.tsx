@@ -2,7 +2,7 @@ import { Handle, Position, NodeProps, useReactFlow, NodeToolbar } from '@xyflow/
 import { NodeType } from '@/api/types/flow.types';
 import { format } from 'date-fns';
 import type { NodeData } from '../types/node.types';
-import { NODE_MIN_HEIGHT, NODE_DEFAULT_HEIGHT, NODE_WIDTH } from '../../../constants';
+import { NODE_MIN_HEIGHT, NODE_DEFAULT_HEIGHT, NODE_WIDTH, COMPACT_NODE_WIDTH, COMPACT_NODE_HEIGHT } from '../../../constants';
 import MarkdownWithLatex from '../../markdown/MarkdownWithLatex';
 import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import { useAppContext } from '@/app/contexts/AppContext';
@@ -192,9 +192,9 @@ export const BaseNode = React.memo(function BaseNode<T extends NodeType>({
   
   // 分别为简化视图和正常视图设置不同的样式 - 优化更大节点的显示
   const simplifiedNodeStyles = useMemo(() => ({
-    width: compactMode ? 380 : (nodeWidth || NODE_WIDTH), // 紧凑模式下使用更大的宽度（从320增加到380）
-    height: compactMode ? 180 : `${nodeHeight}px`, // 紧凑模式下使用更大的高度（从150增加到180）
-    minHeight: compactMode ? 180 : `${NODE_MIN_HEIGHT}px`
+    width: compactMode ? COMPACT_NODE_WIDTH : (nodeWidth || NODE_WIDTH),
+    height: compactMode ? COMPACT_NODE_HEIGHT : `${nodeHeight}px`,
+    minHeight: compactMode ? COMPACT_NODE_HEIGHT : `${NODE_MIN_HEIGHT}px`
   }), [nodeHeight, nodeWidth, compactMode]);
   
   const normalNodeStyles = useMemo(() => ({

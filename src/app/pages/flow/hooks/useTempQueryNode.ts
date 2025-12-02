@@ -2,7 +2,7 @@ import { useMemo, useRef, useCallback, useState, useEffect } from "react";
 import { Node, Edge } from "@xyflow/react";
 import { AiTaskType, NodeType } from "@/api/types/flow.types";
 import useFlowTools from "./useFlowTools";
-import { TEMP_QUERY_NODE_ID_PREFIX } from "../constants";
+import { COMPACT_NODE_HEIGHT, COMPACT_NODE_WIDTH, TEMP_QUERY_NODE_ID_PREFIX } from "../constants";
 
 // 定义临时节点任务数据类型
 export type TempQueryNodeTask = { 
@@ -205,6 +205,8 @@ function useTempQueryNode(
         convId: convIdValue,
         createdAt: Date.now(),
         updatedAt: Date.now(),
+        layoutWidth: COMPACT_NODE_WIDTH,
+        layoutHeight: COMPACT_NODE_HEIGHT
       },
       selectable: false
     };

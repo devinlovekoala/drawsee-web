@@ -1,7 +1,7 @@
 import ELK from 'elkjs/lib/elk-api';
 import type { ElkNode, ElkExtendedEdge } from 'elkjs';
 import { Node, Edge } from '@xyflow/react';
-import { NODE_WIDTH, ROOT_NODE_SIZE, TEMP_QUERY_NODE_HEIGHT, TEMP_QUERY_NODE_ID_PREFIX } from '../constants';
+import { NODE_WIDTH, ROOT_NODE_SIZE, TEMP_QUERY_NODE_HEIGHT, TEMP_QUERY_NODE_ID_PREFIX, COMPACT_NODE_WIDTH, COMPACT_NODE_HEIGHT, FLOW_HORIZONTAL_SPACING, FLOW_VERTICAL_SPACING, FLOW_SIBLING_SPACING } from '../constants';
 import { calculateNodeHeight } from './calculateNodeHeight';
 import { NodeType } from '@/api/types/flow.types';
 import { NodeData } from '../components/node/types/node.types';
@@ -306,45 +306,51 @@ export function entitreeFlexLayout(nodes: Node[], edges: Edge[], shouldUpdateSer
     let cacheHitCount = 0;
     
     nodes.forEach(node => {
-      const width = node.type !== 'root' ? NODE_WIDTH : ROOT_NODE_SIZE;
+      const isRootNode = node.type === 'root';
+      const widthFromData = typeof node.data?.layoutWidth === 'number' ? node.data.layoutWidth : undefined;
+      const width = isRootNode ? ROOT_NODE_SIZE : (widthFromData || NODE_WIDTH);
+      const previousHeightValue = typeof node.data?.height === 'number' ? node.data.height as number : null;
+      const previousHeightWidth = (node.data as any)?.__heightCalcWidth;
       let height: number;
       
-      // 性能优化：优先使用缓存的高度
-      const textLength = (node.data.text && typeof node.data.text === 'string') ? node.data.text.length : 0;
-      const cacheKey = `${node.type}-${textLength}`;
-      
-      if (node.id.startsWith(TEMP_QUERY_NODE_ID_PREFIX)) {
-        height = TEMP_QUERY_NODE_HEIGHT;
-      } else if (node.type === 'root') {
+      if (isRootNode) {
         height = ROOT_NODE_SIZE;
-      } else if (!resetHeight && typeof node.data.height === 'number' && node.data.height > 0) {
-        // 使用已缓存的高度（但要确保高度值有效）
-        height = node.data.height;
-        cacheHitCount++;
-      } else if (!resetHeight && globalHeightCache.has(cacheKey)) {
-        // 使用全局缓存的高度（相同类型和文本长度的节点）
-        height = globalHeightCache.get(cacheKey)!;
-        cacheHitCount++;
+      } else if (node.id.startsWith(TEMP_QUERY_NODE_ID_PREFIX)) {
+        height = TEMP_QUERY_NODE_HEIGHT;
       } else {
-        // 需要计算高度 - 重新布局时强制重新计算以确保一致性
-        height = calculateNodeHeight(node as Node<NodeData<NodeType>>, NODE_WIDTH);
-        heightCalculationCount++;
+        const textLength = (node.data.text && typeof node.data.text === 'string') ? node.data.text.length : 0;
+        const cacheKey = `${node.type}-${textLength}-${width}`;
         
-        // 缓存计算结果
-        globalHeightCache.set(cacheKey, height);
-        
-        // 将没有高度信息的节点添加到需要更新的列表中
-        if (!node.id.startsWith(TEMP_QUERY_NODE_ID_PREFIX) && shouldUpdateServer) {
-          nodesToUpdate.push({
-            id: parseInt(node.id),
-            position: node.position,
-            height
-          });
+        if (!resetHeight && previousHeightValue !== null && previousHeightWidth === width) {
+          height = previousHeightValue;
+          cacheHitCount++;
+        } else if (!resetHeight && globalHeightCache.has(cacheKey)) {
+          height = globalHeightCache.get(cacheKey)!;
+          cacheHitCount++;
+        } else {
+          height = calculateNodeHeight(node as Node<NodeData<NodeType>>, width);
+          heightCalculationCount++;
+          globalHeightCache.set(cacheKey, height);
         }
       }
       
+      const heightChanged = previousHeightValue !== height || previousHeightWidth !== width;
+      
       // 更新节点的高度信息（用于后续渲染）
       node.data.height = height;
+      (node.data as any).__heightCalcWidth = width;
+      
+      if (
+        shouldUpdateServer && 
+        heightChanged &&
+        !node.id.startsWith(TEMP_QUERY_NODE_ID_PREFIX)
+      ) {
+        nodesToUpdate.push({
+          id: parseInt(node.id),
+          position: node.position,
+          height
+        });
+      }
       
       flatTree[node.id] = {
         width,
@@ -358,19 +364,18 @@ export function entitreeFlexLayout(nodes: Node[], edges: Edge[], shouldUpdateSer
     const settings = {
       clone: false,
       enableFlex: true,
-      // 横向布局的节点间距设置 - 使用平衡的间距参数
-      firstDegreeSpacing: 150, // 相同父节点的子节点垂直间距
-      nextAfterSpacing: 15,    // 相邻节点间距
-      nextBeforeSpacing: 15,   // 相邻节点间距
-      nodeHeight: 40,
-      nodeWidth: 40,
-      orientation: "horizontal", // 横向布局
+      // 紧凑模式下的节点间距
+      firstDegreeSpacing: FLOW_SIBLING_SPACING,
+      nextAfterSpacing: 12,
+      nextBeforeSpacing: 12,
+      nodeHeight: COMPACT_NODE_HEIGHT,
+      nodeWidth: COMPACT_NODE_WIDTH,
+      orientation: "horizontal",
       rootX: 0,
       rootY: 0,
-      secondDegreeSpacing: 100, // 不同父节点的节点垂直间距
+      secondDegreeSpacing: FLOW_VERTICAL_SPACING,
       sourcesAccessor: "parents",
-      // 父子节点之间的水平间距（横向布局的核心参数）
-      sourceTargetSpacing: 100, // 层级间水平间距
+      sourceTargetSpacing: FLOW_HORIZONTAL_SPACING,
       targetsAccessor: "children",
     } as Partial<Settings>;
     
