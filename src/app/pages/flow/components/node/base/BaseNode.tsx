@@ -176,19 +176,21 @@ export const BaseNode = React.memo(function BaseNode<T extends NodeType>({
   
   // 使用useMemo缓存计算结果
   const { hasTitle, hasText, formattedDate, textPreview, nodeHeight, displayTitle } = useMemo(() => {
-    // 智能决定显示标题：优先使用内容摘要，其次使用title
-    const contentPreview = extractPreview(nodeData?.text);
-    const shouldUseContentPreview = contentPreview && contentPreview.length > 0;
+    const manualPreview = typeof nodeData?.previewText === 'string'
+      ? nodeData.previewText.trim()
+      : '';
+    const contentPreview = manualPreview || extractPreview(nodeData?.text);
+    const shouldUseContentPreview = Boolean(contentPreview && contentPreview.length > 0);
 
     return {
       hasTitle: nodeData.title !== undefined,
       hasText: nodeData.text !== undefined,
       formattedDate: format(new Date(nodeData.createdAt), 'yyyy-MM-dd HH:mm'),
-      textPreview: contentPreview,  // 使用新的提取逻辑
+      textPreview: contentPreview,
       nodeHeight: nodeData.height || NODE_DEFAULT_HEIGHT,
-      displayTitle: shouldUseContentPreview ? contentPreview : nodeData.title // 混合方案：优先内容摘要
+      displayTitle: shouldUseContentPreview ? contentPreview : nodeData.title
     };
-  }, [nodeData.title, nodeData.text, nodeData.createdAt, nodeData.height]);
+  }, [nodeData.title, nodeData.text, nodeData.createdAt, nodeData.height, nodeData.previewText]);
   
   // 分别为简化视图和正常视图设置不同的样式 - 优化更大节点的显示
   const simplifiedNodeStyles = useMemo(() => ({

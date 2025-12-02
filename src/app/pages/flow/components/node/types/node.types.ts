@@ -4,6 +4,7 @@ import { NodeType, ResourceNodeData } from '@/api/types/flow.types';
 export interface BaseNodeData {
   title?: string;
   text?: string;
+  previewText?: string;
   parentId: number | null;
   convId: number;
   userId: number;

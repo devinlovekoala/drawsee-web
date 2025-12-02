@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useCallback } from 'react';
 import { BaseNode, ExtendedNodeProps } from './base/BaseNode';
 import MarkdownWithLatex from '../markdown/MarkdownWithLatex';
 import type { AnswerNodeData } from './types/node.types';
@@ -23,11 +23,8 @@ function CircuitAnalyzeNode({ data, ...props }: ExtendedNodeProps<'circuit-analy
     }
   }, [nodeData.createdAt]);
 
-  const highlightSummary = useMemo(() => {
-    if (!nodeData.text) {
-      return '模型正在分析该电路，请稍候...';
-    }
-    const stripped = nodeData.text
+  const stripMarkdown = useCallback((input: string) => {
+    return input
       .replace(/\$\$[\s\S]*?\$\$/g, '')
       .replace(/\$(.*?)\$/g, '')
       .replace(/```[\s\S]*?```/g, '')
@@ -36,11 +33,65 @@ function CircuitAnalyzeNode({ data, ...props }: ExtendedNodeProps<'circuit-analy
       .replace(/\*/g, '')
       .replace(/\[.*?\]\(.*?\)/g, '')
       .trim();
-    if (stripped.length <= 66) {
+  }, []);
+
+  const fallbackSummary = useMemo(() => {
+    if (!nodeData.text) {
+      return '模型正在分析该电路，请稍候...';
+    }
+    const stripped = stripMarkdown(nodeData.text);
+    if (stripped.length <= 40) {
       return stripped;
     }
-    return stripped.substring(0, 66) + '...';
+    return stripped.substring(0, 40) + '...';
+  }, [nodeData.text, stripMarkdown]);
+
+  const warmupIntro = useMemo(() => {
+    if (!nodeData.text) return '';
+    const normalized = nodeData.text.replace(/\r\n/g, '\n');
+    let warmupMatch = normalized.match(/###\s*预热导语\s*\n([\s\S]*?)(?=\n\s*(?:#{2,3}|###|##|【)|$)/);
+    if (!warmupMatch) {
+      warmupMatch = normalized.match(/【预热导语】([\s\S]*?)(?=【.*?】|$)/);
+    }
+    if (!warmupMatch) return '';
+    const cleaned = stripMarkdown(warmupMatch[1])
+      .split('\n')
+      .map(line => line.trim())
+      .filter(Boolean)
+      .join(' ');
+    return cleaned.length > 0 ? cleaned : '';
+  }, [nodeData.text, stripMarkdown]);
+
+  // 提取所有标题作为缩略标题
+  const extractedTitle = useMemo(() => {
+    if (!nodeData.text) return '';
+    const normalized = nodeData.text.replace(/\r\n/g, '\n');
+
+    // 按优先级提取标题：预热导语 > 其他三级标题 > 其他二级标题
+    const titlePatterns = [
+      /###\s*(预热导语)/,
+      /###\s*([^\n]+)/,
+      /##\s*([^\n]+)/,
+      /【([^】]+)】/
+    ];
+
+    for (const pattern of titlePatterns) {
+      const match = normalized.match(pattern);
+      if (match && match[1]) {
+        return match[1].trim();
+      }
+    }
+
+    return '';
   }, [nodeData.text]);
+
+  const displayIntro = warmupIntro || fallbackSummary;
+
+  const previewLabel = useMemo(() => {
+    // 在缩略视图中，优先显示提取的标题（如"预热导语"）
+    // 如果没有标题，则显示内容摘要
+    return extractedTitle || displayIntro;
+  }, [extractedTitle, displayIntro]);
 
   const content = useMemo(() => (
     <div className="space-y-3">
@@ -65,7 +116,7 @@ function CircuitAnalyzeNode({ data, ...props }: ExtendedNodeProps<'circuit-analy
           {nodeData.contextTitle || nodeData.title || '未命名电路'}
         </p>
         <p className="mt-1 text-[12px] text-gray-500 leading-relaxed">
-          {highlightSummary}
+          {displayIntro}
         </p>
       </div>
 
@@ -91,12 +142,17 @@ function CircuitAnalyzeNode({ data, ...props }: ExtendedNodeProps<'circuit-analy
         )}
       </div>
     </div>
-  ), [createdAtLabel, nodeData.contextTitle, nodeData.parentId, nodeData.text, highlightSummary, followUps.length]);
+  ), [createdAtLabel, nodeData.contextTitle, nodeData.parentId, nodeData.text, nodeData.title, displayIntro, followUps.length]);
+
+  const enhancedData = useMemo(() => ({
+    ...nodeData,
+    previewText: previewLabel
+  }), [nodeData, previewLabel]);
 
   return (
     <BaseNode
       {...props}
-      data={nodeData}
+      data={enhancedData}
       customContent={content}
     />
   );
