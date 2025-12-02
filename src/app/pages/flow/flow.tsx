@@ -947,8 +947,8 @@ function Flow() {
             </Panel>
             {/* 顶部右侧工具栏 */}
             <Panel position={"top-right"}>
-              <FlowRightToolBar
-                onRelayout={() => handleRelayout(true)} 
+                <FlowRightToolBar
+                  onRelayout={() => handleRelayout(false)}
                 showDetailPanel={showDetailPanel}
                 onToggleDetailPanel={toggleDetailPanel}
                 canReturnToCircuit={Boolean(circuitReturnInfo)}
