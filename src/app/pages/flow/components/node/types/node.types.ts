@@ -59,7 +59,7 @@ export interface KnowledgeDetailNodeData extends BaseNodeData {
   [key: string]: unknown;
 }
 
-export type NodeData<T extends string> = 
+export type NodeData<T extends string> =
   T extends 'root' ? RootNodeData :
   T extends 'query' ? QueryNodeData :
   T extends 'answer' ? AnswerNodeData :
@@ -73,6 +73,8 @@ export type NodeData<T extends string> =
   T extends 'circuit-detail' ? AnswerNodeData :
   T extends 'PDF_DOCUMENT' ? BaseNodeData :
   T extends 'PDF_ANALYSIS_POINT' ? BaseNodeData :
+  T extends 'pdf-circuit-point' ? BaseNodeData :
+  T extends 'pdf-circuit-detail' ? BaseNodeData :
   BaseNodeData;
 
 export type FlowNode<T extends NodeType> = Node<NodeData<T>>;

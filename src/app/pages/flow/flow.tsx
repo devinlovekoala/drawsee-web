@@ -80,19 +80,26 @@ const nodeTypes = {
   'PDF_DOCUMENT': CompactPdfDocumentNode,       // PDF文档节点
   'PDF_ANALYSIS_POINT': CompactPdfAnalysisPointNode, // PDF分析点节点
   'PDF_ANALYSIS_DETAIL': CompactPdfAnalysisDetailNode, // PDF分析详情节点
+  'pdf-circuit-point': CompactPdfAnalysisPointNode, // PDF电路分析点节点（后端类型）
+  'pdf-circuit-detail': CompactPdfAnalysisDetailNode, // PDF电路分析详情节点（后端类型）
 } as const;
 
 // 将后端节点类型归一化为前端已支持的类型
 function normalizeNodeType(apiType: string | undefined | null): string {
   if (!apiType) return 'query';
-  const t = String(apiType).toUpperCase();
+  const apiTypeStr = String(apiType);
+  const t = apiTypeStr.toUpperCase();
   switch (t) {
     case 'QUERY':
       return 'query';
     case 'PDF_CIRCUIT_POINT':
-      return 'PDF_ANALYSIS_POINT';
+    case 'PDF-CIRCUIT-POINT':
+      // 后端返回 pdf-circuit-point，直接返回原值让 nodeTypes 映射处理
+      return 'pdf-circuit-point';
     case 'PDF_CIRCUIT_DETAIL':
-      return 'PDF_ANALYSIS_DETAIL';
+    case 'PDF-CIRCUIT-DETAIL':
+      // 后端返回 pdf-circuit-detail，直接返回原值让 nodeTypes 映射处理
+      return 'pdf-circuit-detail';
     case 'PDF_CIRCUIT_DOCUMENT':
     case 'PDF_DOCUMENT':
       return 'PDF_DOCUMENT';
@@ -104,7 +111,7 @@ function normalizeNodeType(apiType: string | undefined | null): string {
       return 'circuit-analyze';
     default:
       // 对于已是前端支持的小写类型，原样返回，例如 answer / answer-point / knowledge-detail 等
-      return String(apiType);
+      return apiTypeStr;
   }
 }
 

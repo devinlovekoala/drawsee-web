@@ -6,7 +6,9 @@ import { UserDocumentVO } from '@/api/types/document.types';
 import { useNavigate, useLocation } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { bytesToSize } from '@/utils/file';
-import { getResourceUrl } from '@/api/methods/flow.methods';
+import { getResourceUrl, createAiTask } from '@/api/methods/flow.methods';
+import { CreateAiTaskDTO } from '@/api/types/flow.types';
+import { useAppContext } from '@/app/contexts/AppContext';
 import { ModelSelector } from '../../pages/blank/components/ModelSelector';
 import { ModelType } from '../flow/components/input/FlowInputPanel';
 
@@ -31,13 +33,10 @@ export default function DocumentLibrary() {
   const location = useLocation();
   const locationState = location.state as DocumentLibraryLocationState | null;
   const [selectedModel, setSelectedModel] = useState<ModelType>('deepseekV3');
-  // 不使用handleBlankQuery/handleAiTaskCountPlus，分析功能已被前端临时禁用
-  // const { handleBlankQuery, handleAiTaskCountPlus } = useAppContext();
-  
+  const { handleBlankQuery, handleAiTaskCountPlus } = useAppContext();
+
   // 从location中获取班级ID
   const classId = locationState?.classId || null;
-  // avoid unused variable lint (intentional):
-  void classId;
 
   const extractFileNameFromPath = useCallback((objectPath?: string): string => {
     if (!objectPath) return '';
@@ -146,14 +145,38 @@ export default function DocumentLibrary() {
   };
 
   // 跳转到 flow 智能体会话页面并自动分析（实验任务分析agentType）
-  // 已临时禁用：后端分析功能尚未完善，点击该按钮会提示不可用
   const handleAnalyze = async (document: UserDocumentVO) => {
-    console.log('handleAnalyze 调用已被禁用（后端未就绪）', { id: document.id, title: document.title });
-    message.info('实验任务分析功能已临时禁用，待后端完善后恢复');
-    return;
+    try {
+      console.log('开始分析实验文档', { id: document.id, title: document.title });
+
+      // 获取最新的文档URL
+      const documentUrl = await getLatestDocumentUrl(document);
+
+      // 创建分析任务
+      const taskDto: CreateAiTaskDTO = {
+        type: "PDF_CIRCUIT_ANALYSIS",
+        prompt: documentUrl,
+        promptParams: {},
+        convId: null,
+        parentId: null,
+        model: selectedModel,
+        classId: classId
+      };
+
+      const response = await createAiTask(taskDto);
+
+      // 增加AI任务计数
+      handleAiTaskCountPlus();
+
+      // 创建新的对话并导航到对话流页面
+      handleBlankQuery(response);
+
+      message.success('实验分析已开始');
+    } catch (error) {
+      console.error('分析实验文档失败:', error);
+      message.error('分析实验文档失败');
+    }
   };
-  // mark as intentionally unused
-  void handleAnalyze;
 
   // 预览PDF文档（简化版，仅打开URL或已知签名URL）
   const handlePreview = async (document: UserDocumentVO) => {
@@ -229,12 +252,12 @@ export default function DocumentLibrary() {
       key: 'action',
       render: (_: any, record: UserDocumentVO) => (
         <Space size="middle">
-          <Tooltip title="实验任务分析（已禁用，后端未就绪）">
-            <Button 
-              type="primary" 
-              icon={<ExperimentOutlined />} 
-              disabled={true}
-              // onClick={() => handleAnalyze(record)}
+          <Tooltip title="分析实验文档">
+            <Button
+              type="primary"
+              icon={<ExperimentOutlined />}
+              disabled={deleteLoading}
+              onClick={() => handleAnalyze(record)}
             />
           </Tooltip>
           <Tooltip title="查看原文件">

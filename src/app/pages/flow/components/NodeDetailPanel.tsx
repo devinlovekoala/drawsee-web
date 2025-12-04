@@ -1,10 +1,12 @@
 import React, { useMemo, useEffect, useState, useRef, useCallback } from 'react';
 import { Node } from '@xyflow/react';
 import { format } from 'date-fns';
-import { X, Clock, Tag, MessageSquare, Circle, CheckCircle, AlertCircle, FileText, Zap, Brain, Search, Image, BookOpen, Sparkles } from 'lucide-react';
+import { X, Clock, Tag, MessageSquare, Circle, CheckCircle, AlertCircle, FileText, Zap, Brain, Search, Image, BookOpen, Sparkles, Eye } from 'lucide-react';
+import { Button } from 'antd';
 import MarkdownWithLatex from './markdown/MarkdownWithLatex';
 import { NodeData } from './node/types/node.types';
 import { NodeType, FollowUpSuggestionData } from '@/api/types/flow.types';
+import { extractFileNameFromUrl, isHttpUrl } from '@/app/pages/flow/utils/document';
 
 // 动态导入电路组件，避免循环依赖
 const CircuitFlowWithProvider = React.lazy(() => 
@@ -443,7 +445,9 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
       angle: getStringField(currentNodeData, 'angle'),
       objectName: getStringField(currentNodeData, 'objectName'),
       urls: getArrayField(currentNodeData, 'urls'),
-      parentId: getNumberField(currentNodeData, 'parentId')
+      parentId: getNumberField(currentNodeData, 'parentId'),
+      fileUrl: getStringField(currentNodeData, 'fileUrl'),
+      fileType: getStringField(currentNodeData, 'fileType')
     };
   }, [selectedNode?.id, nodeData, getLatestNodeData, forceRefresh, lastUpdatedAt]);
 
@@ -581,7 +585,7 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
     );
   }
 
-  const { title, text, subtype, angle, objectName, urls, parentId } = nodeFields;
+  const { title, text, subtype, angle, objectName, urls, parentId, fileUrl, fileType } = nodeFields;
 
   return (
     <div 
@@ -691,24 +695,103 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
             )}
           </div>
           <div className="prose prose-sm max-w-none" key={`content-${nodeContentKey}-${selectedNode.id}-${forceRefresh}-${lastUpdatedAt}`}>
-            {text ? (
-              <div className="relative">
-                <MarkdownWithLatex 
-                  text={text} 
-                  isStreaming={Boolean(isGenerating)}
-                  key={`markdown-${selectedNode.id}-${forceRefresh}-${text.length}-${lastUpdatedAt}`}
-                />
-                {/* 如果正在生成，显示闪烁光标 */}
-                {isGenerating && (
-                  <span className="inline-block w-2 h-4 bg-blue-500 animate-pulse ml-1 align-text-bottom"></span>
-                )}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-gray-400">
-                <FileText className="w-12 h-12 mx-auto mb-2 text-gray-300" />
-                <p>暂无内容</p>
-              </div>
-            )}
+            {(() => {
+              // 检测是否为PDF查询节点
+              const nodeType = selectedNode?.type as NodeType;
+              const nodeMode = getStringField(nodeData, 'mode');
+              const pdfModes = ['PDF_CIRCUIT_ANALYSIS', 'PDF_CIRCUIT_DESIGN', 'PDF_CIRCUIT_ANALYSIS_DETAIL'];
+              const shouldTreatAsPdfQuery = Boolean(nodeMode && pdfModes.includes(nodeMode));
+              const textIsUrl = isHttpUrl(text);
+              const previewUrl = fileUrl || (textIsUrl ? text : undefined);
+              const shouldRenderDocumentCard = Boolean(
+                previewUrl && (
+                  nodeType === 'PDF_DOCUMENT' ||
+                  (nodeType === 'query' && shouldTreatAsPdfQuery)
+                )
+              );
+
+              if (shouldRenderDocumentCard && previewUrl) {
+                const fileName = extractFileNameFromUrl(previewUrl);
+                const badgeLabel = fileType || 'PDF实验文档';
+                let hostLabel = '';
+                try {
+                  hostLabel = new URL(previewUrl).hostname;
+                } catch {
+                  hostLabel = '';
+                }
+
+                const handlePreview = () => {
+                  if (typeof window !== 'undefined') {
+                    window.open(previewUrl, '_blank', 'noopener,noreferrer');
+                  }
+                };
+
+                return (
+                  <div className="relative p-4 bg-white rounded-2xl border border-indigo-100 shadow-sm">
+                    <div className="flex items-start gap-3">
+                      <div className="flex-shrink-0 w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center">
+                        <FileText className="w-6 h-6 text-indigo-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="inline-flex items-center px-2 py-0.5 rounded-full bg-indigo-50 text-[11px] font-medium text-indigo-700">
+                          {badgeLabel}
+                        </p>
+                        <h3 className="mt-2 font-semibold text-base text-gray-800 truncate" title={fileName}>
+                          {fileName}
+                        </h3>
+                        {hostLabel && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            来源：{hostLabel}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="p-3 mt-4 bg-gradient-to-br from-indigo-50 to-blue-50 rounded-xl border border-indigo-100">
+                      <div className="text-sm text-indigo-900 font-medium mb-1">实验任务文档</div>
+                      <p className="text-xs text-gray-600 leading-relaxed">
+                        包含实验要求、设计规范与技术参数，支持点击右上角的小眼睛在新标签页内预览。
+                      </p>
+                    </div>
+
+                    <div className="flex items-center justify-between mt-3 text-[12px] text-gray-500">
+                      <span>文档上传完成，可用于后续分析</span>
+                      <span className="text-indigo-600 font-medium">PDF</span>
+                    </div>
+
+                    <Button
+                      shape="circle"
+                      size="middle"
+                      type="text"
+                      icon={<Eye className="w-4 h-4" />}
+                      onClick={handlePreview}
+                      title="在新标签页预览文档"
+                      className="absolute top-3 right-3 flex items-center justify-center text-gray-500 hover:!text-indigo-600"
+                    />
+                  </div>
+                );
+              }
+
+              // 普通内容渲染
+              return text ? (
+                <div className="relative">
+                  <MarkdownWithLatex
+                    text={text}
+                    isStreaming={Boolean(isGenerating)}
+                    key={`markdown-${selectedNode.id}-${forceRefresh}-${text.length}-${lastUpdatedAt}`}
+                  />
+                  {/* 如果正在生成，显示闪烁光标 */}
+                  {isGenerating && (
+                    <span className="inline-block w-2 h-4 bg-blue-500 animate-pulse ml-1 align-text-bottom"></span>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-400">
+                  <FileText className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+                  <p>暂无内容</p>
+                </div>
+              );
+            })()}
           </div>
         </div>
 

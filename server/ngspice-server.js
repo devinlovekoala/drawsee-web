@@ -13,7 +13,7 @@ const PORT = process.env.PORT || 3001;
 const DEFAULT_BIN = '/home/devin/Workspace/drawsee-platform/ngspice/linux-ubuntu/build/ngspice';
 const NGSPICE_BIN = process.env.NGSPICE_BIN || DEFAULT_BIN;
 
-app.use(express.json({ limit: '2mb' }));  
+app.use(express.json({ limit: '2mb' }));
 app.use(cors());
 
 const textDecoder = new TextDecoder();

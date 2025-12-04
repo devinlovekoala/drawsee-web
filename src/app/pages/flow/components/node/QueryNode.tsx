@@ -1,5 +1,8 @@
 import { BaseNode, ExtendedNodeProps } from './base/BaseNode';
 import React, { useMemo } from 'react';
+import { Button } from 'antd';
+import { FileTextOutlined, EyeOutlined } from '@ant-design/icons';
+import { extractFileNameFromUrl, isHttpUrl } from '@/app/pages/flow/utils/document';
 
 const chatTypeMap: Record<string, string> = {
   'general': '常规问答',
@@ -46,14 +49,95 @@ function arePropsEqual(
 // 使用React.memo包装QueryNode组件，避免不必要的重新渲染
 const QueryNode = React.memo(function QueryNode({
   data,
-  showSourceHandle, 
-  showTargetHandle, 
-  ...props 
+  showSourceHandle,
+  showTargetHandle,
+  ...props
 }: ExtendedNodeProps<'query'>) {
+  // 检测是否为PDF相关查询
+  const isPdfQuery = useMemo(() => {
+    const mode = String(data.mode || '').toUpperCase();
+    return mode === 'PDF_CIRCUIT_ANALYSIS' ||
+           mode === 'PDF_CIRCUIT_DESIGN' ||
+           mode === 'PDF_CIRCUIT_ANALYSIS_DETAIL';
+  }, [data.mode]);
+
+  // 检测text是否为URL
+  const isPdfUrl = useMemo(() => isHttpUrl(data.text), [data.text]);
+
+  // 从URL中提取文件名
+  const extractFileName = useMemo(() => {
+    if (!isPdfUrl || !data.text) return 'PDF实验文档';
+    return extractFileNameFromUrl(String(data.text));
+  }, [isPdfUrl, data.text]);
+
+  // 预览PDF
+  const handlePreview = useMemo(() => {
+    return () => {
+      if (data.text && typeof data.text === 'string') {
+        window.open(data.text, '_blank');
+      }
+    };
+  }, [data.text]);
+
+  // 如果是PDF查询且text是URL，显示为文档卡片
+  const customContent = useMemo(() => {
+    if (isPdfQuery && isPdfUrl) {
+      return (
+        <div className="space-y-3">
+          {/* 文档标题行 */}
+          <div className="flex items-start mb-3">
+            <div className="flex-shrink-0 w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center mr-3">
+              <FileTextOutlined className="text-indigo-600 text-xl" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="font-semibold text-base text-gray-800 truncate" title={extractFileName}>
+                {extractFileName}
+              </h3>
+              <p className="text-xs text-gray-500 mt-0.5">PDF实验文档</p>
+            </div>
+          </div>
+
+          {/* 文档信息卡片 */}
+          <div className="p-3 bg-gradient-to-br from-indigo-50 to-blue-50 rounded-lg border border-indigo-100">
+            <div className="flex items-start">
+              <span className="text-lg mr-2">📋</span>
+              <div className="flex-1">
+                <div className="text-sm text-indigo-900 font-medium mb-1">
+                  实验任务文档
+                </div>
+                <div className="text-xs text-gray-600 leading-relaxed">
+                  包含实验要求、设计规范和技术参数
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 预览按钮 */}
+          <Button
+            size="small"
+            icon={<EyeOutlined />}
+            onClick={handlePreview}
+            type="primary"
+            block
+            className="mt-2"
+          >
+            打开预览
+          </Button>
+        </div>
+      );
+    }
+    return null;
+  }, [isPdfQuery, isPdfUrl, extractFileName, handlePreview]);
+
   // 处理显示文本，确保只显示用户的原始提问内容
   const cleanQueryText = useMemo(() => {
+    // 如果是PDF查询且有自定义内容，不需要显示text
+    if (isPdfQuery && isPdfUrl) {
+      return '';
+    }
+
     if (!data.text) return '';
-    
+
     // 处理包含引用的情况
     if (data.text.includes('对于之前内容中的：')) {
       const parts = data.text.split('\n\n');
@@ -64,21 +148,21 @@ const QueryNode = React.memo(function QueryNode({
         }
       }
     }
-    
+
     // 处理包含"我的问题是："的情况
     const questionMatch = data.text.match(/我的问题是：([\s\S]*)/);
     if (questionMatch && questionMatch[1]) {
       return questionMatch[1].trim();
     }
-    
+
     // 移除可能的分析部分（通常在第一个双换行后出现）
     const firstParagraphMatch = data.text.split(/\n\n|\r\n\r\n/);
     if (firstParagraphMatch && firstParagraphMatch.length > 0) {
       return firstParagraphMatch[0].trim();
     }
-    
+
     return data.text;
-  }, [data.text]);
+  }, [data.text, isPdfQuery, isPdfUrl]);
 
   // 使用useMemo缓存footerContent
   const footerContent = useMemo(() => {
@@ -98,6 +182,7 @@ const QueryNode = React.memo(function QueryNode({
       showSourceHandle={showSourceHandle}
       showTargetHandle={showTargetHandle}
       footerContent={footerContent}
+      customContent={customContent}
       data={{
         ...data,
         text: cleanQueryText // 使用清理后的查询文本

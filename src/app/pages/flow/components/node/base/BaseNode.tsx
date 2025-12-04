@@ -32,6 +32,8 @@ const NODE_TYPE_STYLES: Record<string, { bgColor: string; textColor: string; bor
   'PDF_DOCUMENT': { bgColor: 'bg-indigo-50', textColor: 'text-indigo-700', borderColor: 'border-indigo-200', label: 'PDF文档' },
   'PDF_ANALYSIS_POINT': { bgColor: 'bg-violet-50', textColor: 'text-violet-700', borderColor: 'border-violet-200', label: 'PDF分点' },
   'PDF_ANALYSIS_DETAIL': { bgColor: 'bg-fuchsia-50', textColor: 'text-fuchsia-700', borderColor: 'border-fuchsia-200', label: 'PDF详情' },
+  'pdf-circuit-point': { bgColor: 'bg-violet-50', textColor: 'text-violet-700', borderColor: 'border-violet-200', label: 'PDF分析点' },
+  'pdf-circuit-detail': { bgColor: 'bg-fuchsia-50', textColor: 'text-fuchsia-700', borderColor: 'border-fuchsia-200', label: 'PDF详情' },
   'root': { bgColor: 'bg-gray-50', textColor: 'text-gray-700', borderColor: 'border-gray-200', label: '根节点' },
   'resource': { bgColor: 'bg-teal-50', textColor: 'text-teal-700', borderColor: 'border-teal-200', label: '资源' },
 };

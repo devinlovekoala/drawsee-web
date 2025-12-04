@@ -165,13 +165,13 @@ export default function DocumentAnalysis() {
   // 处理实验分析
   const handleAnalyze = async () => {
     if (!document) return;
-    
+
     try {
       setAnalyzing(true);
-      
+
       // 保存PDF文件URL到localStorage，供后续节点使用
       localStorage.setItem('currentPdfUrl', document.fileUrl);
-      
+
       // 创建分析任务，严格按照API文档格式
       const taskDto: CreateAiTaskDTO = {
         type: "PDF_CIRCUIT_ANALYSIS",
@@ -182,15 +182,15 @@ export default function DocumentAnalysis() {
         model: selectedModel, // 使用用户选择的模型
         classId: classId // 传递班级ID
       };
-      
+
       const response = await createAiTask(taskDto);
-      
+
       // 增加AI任务计数
       handleAiTaskCountPlus();
-      
+
       // 创建新的对话并导航到对话流页面
       handleBlankQuery(response);
-      
+
       message.success('实验分析已开始');
     } catch (error) {
       console.error('分析实验失败:', error);
@@ -199,18 +199,17 @@ export default function DocumentAnalysis() {
       setAnalyzing(false);
     }
   };
-  void handleAnalyze;
 
   // 处理电路设计
   const handleDesign = async () => {
     if (!document) return;
-    
+
     try {
       setAnalyzing(true);
-      
+
       // 保存PDF文件URL到localStorage，供后续节点使用
       localStorage.setItem('currentPdfUrl', document.fileUrl);
-      
+
       // 创建设计任务，严格按照API文档格式
       const taskDto: CreateAiTaskDTO = {
         type: "PDF_CIRCUIT_DESIGN",
@@ -221,15 +220,15 @@ export default function DocumentAnalysis() {
         model: selectedModel, // 使用用户选择的模型
         classId: classId // 传递班级ID
       };
-      
+
       const response = await createAiTask(taskDto);
-      
+
       // 增加AI任务计数
       handleAiTaskCountPlus();
-      
+
       // 创建新的对话并导航到对话流页面
       handleBlankQuery(response);
-      
+
       message.success('电路设计已开始');
     } catch (error) {
       console.error('设计电路失败:', error);
@@ -238,7 +237,6 @@ export default function DocumentAnalysis() {
       setAnalyzing(false);
     }
   };
-  void handleDesign;
 
   if (loading) {
     return (
@@ -320,25 +318,23 @@ export default function DocumentAnalysis() {
         
         <div className="mb-6">
           <Space direction="vertical" style={{ width: '100%' }}>
-            <Button 
-              type="primary" 
-              // 分析功能已临时禁用，避免触发不完整后端流程
-              disabled={true}
+            <Button
+              type="primary"
+              onClick={handleAnalyze}
               loading={analyzing}
               block
-              title="实验任务分析（已禁用，后端未就绪）"
+              title="分析实验文档内容"
             >
-              分析实验内容（已禁用）
+              分析实验内容
             </Button>
-            
-            <Button 
-              // 设计功能已临时禁用
-              disabled={true}
+
+            <Button
+              onClick={handleDesign}
               loading={analyzing}
               block
-              title="电路设计（已禁用，后端未就绪）"
+              title="根据实验要求设计电路"
             >
-              根据实验要求设计电路（已禁用）
+              根据实验要求设计电路
             </Button>
           </Space>
         </div>

@@ -4,8 +4,9 @@ import { BaseNode, ExtendedNodeProps } from './base/BaseNode';
 /**
  * PDF分析详情节点组件
  * 类似于AnswerDetailNode，显示详细分析内容
+ * 支持两种节点类型：PDF_ANALYSIS_DETAIL 和 pdf-circuit-detail
  */
-export default function PdfAnalysisDetailNode(props: ExtendedNodeProps<'PDF_ANALYSIS_DETAIL'>) {
+export default function PdfAnalysisDetailNode(props: ExtendedNodeProps<'PDF_ANALYSIS_DETAIL'> | ExtendedNodeProps<'pdf-circuit-detail'>) {
   const { data, id } = props;
   
   // 获取分析角度

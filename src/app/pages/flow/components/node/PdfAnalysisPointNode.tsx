@@ -12,8 +12,9 @@ import { ModelType } from '../input/FlowInputPanel';
 /**
  * PDF分析点节点组件 - 两阶段工作流
  * 类似于AnswerPointNode，支持继续解析功能
+ * 支持两种节点类型：PDF_ANALYSIS_POINT 和 pdf-circuit-point
  */
-export default function PdfAnalysisPointNode(props: ExtendedNodeProps<'PDF_ANALYSIS_POINT'>) {
+export default function PdfAnalysisPointNode(props: ExtendedNodeProps<'PDF_ANALYSIS_POINT'> | ExtendedNodeProps<'pdf-circuit-point'>) {
   const { data, id } = props;
   const [loading, setLoading] = useState(false);
   const [selectedModel, setSelectedModel] = useState<ModelType>('deepseekV3');
@@ -58,7 +59,7 @@ export default function PdfAnalysisPointNode(props: ExtendedNodeProps<'PDF_ANALY
 
       await createAiTask(dto);
       handleAiTaskCountPlus();
-      
+
       // 触发自动选中详情节点事件
       window.dispatchEvent(new CustomEvent('auto-select-detail-node', {
         detail: {
@@ -67,7 +68,7 @@ export default function PdfAnalysisPointNode(props: ExtendedNodeProps<'PDF_ANALY
           detailNodeTypes: ['PDF_ANALYSIS_DETAIL']
         }
       }));
-      
+
       message.success('已发送PDF分析详情任务');
     } catch (error) {
       console.error('发送PDF分析详情任务失败:', error);
@@ -76,9 +77,6 @@ export default function PdfAnalysisPointNode(props: ExtendedNodeProps<'PDF_ANALY
       setLoading(false);
     }
   };
-  // intentionally unused while feature is disabled
-  void handlePdfAnalysisDetailChat;
-  void loading;
 
   // 编辑功能
   const handleEdit = () => {
@@ -172,13 +170,12 @@ export default function PdfAnalysisPointNode(props: ExtendedNodeProps<'PDF_ANALY
           type="primary"
           size="small"
           icon={<PlayCircleOutlined />}
-          // 已临时禁用继续解析，后端PDF详情功能未就绪
-          disabled={true}
-          loading={false}
+          onClick={handlePdfAnalysisDetailChat}
+          loading={loading}
           block
-          title="继续解析（已禁用）"
+          title="继续解析此分析点"
         >
-          继续解析（已禁用）
+          继续解析
         </Button>
       )}
     </div>
