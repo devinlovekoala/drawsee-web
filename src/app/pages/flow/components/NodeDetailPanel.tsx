@@ -2,11 +2,14 @@ import React, { useMemo, useEffect, useState, useRef, useCallback } from 'react'
 import { Node } from '@xyflow/react';
 import { format } from 'date-fns';
 import { X, Clock, Tag, MessageSquare, Circle, CheckCircle, AlertCircle, FileText, Zap, Brain, Search, Image, BookOpen, Sparkles, Eye } from 'lucide-react';
-import { Button } from 'antd';
+import { Button, message } from 'antd';
 import MarkdownWithLatex from './markdown/MarkdownWithLatex';
 import { NodeData } from './node/types/node.types';
-import { NodeType, FollowUpSuggestionData } from '@/api/types/flow.types';
+import { NodeType, FollowUpSuggestionData, CreateAiTaskDTO } from '@/api/types/flow.types';
 import { extractFileNameFromUrl, isHttpUrl } from '@/app/pages/flow/utils/document';
+import { useAppContext } from '@/app/contexts/AppContext';
+import { useFlowContext } from '@/app/contexts/FlowContext';
+import { createAiTask } from '@/api/methods/flow.methods';
 
 // 动态导入电路组件，避免循环依赖
 const CircuitFlowWithProvider = React.lazy(() => 
@@ -24,7 +27,7 @@ interface NodeDetailPanelProps {
 }
 
 // 节点类型图标映射
-const nodeTypeIcons: Record<NodeType, React.ReactNode> = {
+const nodeTypeIcons: Record<string, React.ReactNode> = {
   'root': <Circle className="w-4 h-4" />,
   'query': <MessageSquare className="w-4 h-4" />,
   'answer': <CheckCircle className="w-4 h-4" />,
@@ -41,10 +44,12 @@ const nodeTypeIcons: Record<NodeType, React.ReactNode> = {
   'PDF_DOCUMENT': <FileText className="w-4 h-4" />,
   'PDF_ANALYSIS_POINT': <Search className="w-4 h-4" />,
   'PDF_ANALYSIS_DETAIL': <FileText className="w-4 h-4" />,
+  'pdf-circuit-point': <Search className="w-4 h-4" />,
+  'pdf-circuit-detail': <FileText className="w-4 h-4" />,
 };
 
 // 节点类型中文名映射
-const nodeTypeNames: Record<NodeType, string> = {
+const nodeTypeNames: Record<string, string> = {
   'root': '根节点',
   'query': '用户问题',
   'answer': '智能回答',
@@ -61,6 +66,8 @@ const nodeTypeNames: Record<NodeType, string> = {
   'PDF_DOCUMENT': 'PDF文档',
   'PDF_ANALYSIS_POINT': 'PDF分析点',
   'PDF_ANALYSIS_DETAIL': 'PDF分析详情',
+  'pdf-circuit-point': 'PDF分析点',
+  'pdf-circuit-detail': 'PDF分析详情',
 };
 
 // 安全获取字符串字段
@@ -90,6 +97,12 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
   const [forceRefresh, setForceRefresh] = useState(0); // 添加强制刷新状态
   const [lastUpdatedAt, setLastUpdatedAt] = useState<number>(0); // 跟踪上次更新时间
   const scrollRef = useRef<HTMLDivElement>(null); // 用于自动滚动
+  const { handleAiTaskCountPlus } = useAppContext();
+  const { convId } = useFlowContext();
+  const [pdfDetailLoading, setPdfDetailLoading] = useState(false);
+  const nodeTypeValue = selectedNode?.type ? String(selectedNode.type) : '';
+  const isPdfAnalysisPointNode = nodeTypeValue === 'PDF_ANALYSIS_POINT' || nodeTypeValue === 'pdf-circuit-point';
+  const isPdfAnalysisDetailNode = nodeTypeValue === 'PDF_ANALYSIS_DETAIL' || nodeTypeValue === 'pdf-circuit-detail';
   
   // 安全地获取文本内容
   const getCurrentText = useCallback((node: Node | null): string => {
@@ -151,10 +164,11 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
   useEffect(() => {
     if (!selectedNode) return;
     
-    const nodeType = selectedNode.type as NodeType;
+    const nodeType = selectedNode.type ? String(selectedNode.type) : '';
     const process = getStringField(nodeData, 'process');
     const isDetailNode = nodeType === 'answer-detail' || nodeType === 'ANSWER_DETAIL' || 
-                        nodeType === 'circuit-detail' || nodeType === 'knowledge-detail';
+                        nodeType === 'circuit-detail' || nodeType === 'knowledge-detail' ||
+                        nodeType === 'PDF_ANALYSIS_DETAIL' || nodeType === 'pdf-circuit-detail';
     
     // 只对正在生成的详情节点进行检测，已完成的节点停止检测
     if (isDetailNode && process === 'generating') {
@@ -199,10 +213,11 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
   useEffect(() => {
     if (!selectedNode || !nodeData) return;
     
-    const nodeType = selectedNode?.type as NodeType;
+    const nodeType = selectedNode?.type ? String(selectedNode.type) : '';
     const process = getStringField(nodeData, 'process');
     const isDetailNode = nodeType === 'answer-detail' || nodeType === 'ANSWER_DETAIL' || 
-                        nodeType === 'circuit-detail' || nodeType === 'knowledge-detail';
+                        nodeType === 'circuit-detail' || nodeType === 'knowledge-detail' ||
+                        nodeType === 'PDF_ANALYSIS_DETAIL' || nodeType === 'pdf-circuit-detail';
     
     // 只对正在生成的详情节点进行高频检查，已完成或未开始的节点跳过
     if (isDetailNode && process === 'generating') {
@@ -303,7 +318,7 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
     
     const isGenerated = getBooleanField(currentNodeData, 'isGenerated');
     const process = getStringField(currentNodeData, 'process');
-    const nodeType = selectedNode?.type as NodeType;
+    const nodeType = selectedNode?.type ? String(selectedNode.type) : '';
     
     // 减少日志输出频率，避免控制台被刷屏
     if (Math.random() < 0.1) { // 只在10%的计算中输出日志
@@ -319,7 +334,7 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
     // 对于分点节点，优先检查是否已有子节点完成
     if (nodeType === 'answer-point' || nodeType === 'ANSWER_POINT' || 
         nodeType === 'knowledge-head' || nodeType === 'circuit-analyze' ||
-        nodeType === 'PDF_ANALYSIS_POINT') {
+        nodeType === 'PDF_ANALYSIS_POINT' || nodeType === 'pdf-circuit-point') {
       
       // 如果明确标记为已生成且process为completed，显示已完成
       if (isGenerated && process === 'completed') {
@@ -338,7 +353,7 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
     // 对于详情节点（answer-detail, ANSWER_DETAIL, circuit-detail, knowledge-detail, PDF_ANALYSIS_DETAIL等）
     if (nodeType === 'answer-detail' || nodeType === 'ANSWER_DETAIL' || 
         nodeType === 'circuit-detail' || nodeType === 'knowledge-detail' ||
-        nodeType === 'PDF_ANALYSIS_DETAIL') {
+        nodeType === 'PDF_ANALYSIS_DETAIL' || nodeType === 'pdf-circuit-detail') {
       
       // 如果明确标记为已完成
       if (process === 'completed') {
@@ -425,9 +440,8 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
 
   // 检查是否为电路节点类型
   const isCircuitNode = useMemo(() => {
-    const nodeType = selectedNode?.type as NodeType;
-    return nodeType === 'circuit-canvas' || nodeType === 'circuit-analyze' || nodeType === 'circuit-detail';
-  }, [selectedNode?.type]);
+    return nodeTypeValue === 'circuit-canvas' || nodeTypeValue === 'circuit-analyze' || nodeTypeValue === 'circuit-detail';
+  }, [nodeTypeValue]);
 
   // 获取文本内容和其他字段信息 - 使用最新的节点数据
   const nodeFields = useMemo(() => {
@@ -460,7 +474,7 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
     
     const process = getStringField(currentNodeData, 'process');
     const isGenerated = getBooleanField(currentNodeData, 'isGenerated');
-    const nodeType = selectedNode?.type as NodeType;
+    const nodeType = nodeTypeValue;
     
     // 对于已明确标记为已生成且process为completed的节点，直接返回false
     if (isGenerated && process === 'completed') {
@@ -476,7 +490,7 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
     // 如果明确标记为已生成，则认为不再生成中
     if (nodeType === 'answer-point' || nodeType === 'ANSWER_POINT' || 
         nodeType === 'knowledge-head' || nodeType === 'circuit-analyze' ||
-        nodeType === 'PDF_ANALYSIS_POINT') {
+        nodeType === 'PDF_ANALYSIS_POINT' || nodeType === 'pdf-circuit-point') {
       return !isGenerated && process === 'generating'; // 只有在明确生成中状态才显示生成中
     }
     
@@ -484,7 +498,7 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
     // 检查是否正在流式生成内容
     if (nodeType === 'answer-detail' || nodeType === 'ANSWER_DETAIL' || 
         nodeType === 'circuit-detail' || nodeType === 'knowledge-detail' ||
-        nodeType === 'PDF_ANALYSIS_DETAIL') {
+        nodeType === 'PDF_ANALYSIS_DETAIL' || nodeType === 'pdf-circuit-detail') {
       
       console.log(`详情节点 ${selectedNode?.id} 状态检查:`, {
         process,
@@ -572,6 +586,62 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
     return { suggestions, contextTitle };
   }, [selectedNode?.id, nodeData, getLatestNodeData, forceRefresh, lastUpdatedAt]);
 
+  const { title, text, subtype, angle, objectName, urls, parentId, fileUrl, fileType } = nodeFields;
+
+  const pdfFollowUpLabel = useMemo(() => {
+    const labelSource = (typeof title === 'string' && title.trim().length > 0) ? title.trim() :
+      (typeof angle === 'string' && angle.trim().length > 0) ? angle.trim() : '该分析点';
+    return labelSource;
+  }, [title, angle]);
+
+  const handlePdfFollowupPrefill = useCallback(() => {
+    if (!onApplySuggestion) return;
+    const template = `围绕「${pdfFollowUpLabel}」这个PDF分析点，我想进一步了解：`;
+    onApplySuggestion(template);
+  }, [onApplySuggestion, pdfFollowUpLabel]);
+
+  const handlePdfDetailGeneration = useCallback(async () => {
+    if (!selectedNode) return;
+    const sanitizedText = typeof text === 'string' ? text.trim() : '';
+    if (!sanitizedText) {
+      message.error('分析点内容为空，无法生成详情');
+      return;
+    }
+    if (pdfDetailLoading) return;
+    const parentNodeId = Number(selectedNode.id);
+    if (Number.isNaN(parentNodeId)) {
+      message.error('节点ID无效，无法生成详情');
+      return;
+    }
+    setPdfDetailLoading(true);
+    try {
+      const dto: CreateAiTaskDTO = {
+        type: 'PDF_CIRCUIT_ANALYSIS_DETAIL',
+        prompt: sanitizedText,
+        promptParams: {},
+        convId: typeof convId === 'number' ? convId : null,
+        parentId: parentNodeId,
+        model: 'deepseekV3',
+        classId: null
+      };
+      await createAiTask(dto);
+      handleAiTaskCountPlus();
+      window.dispatchEvent(new CustomEvent('auto-select-detail-node', {
+        detail: {
+          parentNodeId: selectedNode.id,
+          detailNodeType: 'PDF_ANALYSIS_DETAIL',
+          detailNodeTypes: ['PDF_ANALYSIS_DETAIL', 'pdf-circuit-detail']
+        }
+      }));
+      message.success('已发送PDF分析详情任务');
+    } catch (error) {
+      console.error('发送PDF分析详情任务失败:', error);
+      message.error('发送PDF分析详情任务失败');
+    } finally {
+      setPdfDetailLoading(false);
+    }
+  }, [selectedNode, text, convId, handleAiTaskCountPlus, pdfDetailLoading]);
+
   // 早期返回：当没有选中节点时
   if (!selectedNode || !nodeData) {
     return (
@@ -584,8 +654,6 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
       </div>
     );
   }
-
-  const { title, text, subtype, angle, objectName, urls, parentId, fileUrl, fileType } = nodeFields;
 
   return (
     <div 
@@ -603,9 +671,9 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
       {/* 头部 */}
       <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gray-50">
         <div className="flex items-center space-x-2">
-          {nodeTypeIcons[selectedNode.type as NodeType] || <Circle className="w-4 h-4" />}
+          {nodeTypeIcons[nodeTypeValue] || <Circle className="w-4 h-4" />}
           <h2 className="text-lg font-semibold text-gray-800">
-            {nodeTypeNames[selectedNode.type as NodeType] || '未知节点'}
+            {nodeTypeNames[nodeTypeValue] || '未知节点'}
           </h2>
           {/* 显示生成状态指示器 */}
           {isGenerating && (
@@ -675,7 +743,7 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
                 <div className="w-1 h-1 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                 <span className="ml-1">
                   {(() => {
-                    const nodeType = selectedNode?.type as NodeType;
+                    const nodeType = nodeTypeValue;
                     
                     // 根据节点类型显示不同的提示文字
                     if (nodeType === 'answer-detail' || nodeType === 'ANSWER_DETAIL' || 
@@ -696,8 +764,94 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
           </div>
           <div className="prose prose-sm max-w-none" key={`content-${nodeContentKey}-${selectedNode.id}-${forceRefresh}-${lastUpdatedAt}`}>
             {(() => {
+              // PDF分析点/详情节点的专属展示
+              if (isPdfAnalysisPointNode) {
+                return (
+                  <div className="space-y-3">
+                    <div className="relative p-4 rounded-2xl border border-violet-100 bg-gradient-to-b from-white to-violet-50 shadow-sm">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-xs font-semibold text-violet-500 uppercase tracking-wide">
+                            PDF 分析分点
+                          </p>
+                          <h3 className="mt-1 text-lg font-semibold text-gray-900">
+                            {title || 'PDF分析分点'}
+                          </h3>
+                        </div>
+                        {nodeStatus && (
+                          <span className={`px-3 py-1 rounded-full text-xs font-medium ${nodeStatus.color}`}>
+                            {nodeStatus.text}
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-3 text-sm text-gray-700 leading-relaxed whitespace-pre-line">
+                        {text?.trim() || '分析点内容正在生成，请稍候...'}
+                      </p>
+                      <div className="grid grid-cols-2 gap-3 mt-4">
+                        <Button
+                          type="primary"
+                          block
+                          onClick={handlePdfDetailGeneration}
+                          loading={pdfDetailLoading}
+                        >
+                          生成详细解析
+                        </Button>
+                        <Button
+                          block
+                          onClick={handlePdfFollowupPrefill}
+                          disabled={!onApplySuggestion}
+                        >
+                          引用此分点追问
+                        </Button>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-2">
+                        在下方输入框继续提问会自动携带该分点的上下文。
+                      </p>
+                    </div>
+                  </div>
+                );
+              }
+
+              if (isPdfAnalysisDetailNode) {
+                return (
+                  <div className="space-y-3">
+                    <div className="p-4 rounded-2xl border border-indigo-100 bg-gradient-to-r from-indigo-50 to-blue-50 shadow-sm">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-xs font-semibold text-indigo-500 uppercase tracking-wide">
+                            PDF 分点详情
+                          </p>
+                          <h3 className="mt-1 text-lg font-semibold text-gray-900">
+                            {title || '分析分点详情'}
+                          </h3>
+                        </div>
+                        {angle && (
+                          <span className="px-3 py-1 rounded-full bg-white text-indigo-600 text-xs font-medium shadow-sm">
+                            {angle}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-600 mt-2">
+                        该分点的详细说明已就绪，可继续追问以获取更深入的结论。
+                      </p>
+                    </div>
+                    <div className="rounded-2xl border border-gray-100 bg-white p-4 text-sm leading-relaxed text-gray-800 min-h-[120px]">
+                      {text?.trim() ? (
+                        <div dangerouslySetInnerHTML={{ __html: text.replace(/\n/g, '<br/>') }} />
+                      ) : (
+                        <span className="text-gray-400">详细内容正在生成，请稍候...</span>
+                      )}
+                    </div>
+                    {onApplySuggestion && (
+                      <Button block onClick={handlePdfFollowupPrefill}>
+                        引用该分点继续追问
+                      </Button>
+                    )}
+                  </div>
+                );
+              }
+
               // 检测是否为PDF查询节点
-              const nodeType = selectedNode?.type as NodeType;
               const nodeMode = getStringField(nodeData, 'mode');
               const pdfModes = ['PDF_CIRCUIT_ANALYSIS', 'PDF_CIRCUIT_DESIGN', 'PDF_CIRCUIT_ANALYSIS_DETAIL'];
               const shouldTreatAsPdfQuery = Boolean(nodeMode && pdfModes.includes(nodeMode));
@@ -705,8 +859,8 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
               const previewUrl = fileUrl || (textIsUrl ? text : undefined);
               const shouldRenderDocumentCard = Boolean(
                 previewUrl && (
-                  nodeType === 'PDF_DOCUMENT' ||
-                  (nodeType === 'query' && shouldTreatAsPdfQuery)
+                  nodeTypeValue === 'PDF_DOCUMENT' ||
+                  (nodeTypeValue === 'query' && shouldTreatAsPdfQuery)
                 )
               );
 

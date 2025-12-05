@@ -1,4 +1,4 @@
-export type NodeType = "root" | "query" | "answer" | "answer-point" | "answer-detail" | "ANSWER_POINT" | "ANSWER_DETAIL" | "knowledge-head" | "knowledge-detail" | "resource" | "circuit-canvas" | "circuit-analyze" | "circuit-detail" | "PDF_DOCUMENT" | "PDF_ANALYSIS_POINT" | "PDF_ANALYSIS_DETAIL";
+export type NodeType = "root" | "query" | "answer" | "answer-point" | "answer-detail" | "ANSWER_POINT" | "ANSWER_DETAIL" | "knowledge-head" | "knowledge-detail" | "resource" | "circuit-canvas" | "circuit-analyze" | "circuit-detail" | "PDF_DOCUMENT" | "PDF_ANALYSIS_POINT" | "PDF_ANALYSIS_DETAIL" | "pdf-circuit-point" | "pdf-circuit-detail";
 
 export interface ConversationVO {
   id: number;
@@ -116,6 +116,8 @@ export type NodeData = {
   'PDF_DOCUMENT': PdfDocumentNodeData;
   'PDF_ANALYSIS_POINT': PdfAnalysisPointNodeData;
   'PDF_ANALYSIS_DETAIL': PdfAnalysisDetailNodeData;
+  'pdf-circuit-point': PdfAnalysisPointNodeData;
+  'pdf-circuit-detail': PdfAnalysisDetailNodeData;
 }
 
 export interface NodeVO {

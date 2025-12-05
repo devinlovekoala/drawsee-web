@@ -23,7 +23,11 @@ const ALLOWED_PARENT_TYPES: NodeType[] = [
   'circuit-detail',
   'circuit-canvas',
   'circuit-analyze',
-  'answer'
+  'answer',
+  'PDF_ANALYSIS_POINT',
+  'PDF_ANALYSIS_DETAIL',
+  'pdf-circuit-point',
+  'pdf-circuit-detail'
 ];
 
 // 防抖函数

@@ -76,16 +76,52 @@ ref) {
     if (!selectedNode) return 'GENERAL';
     const nodeType = selectedNode.type as string | undefined;
     const nodeSubtype = (selectedNode.data as Record<string, unknown> | undefined)?.subtype as string | undefined;
-    if (nodeType === 'answer' && nodeSubtype === 'circuit-analyze') {
+
+    const isCircuitNode = (nodeType === 'answer' && nodeSubtype === 'circuit-analyze') ||
+      nodeSubtype === 'circuit-canvas' ||
+      nodeSubtype === 'circuit-analyze' ||
+      nodeType === 'circuit-canvas' ||
+      nodeType === 'circuit-analyze';
+
+    if (isCircuitNode) {
       return 'CIRCUIT_DETAIL';
     }
-    if (nodeSubtype === 'circuit-canvas' || nodeSubtype === 'circuit-analyze') {
-      return 'CIRCUIT_DETAIL';
+
+    const isPdfNode = nodeType === 'PDF_ANALYSIS_POINT' ||
+      nodeType === 'PDF_ANALYSIS_DETAIL' ||
+      nodeType === 'pdf-circuit-point' ||
+      nodeType === 'pdf-circuit-detail' ||
+      nodeSubtype === 'PDF_ANALYSIS_POINT' ||
+      nodeSubtype === 'PDF_ANALYSIS_DETAIL' ||
+      nodeSubtype === 'pdf-circuit-point' ||
+      nodeSubtype === 'pdf-circuit-detail';
+
+    if (isPdfNode) {
+      return 'PDF_CIRCUIT_ANALYSIS_DETAIL';
     }
-    if (nodeType === 'circuit-canvas' || nodeType === 'circuit-analyze') {
-      return 'CIRCUIT_DETAIL';
-    }
+
     return 'GENERAL';
+  }, [selectedNode]);
+
+  const buildPromptWithNodeContext = useCallback((basePrompt: string): string => {
+    if (!selectedNode) return basePrompt;
+    const nodeType = selectedNode.type as string | undefined;
+    const nodeData = selectedNode.data as Record<string, unknown> | undefined;
+    const rawText = typeof nodeData?.text === 'string' ? nodeData.text.trim() : '';
+    const nodeTitle = typeof nodeData?.title === 'string' ? nodeData.title.trim() : '';
+    const rawSubtype = typeof nodeData?.subtype === 'string' ? nodeData.subtype : undefined;
+    const displayTitle = nodeTitle || (rawText ? rawText.slice(0, 30) : '');
+
+    const isPdfPoint = nodeType === 'PDF_ANALYSIS_POINT' || nodeType === 'pdf-circuit-point' ||
+      rawSubtype === 'PDF_ANALYSIS_POINT' || rawSubtype === 'pdf-circuit-point';
+    const isPdfDetail = nodeType === 'PDF_ANALYSIS_DETAIL' || nodeType === 'pdf-circuit-detail' ||
+      rawSubtype === 'PDF_ANALYSIS_DETAIL' || rawSubtype === 'pdf-circuit-detail';
+
+    if ((isPdfPoint || isPdfDetail) && rawText) {
+      return `请基于以下PDF分析分点继续回答用户问题：\n分点标题：${displayTitle || '未命名分点'}\n分点内容：${rawText}\n\n用户追问：${basePrompt}`;
+    }
+
+    return basePrompt;
   }, [selectedNode]);
   
   // 处理输入变化
@@ -145,13 +181,13 @@ ref) {
 
     setIsProcessing(true);
     
-    // 构建最终提交的问题文本，如果有引用则包含引用内容
+    // 构建最终提交的问题文本，如果有引用则包含引用内容，并叠加节点上下文
     let finalPrompt = prompt;
     if (quoteText) {
       finalPrompt = `对于之前内容中的：\n\n>${quoteText.replace(/\n/g, ' ')}\n\n我的问题是：${prompt}`;
     }
+    finalPrompt = buildPromptWithNodeContext(finalPrompt);
     
-    // 使用统一的GENERAL任务类型，由后端决定是否为知识问答
     const taskType: AiTaskType = determineTaskType();
     
     // 最终选择的模型
@@ -199,7 +235,8 @@ ref) {
       setIsProcessing(false);
     });
   }, [isProcessing, prompt, quoteText, selectedModel, convId, parentIdOfTempQueryNode, 
-      setPrompt, setQuoteText, setIsExpanded, setIsAnimating, handleAiTaskCountPlus, chat, handleNewChat, classId]);
+      setPrompt, setQuoteText, setIsExpanded, setIsAnimating, handleAiTaskCountPlus, chat, handleNewChat, classId, 
+      canInput, canNotInputReason, determineTaskType, buildPromptWithNodeContext]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
