@@ -19,10 +19,13 @@ import {
   ScissorOutlined
   ,
   MenuFoldOutlined,
-  MenuUnfoldOutlined
+  MenuUnfoldOutlined,
+  SwitcherOutlined
 } from '@ant-design/icons';
 import { AppstoreOutlined } from '@ant-design/icons';
 import { ModelType } from '@/app/pages/flow/components/input/FlowInputPanel';
+
+type CircuitWorkspaceMode = 'analog' | 'digital' | 'hybrid';
 
 interface CircuitToolbarProps {
   onSave?: () => void;
@@ -61,6 +64,10 @@ interface CircuitToolbarProps {
   isSidebarOpen?: boolean;
   onToggleElementLibrary?: () => void;
   isElementLibraryOpen?: boolean;
+  workspaceMode?: CircuitWorkspaceMode;
+  workspaceModeMismatch?: boolean;
+  detectedWorkspaceMode?: CircuitWorkspaceMode;
+  onWorkspaceModeToggle?: () => void;
 }
 
 export const CircuitToolbar: FC<CircuitToolbarProps> = ({
@@ -95,6 +102,10 @@ export const CircuitToolbar: FC<CircuitToolbarProps> = ({
   isSidebarOpen = true,
   onToggleElementLibrary,
   isElementLibraryOpen = true,
+  workspaceMode,
+  workspaceModeMismatch = false,
+  detectedWorkspaceMode,
+  onWorkspaceModeToggle,
 }) => {
 
   // 只在开发环境下输出日志
@@ -118,7 +129,16 @@ export const CircuitToolbar: FC<CircuitToolbarProps> = ({
   };
   
   // 检查操作功能是否可用
-  
+  const workspaceModeDisplayLabels: Record<CircuitWorkspaceMode, string> = {
+    analog: '模拟',
+    digital: '数字',
+    hybrid: '混合'
+  };
+  const currentWorkspaceLabel = workspaceMode ? workspaceModeDisplayLabels[workspaceMode] : '工作台';
+  const detectedWorkspaceLabel = detectedWorkspaceMode ? workspaceModeDisplayLabels[detectedWorkspaceMode] : '';
+  const workspaceTooltip = workspaceModeMismatch && detectedWorkspaceLabel
+    ? `检测到导入的电路为${detectedWorkspaceLabel}类型，点击切换到对应工作台`
+    : `当前：${currentWorkspaceLabel}工作台，点击切换`;
 
   return (
     <div className="flex items-center gap-2 bg-white p-2 border border-gray-200 rounded-md shadow-sm">
@@ -168,6 +188,16 @@ export const CircuitToolbar: FC<CircuitToolbarProps> = ({
           icon={<PictureOutlined />}
           loading={isImportingImage}
           className={getButtonClass(!onImageImport)}
+        />
+      </Tooltip>
+
+      <Tooltip title={workspaceTooltip}>
+        <Button
+          type={workspaceModeMismatch ? 'primary' : 'text'}
+          onClick={onWorkspaceModeToggle}
+          disabled={!onWorkspaceModeToggle}
+          icon={<SwitcherOutlined />}
+          className={getButtonClass(!onWorkspaceModeToggle)}
         />
       </Tooltip>
 

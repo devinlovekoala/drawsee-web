@@ -665,6 +665,11 @@ function Flow() {
     };
   }, [send]);
 
+  const elementsRef = useRef<Node[]>([]);
+  useEffect(() => {
+    elementsRef.current = elements.nodes;
+  }, [elements.nodes]);
+
   // 监听自动选中详情节点事件
   useEffect(() => {
     const handleAutoSelectDetailNode = (event: CustomEvent) => {
@@ -682,11 +687,12 @@ function Flow() {
       }
       
       // 延迟一段时间执行，确保详情节点已经创建和渲染
-      const attemptSelectDetailNode = (attempt = 1, maxAttempts = 10) => {
+      const attemptSelectDetailNode = (attempt = 1, maxAttempts = 20) => {
         setTimeout(() => {
           // 查找对应的详情节点
           const supportedTypes = detailNodeTypes || [detailNodeType];
-          const detailNode = elements.nodes.find(node => {
+          const currentNodes = elementsRef.current || [];
+          const detailNode = currentNodes.find(node => {
             // 检查节点类型是否匹配
             const typeMatches = supportedTypes.includes(node.type);
             // 检查父节点ID是否匹配
@@ -718,7 +724,7 @@ function Flow() {
             setTimeout(() => {
               smartFitView(
                 [detailNode.id], 
-                elements.nodes,
+                currentNodes,
                 200,
                 500,
                 detailNode.type
@@ -744,7 +750,7 @@ function Flow() {
     return () => {
       window.removeEventListener('auto-select-detail-node', handleAutoSelectDetailNode as EventListener);
     };
-  }, [elements.nodes, protectedSetSelectedNode, setElements, showDetailPanel, smartFitView, selectedNode]);
+  }, [protectedSetSelectedNode, setElements, showDetailPanel, smartFitView, selectedNode]);
   
   // 监听节点变化，确保详情节点创建时自动开启详情面板
   useEffect(() => {

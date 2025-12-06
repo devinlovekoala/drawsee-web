@@ -115,6 +115,13 @@ const serializeCircuitDesignSnapshot = (design?: CircuitDesign | null): string =
 
 type CircuitWorkspaceMode = 'analog' | 'digital' | 'hybrid';
 
+const WORKSPACE_MODE_SEQUENCE: CircuitWorkspaceMode[] = ['analog', 'digital', 'hybrid'];
+const workspaceModeLabels: Record<CircuitWorkspaceMode, string> = {
+  analog: '模拟',
+  digital: '数字',
+  hybrid: '混合'
+};
+
 type WireAnchor = {
   nodeId: string;
   handleId: string | null;
@@ -1313,6 +1320,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
     return determineWorkspaceMode(initialTypes);
   }, [initialCircuitDesign, workspaceModeProp]);
   const [workspaceMode, setWorkspaceMode] = useState<CircuitWorkspaceMode>(initialWorkspaceMode);
+  const [workspaceModeOverride, setWorkspaceModeOverride] = useState<CircuitWorkspaceMode | null>(null);
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -1416,21 +1424,45 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
   const [hasUploadedImage, setHasUploadedImage] = useState(false);
   const imageUploaderRef = useRef<{ triggerRecognition: () => void; hasImage: () => boolean }>(null);
 
+  const elementTypesForDetection = useMemo(() => {
+    if (nodes.length > 0) {
+      return nodes
+        .map((node) => node.data?.type as CircuitElementType)
+        .filter(Boolean);
+    }
+    if (initialCircuitDesign?.elements?.length) {
+      return initialCircuitDesign.elements.map((element) => element.type as CircuitElementType);
+    }
+    return [];
+  }, [nodes, initialCircuitDesign]);
+
+  const detectedWorkspaceMode = useMemo(() => determineWorkspaceMode(elementTypesForDetection), [elementTypesForDetection]);
+  const workspaceModeMismatch = workspaceMode !== detectedWorkspaceMode;
+  const canManuallySwitchWorkspaceMode = !isReadOnly && Boolean(workspaceModeProp && workspaceModeProp !== 'auto');
+
   useEffect(() => {
+    if (workspaceModeOverride) {
+      if (workspaceMode !== workspaceModeOverride) {
+        setWorkspaceMode(workspaceModeOverride);
+      }
+      return;
+    }
     if (workspaceModeProp && workspaceModeProp !== 'auto') {
       if (workspaceMode !== workspaceModeProp) {
         setWorkspaceMode(workspaceModeProp);
       }
       return;
     }
-    const elementTypesFromNodes = nodes.length
-      ? nodes.map((node) => node.data.type as CircuitElementType)
-      : initialCircuitDesign?.elements?.map((element) => element.type as CircuitElementType);
-    const detectedMode = determineWorkspaceMode(elementTypesFromNodes);
-    if (detectedMode !== workspaceMode) {
-      setWorkspaceMode(detectedMode);
+    if (workspaceMode !== detectedWorkspaceMode) {
+      setWorkspaceMode(detectedWorkspaceMode);
     }
-  }, [workspaceModeProp, nodes, initialCircuitDesign, workspaceMode]);
+  }, [workspaceModeProp, workspaceModeOverride, workspaceMode, detectedWorkspaceMode]);
+
+  useEffect(() => {
+    if (!workspaceModeProp || workspaceModeProp === 'auto') {
+      setWorkspaceModeOverride(null);
+    }
+  }, [workspaceModeProp]);
 
   const reactFlowInstance = useReactFlow();
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
@@ -1441,6 +1473,14 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
   const [isWireModeActive, setIsWireModeActive] = useState(false);
   const [wireAnchor, setWireAnchor] = useState<WireAnchor | null>(null);
   const [isJunctionModeActive, setIsJunctionModeActive] = useState(false);
+  const handleWorkspaceModeToggle = useCallback(() => {
+    if (!canManuallySwitchWorkspaceMode) return;
+    const nextMode = workspaceModeMismatch
+      ? detectedWorkspaceMode
+      : WORKSPACE_MODE_SEQUENCE[(WORKSPACE_MODE_SEQUENCE.indexOf(workspaceMode) + 1) % WORKSPACE_MODE_SEQUENCE.length];
+    setWorkspaceModeOverride(nextMode);
+    message.success(`已切换到${workspaceModeLabels[nextMode]}电路工作台`);
+  }, [canManuallySwitchWorkspaceMode, workspaceModeMismatch, detectedWorkspaceMode, workspaceMode]);
   
   const getLabelPrefix = useCallback((type: CircuitElementType) => {
     return elementNamePrefixes[type] || 'X';
@@ -3569,6 +3609,10 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
               onDeleteEdge={isReadOnly ? undefined : deleteSelectedEdge}
               onToggleElementLibrary={() => setShowElementLibrary(prev => !prev)}
               isElementLibraryOpen={showElementLibrary}
+              workspaceMode={workspaceMode}
+              detectedWorkspaceMode={detectedWorkspaceMode}
+              workspaceModeMismatch={workspaceModeMismatch}
+              onWorkspaceModeToggle={canManuallySwitchWorkspaceMode ? handleWorkspaceModeToggle : undefined}
             />
           </div>
         )}

@@ -98,7 +98,7 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
   const [lastUpdatedAt, setLastUpdatedAt] = useState<number>(0); // 跟踪上次更新时间
   const scrollRef = useRef<HTMLDivElement>(null); // 用于自动滚动
   const { handleAiTaskCountPlus } = useAppContext();
-  const { convId } = useFlowContext();
+  const { convId, chat } = useFlowContext();
   const [pdfDetailLoading, setPdfDetailLoading] = useState(false);
   const nodeTypeValue = selectedNode?.type ? String(selectedNode.type) : '';
   const isPdfAnalysisPointNode = nodeTypeValue === 'PDF_ANALYSIS_POINT' || nodeTypeValue === 'pdf-circuit-point';
@@ -624,7 +624,7 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
         model: 'deepseekV3',
         classId: null
       };
-      await createAiTask(dto);
+      const response = await createAiTask(dto);
       handleAiTaskCountPlus();
       window.dispatchEvent(new CustomEvent('auto-select-detail-node', {
         detail: {
@@ -634,13 +634,16 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
         }
       }));
       message.success('已发送PDF分析详情任务');
+      if (response?.taskId) {
+        chat(response.taskId);
+      }
     } catch (error) {
       console.error('发送PDF分析详情任务失败:', error);
       message.error('发送PDF分析详情任务失败');
     } finally {
       setPdfDetailLoading(false);
     }
-  }, [selectedNode, text, convId, handleAiTaskCountPlus, pdfDetailLoading]);
+  }, [selectedNode, text, convId, handleAiTaskCountPlus, pdfDetailLoading, chat]);
 
   // 早期返回：当没有选中节点时
   if (!selectedNode || !nodeData) {
@@ -654,6 +657,26 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
       </div>
     );
   }
+
+  const renderStreamContent = () => {
+    return text ? (
+      <div className="relative">
+        <MarkdownWithLatex
+          text={text}
+          isStreaming={Boolean(isGenerating)}
+          key={`markdown-${selectedNode?.id}-${forceRefresh}-${text.length}-${lastUpdatedAt}`}
+        />
+        {isGenerating && (
+          <span className="inline-block w-2 h-4 bg-blue-500 animate-pulse ml-1 align-text-bottom"></span>
+        )}
+      </div>
+    ) : (
+      <div className="text-center py-8 text-gray-400">
+        <FileText className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+        <p>暂无内容</p>
+      </div>
+    );
+  };
 
   return (
     <div 
@@ -835,13 +858,7 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
                         该分点的详细说明已就绪，可继续追问以获取更深入的结论。
                       </p>
                     </div>
-                    <div className="rounded-2xl border border-gray-100 bg-white p-4 text-sm leading-relaxed text-gray-800 min-h-[120px]">
-                      {text?.trim() ? (
-                        <div dangerouslySetInnerHTML={{ __html: text.replace(/\n/g, '<br/>') }} />
-                      ) : (
-                        <span className="text-gray-400">详细内容正在生成，请稍候...</span>
-                      )}
-                    </div>
+                    {renderStreamContent()}
                     {onApplySuggestion && (
                       <Button block onClick={handlePdfFollowupPrefill}>
                         引用该分点继续追问
@@ -926,25 +943,7 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
                 );
               }
 
-              // 普通内容渲染
-              return text ? (
-                <div className="relative">
-                  <MarkdownWithLatex
-                    text={text}
-                    isStreaming={Boolean(isGenerating)}
-                    key={`markdown-${selectedNode.id}-${forceRefresh}-${text.length}-${lastUpdatedAt}`}
-                  />
-                  {/* 如果正在生成，显示闪烁光标 */}
-                  {isGenerating && (
-                    <span className="inline-block w-2 h-4 bg-blue-500 animate-pulse ml-1 align-text-bottom"></span>
-                  )}
-                </div>
-              ) : (
-                <div className="text-center py-8 text-gray-400">
-                  <FileText className="w-12 h-12 mx-auto mb-2 text-gray-300" />
-                  <p>暂无内容</p>
-                </div>
-              );
+              return renderStreamContent();
             })()}
           </div>
         </div>
