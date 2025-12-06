@@ -182,57 +182,57 @@ curl -v http://127.0.0.1:3001/health
 
 ### B. Docker / docker-compose（容器化部署）
 
-适用场景：需要隔离、便于 CI/CD 与回滚，或在多宿主/多环境间一致性运行。
+项目已经内置两份官方 Dockerfile（`docker/Dockerfile.ngspice` 与 `docker/Dockerfile.verilog`）和顶层 `docker-compose.yml`。镜像基于 `node:20-bookworm-slim`，在容器内通过 apt 安装 `ngspice` 或 `iverilog`/`vvp`，再执行 `npm ci --omit=dev`，确保模拟/数字仿真后端都能自包含运行。
 
-关键点：
-- 可以在镜像中编译 ngspice（耗时），或在宿主编译好后挂载进去（推荐快速方案）。
-
-示例 `Dockerfile`（假设宿主挂载 ngspice 到容器 `/opt/ngspice/bin/ngspice`）：
-
-```dockerfile
-FROM node:18-bullseye
-WORKDIR /usr/src/app
-COPY package*.json ./
-RUN npm ci --only=production
-COPY . .
-EXPOSE 3001
-ENV PORT=3001
-ENV NGSPICE_BIN=/opt/ngspice/bin/ngspice
-CMD ["npm", "run", "ngspice:serve-local"]
-```
-
-示例 `docker-compose.yml`：
-
-```yaml
-version: '3.8'
-services:
-  ngspice-backend:
-    build: .
-    image: drawsee/ngspice-backend:latest
-    restart: always
-    ports:
-      - "3001:3001"
-    volumes:
-      - /opt/ngspice/bin/ngspice:/opt/ngspice/bin/ngspice:ro
-      - /opt/drawsee/drawsee-web:/usr/src/app:ro
-    environment:
-      - PORT=3001
-      - NGSPICE_BIN=/opt/ngspice/bin/ngspice
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-```
-
-启动：
+**本地（开发环境）**
 
 ```bash
-docker-compose up -d --build
-docker-compose logs -f
+# 构建镜像
+npm run docker:build
+# 前台启动，按 Ctrl+C 停止（生产可加 -d）
+npm run docker:up
 ```
 
-优点：便于回滚、隔离环境、快速扩缩容（结合编排工具）。
+Compose 会同时启动：
+
+- `ngspice-backend`：监听 `3001`，环境变量 `NGSPICE_BIN=/usr/bin/ngspice`
+- `verilog-backend`：监听 `3002`，环境变量 `IVERILOG_BIN=/usr/bin/iverilog`、`VVP_BIN=/usr/bin/vvp`
+
+如需修改端口，可设置 `NGSPICE_PORT`、`VERILOG_PORT`（命令行或 `.env`）：
+
+```bash
+NGSPICE_PORT=4001 VERILOG_PORT=4002 docker compose up --build
+```
+
+`docker-compose.yml` 内置 `curl` 健康检查，并使用 `restart: unless-stopped`。开发调试时，若修改代码可运行 `docker compose up --build` 重新构建，或直接在宿主执行 `npm run ngspice:serve-local` / `npm run verilog:serve-local` 获得更快热重启。
+
+**生产环境**
+
+1. 在 CI/CD 或本机构建并推送镜像：
+
+   ```bash
+   docker compose build
+   docker tag drawsee/ngspice-backend:local registry.example.com/drawsee/ngspice-backend:prod
+   docker push registry.example.com/drawsee/ngspice-backend:prod
+   docker tag drawsee/verilog-backend:local registry.example.com/drawsee/verilog-backend:prod
+   docker push registry.example.com/drawsee/verilog-backend:prod
+   ```
+
+   若需要自定义镜像名称，可修改 `docker-compose.yml` 中的 `image` 字段，或在部署时覆盖。
+
+2. 服务器上拉取并启动：
+
+   ```bash
+   docker pull registry.example.com/drawsee/ngspice-backend:prod
+   docker pull registry.example.com/drawsee/verilog-backend:prod
+   NGSPICE_PORT=3001 VERILOG_PORT=3002 docker compose up -d
+   ```
+
+   也可以直接在服务器仓库目录执行 `docker compose up -d --build`，由 Compose 使用源码构建镜像。
+
+3. 通过 `docker compose logs -f`, `docker ps`, `curl http://127.0.0.1:3001/health` 与 `curl http://127.0.0.1:3002/health` 验证运行状态。容器异常退出时会自动重启，可继续结合 systemd/Kubernetes 统一管理。
+
+容器化带来一致的依赖、快速回滚、易于水平扩展；若你仍需使用自编译的 `ngspice` 或 `iverilog`，可以挂载宿主目录并覆盖相关环境变量，镜像本身不做限制。
 
 ### C. Kubernetes（可选）
 

@@ -5,7 +5,9 @@ import { getCircuitDesignById } from '@/api/methods/circuit.methods';
 import { CircuitFlowWithProvider } from '@/app/pages/circuit/components/CircuitFlow';
 import { Button, Spin, Result, Card, Modal } from 'antd';
 import { CircuitDesign } from '@/api/types/circuit.types';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
+import type { FlowLocationState } from '@/app/contexts/FlowContext';
+import { useFlowReturnInfo } from '@/app/pages/circuit/hooks/useFlowReturnInfo';
 
 // 导航事件类型定义
 interface NavigationEvent {
@@ -22,7 +24,7 @@ export default function CircuitEditPage() {
   const params = useParams();
   const id = params.id as string;
   const navigate = useNavigate();
-  const location = useLocation();
+  const flowReturnConvId = useFlowReturnInfo();
   
   const [circuitDesign, setCircuitDesign] = useState<CircuitDesign | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -218,6 +220,14 @@ export default function CircuitEditPage() {
         }}
         extra={
           <div className="flex gap-2">
+            {flowReturnConvId && (
+              <Button
+                type="primary"
+                onClick={() => handleNavigation('/flow', { convId: flowReturnConvId } as FlowLocationState)}
+              >
+                返回会话
+              </Button>
+            )}
             <Button
               onClick={() => handleNavigation('/circuit/list')}
             >

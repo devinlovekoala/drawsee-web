@@ -1,0 +1,35 @@
+services:
+  ngspice-backend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.ngspice
+    image: drawsee/ngspice-backend:local
+    restart: unless-stopped
+    environment:
+      PORT: ${NGSPICE_PORT:-3001}
+      NGSPICE_BIN: /usr/bin/ngspice
+    ports:
+      - "${NGSPICE_PORT:-3001}:3001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:3001/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+
+  verilog-backend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.verilog
+    image: drawsee/verilog-backend:local
+    restart: unless-stopped
+    environment:
+      VERILOG_PORT: ${VERILOG_PORT:-3002}
+      IVERILOG_BIN: /usr/bin/iverilog
+      VVP_BIN: /usr/bin/vvp
+    ports:
+      - "${VERILOG_PORT:-3002}:3002"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:3002/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5

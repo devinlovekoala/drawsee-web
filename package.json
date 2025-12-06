@@ -12,7 +12,10 @@
     "ngspice:serve": "node server/ngspice-server.js",
     "ngspice:serve-local": "NGSPICE_BIN=/home/devin/Workspace/drawsee-platform/ngspice/linux-ubuntu/build/ngspice PORT=3001 node server/ngspice-server.js",
     "verilog:serve": "node server/verilog-sim-server.js",
-    "verilog:serve-local": "IVERILOG_BIN=iverilog VVP_BIN=vvp VERILOG_PORT=3002 node server/verilog-sim-server.js"
+    "verilog:serve-local": "IVERILOG_BIN=iverilog VVP_BIN=vvp VERILOG_PORT=3002 node server/verilog-sim-server.js",
+    "docker:build": "docker compose build",
+    "docker:up": "docker compose up --build",
+    "docker:down": "docker compose down"
   },
   "dependencies": {
     "@ant-design/charts": "^2.2.7",

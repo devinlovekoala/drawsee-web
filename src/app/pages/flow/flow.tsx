@@ -35,7 +35,7 @@ import { FlowContext, FlowLocationState } from "@/app/contexts/FlowContext";
 import FlowRightToolBar from "./components/FlowRightToolBar";
 import ResourceNode from "./components/node/resource/ResourceNode";
 import FlowLeftToolBar from "./components/FlowLeftToolBar";
-import { TASK_KEY_PREFIX } from "@/common/constant/storage-key.constant";
+import { FLOW_RETURN_INFO_KEY, TASK_KEY_PREFIX } from "@/common/constant/storage-key.constant";
 import { useViewportChange } from "./hooks/useViewportChange";
 
 type CircuitReturnInfo = {
@@ -205,6 +205,16 @@ function Flow() {
   const handleReturnToCircuit = useCallback(() => {
     if (!circuitReturnInfo) return;
     const targetPath = circuitReturnInfo.path || (circuitReturnInfo.designId ? `/circuit/edit/${circuitReturnInfo.designId}` : '/circuit');
+    if (convId) {
+      sessionStorage.setItem(
+        FLOW_RETURN_INFO_KEY,
+        JSON.stringify({
+          convId,
+          ts: Date.now(),
+          from: 'flow'
+        })
+      );
+    }
     navigate(targetPath, { state: { convId, fromFlow: true } });
   }, [circuitReturnInfo, navigate, convId]);
   

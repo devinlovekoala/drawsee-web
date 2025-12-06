@@ -6,6 +6,8 @@ import { CircuitFlowWithProvider } from '@/app/pages/circuit/components/CircuitF
 import { Button, Spin, Result, Card } from 'antd';
 import { CircuitDesign } from '@/api/types/circuit.types';
 import { useParams, useNavigate } from 'react-router-dom';
+import type { FlowLocationState } from '@/app/contexts/FlowContext';
+import { useFlowReturnInfo } from '@/app/pages/circuit/hooks/useFlowReturnInfo';
 
 /**
  * 电路设计查看页面
@@ -15,6 +17,7 @@ export default function CircuitViewPage() {
   const params = useParams();
   const id = params.id as string;
   const navigate = useNavigate();
+  const flowReturnConvId = useFlowReturnInfo();
   
   const [circuitDesign, setCircuitDesign] = useState<CircuitDesign | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -90,6 +93,14 @@ export default function CircuitViewPage() {
         }}
         extra={
           <div className="flex gap-2">
+            {flowReturnConvId && (
+              <Button
+                type="primary"
+                onClick={() => navigate('/flow', { state: { convId: flowReturnConvId } as FlowLocationState })}
+              >
+                返回会话
+              </Button>
+            )}
             <Button 
               onClick={() => navigate('/circuit/list')}
             >

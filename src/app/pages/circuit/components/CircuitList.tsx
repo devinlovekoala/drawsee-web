@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getCircuitDesigns, deleteCircuitDesign } from '@/api/methods/circuit.methods';
 import { Table, Button, Card, Space, message, Modal, Empty, Typography, Spin } from 'antd';
-import { DeleteOutlined, EditOutlined, EyeOutlined, PlusOutlined } from '@ant-design/icons';
+import { DeleteOutlined, EditOutlined, EyeOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { Link, useNavigate } from 'react-router-dom';
 
@@ -131,13 +131,6 @@ export const CircuitList = () => {
       <Card>
         <div className="flex justify-between items-center mb-4">
           <Title level={4}>我的电路设计</Title>
-          <Button 
-            type="primary" 
-            icon={<PlusOutlined />}
-            onClick={() => navigate('/circuit/create')}
-          >
-            新建电路设计
-          </Button>
         </div>
 
         {loading ? (
