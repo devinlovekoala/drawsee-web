@@ -21,6 +21,9 @@
 - **Lucide**: 0.474.0 (图标库)
 - **D3.js**: 7.9.0 (数据可视化)
 
+## 部署/运维
+- 远程推送并启动 ngspice / verilog / qdrant 容器：使用 `scripts/deploy-remote-containers.sh`，详见 `doc/remote-deploy.md`
+
 ## 项目结构（详细版）
 
 ### 核心目录结构
