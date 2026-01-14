@@ -72,6 +72,7 @@ function useFlowState(convId: number, selectedNode?: Node | null, setSelectedNod
   // 限次补偿轮询（SSE遗漏时兜底）
   const pollTimer = useRef<number | null>(null);
   const pollAttempts = useRef<number>(0);
+  const lastNodeCount = useRef<number>(0);
 
   // 主动拉取最新节点（用于处理无nodeId的DATA进度消息）
   const refreshNodesFromServer = useCallback(async () => {
@@ -79,8 +80,9 @@ function useFlowState(convId: number, selectedNode?: Node | null, setSelectedNod
     try {
       // 加入时间戳避免alova命中缓存
       const nodesFromApi = await getNodesByConvId(convId, { _ts: Date.now() });
-      setElements(({ edges }) => {
-        const flowNodes = nodesFromApi.map(node => ({
+      setElements(({ nodes: currentNodes, edges }) => {
+        // 将服务器节点转换为前端节点
+        const incomingNodes = nodesFromApi.map(node => ({
           id: node.id.toString(),
           type: normalizeNodeType(node.type),
           position: node.position,
@@ -94,6 +96,12 @@ function useFlowState(convId: number, selectedNode?: Node | null, setSelectedNod
           }
         })) as Node[];
 
+        // 合并：如果服务器返回的节点数更少，不删除本地已存在的节点（避免短暂空列表覆盖）
+        const mergedMap = new Map<string, Node>();
+        currentNodes.forEach(n => mergedMap.put?.(n.id, n) || mergedMap.set(n.id, n));
+        incomingNodes.forEach(n => mergedMap.set(n.id, n));
+        const flowNodes = Array.from(mergedMap.values());
+
         const flowEdges = flowNodes
           .filter(node => node.data.parentId !== null)
           .map(node => ({
@@ -103,7 +111,13 @@ function useFlowState(convId: number, selectedNode?: Node | null, setSelectedNod
             type: 'smoothstep',
           })) as Edge[];
 
-        const layoutedNodes = executeLayout(flowNodes, flowEdges, true);
+        const layoutedNodes = executeLayout(flowNodes, flowEdges, false);
+        lastNodeCount.current = flowNodes.length;
+        // 如果节点已达到3个及以上，停止补偿轮询
+        if (pollTimer.current && lastNodeCount.current >= 3) {
+          window.clearInterval(pollTimer.current);
+          pollTimer.current = null;
+        }
         return { nodes: layoutedNodes, edges: flowEdges };
       });
     } catch (e) {
@@ -597,15 +611,16 @@ function useFlowState(convId: number, selectedNode?: Node | null, setSelectedNod
     activeNodeIds.current.clear();
     // 立即拉取一次节点，防止首帧只有ROOT
     void refreshNodesFromServer();
-    // 启动限次补偿轮询（最多6次）
+    // 启动限次补偿轮询（最多15次或节点数>=3即停止）
     if (pollTimer.current) {
       window.clearInterval(pollTimer.current);
     }
     pollAttempts.current = 0;
+    lastNodeCount.current = 0;
     pollTimer.current = window.setInterval(() => {
       pollAttempts.current += 1;
       void refreshNodesFromServer();
-      if (pollAttempts.current >= 6) {
+      if (pollAttempts.current >= 15 || lastNodeCount.current >= 3) {
         window.clearInterval(pollTimer.current!);
         pollTimer.current = null;
       }

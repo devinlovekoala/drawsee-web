@@ -425,13 +425,25 @@ export function entitreeFlexLayout(nodes: Node[], edges: Edge[], shouldUpdateSer
     // 更新服务器 - 仅当要求且有节点需要更新时才执行
     if (shouldUpdateServer && nodesToUpdate.length > 0) {
       console.log(`更新服务器节点数: ${nodesToUpdate.length}`);
-      updateNodesPositionAndHeight(nodesToUpdate).send()
-        .then(() => {
-          console.log('节点位置和高度更新成功');
-        })
-        .catch(error => {
-          console.error('节点位置和高度更新失败', error);
-        });
+      // 仅当位置或高度确实发生变化时才发送更新，防止无谓写库
+      const changedOnly = nodesToUpdate.filter((nu) => {
+        const original = nodes.find(n => n.id === nu.id);
+        if (!original) return true;
+        const posChanged = original.position?.x !== nu.position?.x || original.position?.y !== nu.position?.y;
+        const hChanged = (original.data as any)?.height !== nu.height;
+        return posChanged || hChanged;
+      });
+      if (changedOnly.length > 0) {
+        updateNodesPositionAndHeight(changedOnly).send()
+          .then(() => {
+            console.log('节点位置和高度更新成功');
+          })
+          .catch(error => {
+            console.error('节点位置和高度更新失败', error);
+          });
+      } else {
+        console.log('节点位置和高度无变化，跳过更新服务器');
+      }
     }
     
     // 性能统计输出

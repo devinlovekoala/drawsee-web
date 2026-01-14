@@ -389,7 +389,7 @@ function Flow() {
           significantChanges,
           significantChangeRatio
         });
-        newNodes = executeLayout(newNodes, edges, true);
+        newNodes = executeLayout(newNodes, edges, false);
       }
 
       // 保存被拖动的节点位置到服务器
@@ -606,7 +606,7 @@ function Flow() {
       }));
 
       // 执行布局 - 但不使用动画，提高性能
-      const layoutedNodes = executeLayout(flowNodes, flowEdges, true);
+      const layoutedNodes = executeLayout(flowNodes, flowEdges, false);
       setElements({nodes: layoutedNodes, edges: flowEdges});
 
       // 如果当前有选中的节点，更新selectedNode以反映最新数据
@@ -772,7 +772,7 @@ function Flow() {
     if (isChatting) return;
     console.log('handleRelayout');
     setElements(({nodes, edges}) => {
-      const layoutedNodes = executeLayout(nodes, edges, true, resetHeight);
+      const layoutedNodes = executeLayout(nodes, edges, false, resetHeight);
       
       // 使用智能fitView进行重布局后的视图调整
       setTimeout(() => {
