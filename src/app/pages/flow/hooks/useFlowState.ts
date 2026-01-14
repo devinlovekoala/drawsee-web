@@ -1,4 +1,5 @@
 import { NodeVO } from "@/api/types/flow.types";
+import { getNodesByConvId } from "@/api/methods/flow.methods";
 import { Edge, Node } from "@xyflow/react";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { ChatTask, TextData } from "../types/ChatTask.types";
@@ -10,6 +11,33 @@ import { TOKEN_KEY } from "@/common/constant/storage-key.constant";
 import useFlowTools from "./useFlowTools";
 import { COMPACT_NODE_HEIGHT, COMPACT_NODE_WIDTH, TEMP_QUERY_NODE_ID_PREFIX } from "../constants";
 import { processTextUpdate } from "../utils/sectionParser";
+
+// 将后端节点类型归一化为前端可识别的类型
+const normalizeNodeType = (apiType: string | undefined | null): string => {
+  if (!apiType) return 'query';
+  const t = String(apiType).toUpperCase();
+  switch (t) {
+    case 'QUERY':
+      return 'query';
+    case 'PDF_CIRCUIT_POINT':
+    case 'PDF-CIRCUIT-POINT':
+      return 'pdf-circuit-point';
+    case 'PDF_CIRCUIT_DETAIL':
+    case 'PDF-CIRCUIT-DETAIL':
+      return 'pdf-circuit-detail';
+    case 'PDF_CIRCUIT_DOCUMENT':
+    case 'PDF_DOCUMENT':
+      return 'PDF_DOCUMENT';
+    case 'PDF_ANALYSIS_POINT':
+      return 'PDF_ANALYSIS_POINT';
+    case 'PDF_ANALYSIS_DETAIL':
+      return 'PDF_ANALYSIS_DETAIL';
+    case 'CIRCUIT-ANALYZE':
+      return 'circuit-analyze';
+    default:
+      return String(apiType);
+  }
+};
 
 /**
  * 流程图状态管理Hook
@@ -41,6 +69,47 @@ function useFlowState(convId: number, selectedNode?: Node | null, setSelectedNod
   const lastFocusNodeId = useRef<string | null>(null);
   // 跟踪正在生成内容的节点
   const activeNodeIds = useRef<Set<string>>(new Set());
+  // 限次补偿轮询（SSE遗漏时兜底）
+  const pollTimer = useRef<number | null>(null);
+  const pollAttempts = useRef<number>(0);
+
+  // 主动拉取最新节点（用于处理无nodeId的DATA进度消息）
+  const refreshNodesFromServer = useCallback(async () => {
+    if (!convId) return;
+    try {
+      // 加入时间戳避免alova命中缓存
+      const nodesFromApi = await getNodesByConvId(convId, { _ts: Date.now() });
+      setElements(({ edges }) => {
+        const flowNodes = nodesFromApi.map(node => ({
+          id: node.id.toString(),
+          type: normalizeNodeType(node.type),
+          position: node.position,
+          data: {
+            ...node.data,
+            parentId: node.parentId,
+            convId: node.convId,
+            userId: node.userId,
+            createdAt: node.createdAt,
+            updatedAt: node.updatedAt
+          }
+        })) as Node[];
+
+        const flowEdges = flowNodes
+          .filter(node => node.data.parentId !== null)
+          .map(node => ({
+            id: `e${node.data.parentId}-${node.id}`,
+            source: node.data.parentId!.toString(),
+            target: node.id,
+            type: 'smoothstep',
+          })) as Edge[];
+
+        const layoutedNodes = executeLayout(flowNodes, flowEdges, true);
+        return { nodes: layoutedNodes, edges: flowEdges };
+      });
+    } catch (e) {
+      console.error('刷新节点失败', e);
+    }
+  }, [convId, executeLayout, setElements]);
 
   /**
    * 处理聊天消息
@@ -64,31 +133,6 @@ function useFlowState(convId: number, selectedNode?: Node | null, setSelectedNod
             break;
           }
           
-          // 归一化后端节点类型，确保前端认识
-          const normalizeNodeType = (apiType: string | undefined | null): string => {
-            if (!apiType) return 'query';
-            const t = String(apiType).toUpperCase();
-            switch (t) {
-              case 'QUERY':
-                return 'query';
-              case 'PDF_CIRCUIT_POINT':
-                return 'PDF_ANALYSIS_POINT';
-              case 'PDF_CIRCUIT_DETAIL':
-                return 'PDF_ANALYSIS_DETAIL';
-              case 'PDF_CIRCUIT_DOCUMENT':
-              case 'PDF_DOCUMENT':
-                return 'PDF_DOCUMENT';
-            case 'PDF_ANALYSIS_POINT':
-              return 'PDF_ANALYSIS_POINT';
-            case 'PDF_ANALYSIS_DETAIL':
-              return 'PDF_ANALYSIS_DETAIL';
-            case 'CIRCUIT-ANALYZE':
-              return 'circuit-analyze';
-            default:
-              return String(apiType);
-          }
-          };
-
           const normalizedType = normalizeNodeType(nodeVO.type as unknown as string);
           console.log(`[SSE] 接收到节点，ID: ${nodeVO.id}, 原始类型: ${nodeVO.type}, 归一化类型: ${normalizedType}, parentId: ${nodeVO.parentId}`);
 
@@ -301,6 +345,8 @@ function useFlowState(convId: number, selectedNode?: Node | null, setSelectedNod
           
           // 验证nodeId是否存在
           if (!data || typeof data.nodeId === 'undefined') {
+            // 无nodeId的数据（进度/统计），主动刷新一次节点列表
+            void refreshNodesFromServer();
             break;
           }
           
@@ -408,6 +454,9 @@ function useFlowState(convId: number, selectedNode?: Node | null, setSelectedNod
         case 'done': {
           console.log('接收到done消息，准备完成对话');
           
+          // 兜底刷新，防止有延迟节点未到
+          void refreshNodesFromServer();
+
           // 将所有活跃节点状态设置为已完成
           setElements(({nodes, edges}) => {
             const updatedNodes = nodes.map(node => {
@@ -498,6 +547,10 @@ function useFlowState(convId: number, selectedNode?: Node | null, setSelectedNod
           
           // 清理lastFocusNodeId以避免后续误操作
           lastFocusNodeId.current = null;
+          if (pollTimer.current) {
+            window.clearInterval(pollTimer.current);
+            pollTimer.current = null;
+          }
           break;
         }
         // 错误
@@ -506,13 +559,17 @@ function useFlowState(convId: number, selectedNode?: Node | null, setSelectedNod
           toast.error(`对话出错：${errorMessage}`);
           // 设置聊天状态为false
           setIsChatting(false);
+          if (pollTimer.current) {
+            window.clearInterval(pollTimer.current);
+            pollTimer.current = null;
+          }
           break;
         }
       }
     }
     // 释放锁
     isChatTaskProcessing.current = false;
-  }, [executeLayout, executeFitView, adjustViewportToShowLatestContent, handleTitleUpdate, convId, selectedNode, setSelectedNode]);
+  }, [executeLayout, executeFitView, adjustViewportToShowLatestContent, handleTitleUpdate, convId, selectedNode, setSelectedNode, refreshNodesFromServer]);
 
   /**
    * 添加消息到队列
@@ -538,6 +595,21 @@ function useFlowState(convId: number, selectedNode?: Node | null, setSelectedNod
     lastFocusNodeId.current = null;
     // 清空活跃节点列表
     activeNodeIds.current.clear();
+    // 立即拉取一次节点，防止首帧只有ROOT
+    void refreshNodesFromServer();
+    // 启动限次补偿轮询（最多6次）
+    if (pollTimer.current) {
+      window.clearInterval(pollTimer.current);
+    }
+    pollAttempts.current = 0;
+    pollTimer.current = window.setInterval(() => {
+      pollAttempts.current += 1;
+      void refreshNodesFromServer();
+      if (pollAttempts.current >= 6) {
+        window.clearInterval(pollTimer.current!);
+        pollTimer.current = null;
+      }
+    }, 1200);
 
     // SSE请求
     const source = new SSE(
@@ -594,6 +666,10 @@ function useFlowState(convId: number, selectedNode?: Node | null, setSelectedNod
       // 确保isChatting被设置为false
       setTimeout(() => {
         setIsChatting(false);
+        if (pollTimer.current) {
+          window.clearInterval(pollTimer.current);
+          pollTimer.current = null;
+        }
       }, 200);
     });
     

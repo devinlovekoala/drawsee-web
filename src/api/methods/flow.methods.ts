@@ -12,7 +12,10 @@ export const getConversations =
   () => alova.Get<Array<ConversationVO>>('/flow/conversations');
 
 export const getNodesByConvId =
-    (convId: number) => alova.Get<Array<NodeVO>>('/flow/nodes', {params: {convId}});
+    (convId: number, extraParams?: Record<string, unknown>) => alova.Get<Array<NodeVO>>('/flow/nodes', {
+      params: {convId, ...(extraParams || {})},
+      cacheFor: 0 // 禁用缓存，确保每次刷新拿到最新节点
+    });
 
 export const updateNodesPositionAndHeight =
   (nodes: Array<NodeToUpdate>) => alova.Post('/flow/nodes', { nodes });
