@@ -6,6 +6,8 @@ import { ModelType } from '../flow/components/input/FlowInputPanel';
 import { Button, Tooltip, Modal } from 'antd';
 import { BrainCircuit, InfoIcon, Save, Cpu } from 'lucide-react';
 
+const CIRCUIT_PREFILL_STORAGE_KEY = 'flow_prefill_circuit_design';
+
 interface NavigationEvent {
   path: string;
   state?: any;
@@ -20,7 +22,7 @@ function Circuit() {
   const classId = location.state?.classId as string || null;
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [_circuitDesign, setCircuitDesign] = useState<CircuitDesign | null>(null);
+  const [circuitDesign, setCircuitDesign] = useState<CircuitDesign | null>(null);
   const [selectedModel, setSelectedModel] = useState<ModelType>('deepseekV3'); // 默认使用DeepSeekV3模型
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [pendingNavigation, setPendingNavigation] = useState<NavigationEvent | null>(null);
@@ -29,6 +31,22 @@ function Circuit() {
   // 更新电路设计数据
   const handleCircuitDesignChange = useCallback((design: CircuitDesign) => {
     setCircuitDesign(design);
+  }, []);
+
+  // 从Flow预填电路设计（无ID时也能直接带入）
+  useEffect(() => {
+    try {
+      const stored = sessionStorage.getItem(CIRCUIT_PREFILL_STORAGE_KEY);
+      if (!stored) return;
+      const parsed = JSON.parse(stored) as { design?: CircuitDesign; ts?: number };
+      if (parsed?.design) {
+        setCircuitDesign(parsed.design);
+      }
+    } catch (err) {
+      console.error('读取预填电路设计失败', err);
+    } finally {
+      try { sessionStorage.removeItem(CIRCUIT_PREFILL_STORAGE_KEY); } catch (err) {}
+    }
   }, []);
   
   // 处理模型切换
@@ -153,6 +171,7 @@ function Circuit() {
         <CircuitFlowWithProvider 
           onCircuitDesignChange={handleCircuitDesignChange}
           selectedModel={selectedModel}
+          initialCircuitDesign={circuitDesign || undefined}
           classId={classId}
           onModelChange={handleModelChange}
           onUnsavedChange={setHasUnsavedChanges}

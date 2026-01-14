@@ -10,6 +10,9 @@ import { extractFileNameFromUrl, isHttpUrl } from '@/app/pages/flow/utils/docume
 import { useAppContext } from '@/app/contexts/AppContext';
 import { useFlowContext } from '@/app/contexts/FlowContext';
 import { createAiTask } from '@/api/methods/flow.methods';
+import type { CircuitDesign } from '@/api/types/circuit.types';
+
+const CIRCUIT_PREFILL_STORAGE_KEY = 'flow_prefill_circuit_design';
 
 // 动态导入电路组件，避免循环依赖
 const CircuitFlowWithProvider = React.lazy(() => 
@@ -539,13 +542,67 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
     return process === 'generating' || (!isGenerated && text && text.length > 0 && process !== 'completed');
   }, [selectedNode?.id, selectedNode?.type, nodeData, nodeFields.text, getLatestNodeData, forceRefresh, lastUpdatedAt]);
 
+  const ensureCircuitMetadata = useCallback((design?: CircuitDesign | null) => {
+    if (!design) return null;
+    const fallbackTitle = (nodeData && typeof (nodeData as any).title === 'string' ? (nodeData as any).title : '电路设计') || '电路设计';
+    const nowIso = new Date().toISOString();
+    return {
+      ...design,
+      metadata: {
+        title: design.metadata?.title || fallbackTitle,
+        description: design.metadata?.description || '',
+        createdAt: design.metadata?.createdAt || nowIso,
+        updatedAt: design.metadata?.updatedAt || nowIso
+      }
+    } as CircuitDesign;
+  }, [nodeData]);
+
+  const handleOpenCircuitPage = useCallback(() => {
+    const circuitDesign = circuitInfo?.circuitDesign as CircuitDesign | undefined;
+    const normalizedDesign = ensureCircuitMetadata(circuitDesign);
+    if (normalizedDesign) {
+      sessionStorage.setItem(
+        CIRCUIT_PREFILL_STORAGE_KEY,
+        JSON.stringify({
+          design: normalizedDesign,
+          ts: Date.now(),
+          convId
+        })
+      );
+    }
+    const targetPath = circuitDesign?.id ? `/circuit/edit/${circuitDesign.id}` : '/circuit';
+    if (convId) {
+      sessionStorage.setItem(
+        `circuit_return_info_${convId}`,
+        JSON.stringify({
+          designId: circuitDesign?.id,
+          path: targetPath,
+          from: 'flow',
+          ts: Date.now()
+        })
+      );
+    }
+    window.location.href = targetPath;
+  }, [circuitInfo?.circuitDesign, convId, ensureCircuitMetadata]);
+
   // 渲染电路内容
   const renderCircuitContent = useMemo(() => {
     if (!isCircuitNode || !circuitInfo?.circuitDesign) return null;
     
     return (
       <div className="border-t border-gray-100 pt-4">
-        <h4 className="text-sm font-medium text-gray-700 mb-3">电路图预览</h4>
+        <div className="flex items-center justify-between mb-3 gap-2">
+          <h4 className="text-sm font-medium text-gray-700">电路图预览</h4>
+          <div className="flex items-center gap-2">
+            <Button
+              size="small"
+              onClick={handleOpenCircuitPage}
+              type="primary"
+            >
+              在画布中打开
+            </Button>
+          </div>
+        </div>
         <div className="border rounded-lg overflow-hidden bg-gray-50" style={{ height: '300px' }}>
           <React.Suspense fallback={
             <div className="h-full flex items-center justify-center text-gray-500">
@@ -564,7 +621,7 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
         </div>
       </div>
     );
-  }, [isCircuitNode, circuitInfo?.circuitDesign, nodeData]);
+  }, [isCircuitNode, circuitInfo?.circuitDesign, nodeData, handleOpenCircuitPage]);
 
   const followUpInfo = useMemo(() => {
     const latestNode = selectedNode?.id && getLatestNodeData ? 
@@ -1134,6 +1191,7 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
           </div>
         </div>
       </div>
+
     </div>
   );
-} 
+}

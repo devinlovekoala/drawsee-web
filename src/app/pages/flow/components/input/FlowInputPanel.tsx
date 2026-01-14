@@ -6,6 +6,7 @@ import type { AiTaskType, CreateAiTaskDTO } from '@/api/types/flow.types.ts';
 import { TempQueryNodeTask } from "../../hooks/useTempQueryNode";
 import { useFlowContext } from "@/app/contexts/FlowContext";
 import { useAppContext } from "@/app/contexts/AppContext";
+import type { CircuitDesign } from '@/api/types/circuit.types';
 import '@/app/components/text-selection/TextSelectionToolbar.css';
 import { Node as FlowNode } from "@xyflow/react";
 import { DeepSeek, Doubao } from "./ModelIcons";
@@ -111,11 +112,20 @@ ref) {
     const nodeTitle = typeof nodeData?.title === 'string' ? nodeData.title.trim() : '';
     const rawSubtype = typeof nodeData?.subtype === 'string' ? nodeData.subtype : undefined;
     const displayTitle = nodeTitle || (rawText ? rawText.slice(0, 30) : '');
+    const circuitDesign = nodeData?.circuitDesign as CircuitDesign | undefined;
+    const isCircuitCanvas = nodeType === 'circuit-canvas' || rawSubtype === 'circuit-canvas';
 
     const isPdfPoint = nodeType === 'PDF_ANALYSIS_POINT' || nodeType === 'pdf-circuit-point' ||
       rawSubtype === 'PDF_ANALYSIS_POINT' || rawSubtype === 'pdf-circuit-point';
     const isPdfDetail = nodeType === 'PDF_ANALYSIS_DETAIL' || nodeType === 'pdf-circuit-detail' ||
       rawSubtype === 'PDF_ANALYSIS_DETAIL' || rawSubtype === 'pdf-circuit-detail';
+
+    if (isCircuitCanvas && circuitDesign) {
+      const elementCount = circuitDesign.elements?.length ?? 0;
+      const connectionCount = circuitDesign.connections?.length ?? 0;
+      const metaTitle = circuitDesign.metadata?.title || displayTitle || '当前电路图';
+      return `请基于以下电路设计回答追问：\n电路名称：${metaTitle}\n元件/连线：${elementCount} / ${connectionCount}\n问题：${basePrompt}`;
+    }
 
     if ((isPdfPoint || isPdfDetail) && rawText) {
       return `请基于以下PDF分析分点继续回答用户问题：\n分点标题：${displayTitle || '未命名分点'}\n分点内容：${rawText}\n\n用户追问：${basePrompt}`;
