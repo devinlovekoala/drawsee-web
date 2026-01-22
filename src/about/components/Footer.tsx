@@ -1,8 +1,9 @@
 import React from 'react';
 
 const Footer: React.FC = () => {
-  
   const currentYear = new Date().getFullYear();
+  const icpRecord = "ICP 备案号待补充";
+  const icpLink = "https://beian.miit.gov.cn/";
 
   return (
     <footer className="bg-gradient-to-b from-white to-blue-50 relative overflow-hidden">
@@ -107,6 +108,20 @@ const Footer: React.FC = () => {
           {/* 版权信息 */}
           <div className="mt-12 pt-8 border-t border-blue-100 text-center text-gray-500 text-sm">
             <p>© {currentYear} DrawSee。保留所有权利。</p>
+            <div className="mt-4 flex flex-col items-center gap-3 text-xs text-gray-500">
+              <a
+                href={icpLink}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-white/80 px-4 py-1.5 text-gray-600 shadow-sm shadow-blue-100/40 backdrop-blur transition hover:border-blue-200 hover:text-blue-600"
+              >
+                <span className="h-1.5 w-1.5 rounded-full bg-blue-500"></span>
+                {icpRecord}
+              </a>
+              <p className="text-gray-400">
+                工信部备案信息以官方网站查询为准
+              </p>
+            </div>
           </div>
         </div>
       </div>
