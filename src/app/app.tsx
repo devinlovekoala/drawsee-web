@@ -20,6 +20,7 @@ import HtmlPreviewModal from "./pages/flow/components/markdown/HtmlPreviewModal"
 import Dialog from "@/common/components/ui/dialog";
 import TextSelectionToolbar from "./components/text-selection/TextSelectionToolbar";
 import { LoginVO } from "@/api/types/auth.types";
+import About from "@/about/about";
 
 export interface UserInfo {
   username: string;
@@ -35,7 +36,11 @@ function App() {
   // 当前激活的会话ID
   const [activeConversationId, setActiveConversationId] = useState<number | null>(null);
   // 是否登录
-  const [isLogin, setIsLogin] = useState<boolean>(true);
+  const [isLogin, setIsLogin] = useState<boolean>(
+    sessionStorage.getItem(LOGIN_FLAG_KEY) === 'true'
+  );
+  const [showAuthModal, setShowAuthModal] = useState<boolean>(!isLogin);
+  const [hasDismissedAuthModal, setHasDismissedAuthModal] = useState<boolean>(false);
   // 节点宽度
   const [nodeWidth, setNodeWidth] = useState<number>(NODE_WIDTH);
   
@@ -114,8 +119,9 @@ function App() {
     if (!firstEnter) {
       localStorage.setItem(FIRST_ENTER_KEY, JSON.stringify(true));
       sessionStorage.removeItem(LOGIN_FLAG_KEY);
-      navigate('/about');
-      return;
+      setIsLogin(false);
+      setShowAuthModal(true);
+      setHasDismissedAuthModal(false);
     }
 
     // 如果已经登录，就不需要处理其他逻辑了
@@ -132,6 +138,8 @@ function App() {
     const locationState = location.state as any;
     if (locationState?.requireLogin) {
       setIsLogin(false);
+      setShowAuthModal(true);
+      setHasDismissedAuthModal(false);
       return;
     }
 
@@ -141,9 +149,8 @@ function App() {
     // 如果用户已经主动登出，则不执行自动登录，而是显示登录界面
     if (hasLoggedOut) {
       setIsLogin(false);
-      // 如果当前不在about页面，则重定向到about页面
-      if (location.pathname !== '/about') {
-        navigate('/about');
+      if (!hasDismissedAuthModal) {
+        setShowAuthModal(true);
       }
       return;
     }
@@ -156,6 +163,8 @@ function App() {
         // 清除登出标志
         localStorage.removeItem('Auth:LoggedOut');
         setIsLogin(true);
+        setShowAuthModal(false);
+        setHasDismissedAuthModal(false);
         setUserInfo({
           username: data.username,
           aiTaskCount: data.aiTaskCount,
@@ -167,8 +176,11 @@ function App() {
       .catch(() => {
         toast.error("未登录，请先登录");
         setIsLogin(false);
+        if (!hasDismissedAuthModal) {
+          setShowAuthModal(true);
+        }
       });
-  }, [getConvData, navigate, location.pathname, location.state]);
+  }, [getConvData, navigate, location.pathname, location.state, hasDismissedAuthModal]);
 
   // 登录成功后的操作
   const handleLoginSuccess = useCallback((data: LoginVO) => {
@@ -177,6 +189,8 @@ function App() {
     
     // 立即更新登录状态，避免重复显示登录表单
     setIsLogin(true);
+    setShowAuthModal(false);
+    setHasDismissedAuthModal(false);
     
     if (data.token) {
       localStorage.setItem(TOKEN_KEY, data.token);
@@ -329,9 +343,9 @@ function App() {
     localStorage.setItem('Auth:LoggedOut', 'true');
     // 更新状态
     setIsLogin(false);
-    // 导航到欢迎页
-    navigate('/about');
-  }, [navigate]);
+    setShowAuthModal(true);
+    setHasDismissedAuthModal(false);
+  }, []);
 
   // HTML预览相关函数
   const openHtmlPreview = useCallback((htmlContent: string) => {
@@ -398,30 +412,46 @@ function App() {
     }}>
       {/* 登录模态框 */}
       {!isLogin && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm">
-          <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[420px] bg-white rounded-xl shadow-2xl p-6 animate-in fade-in-0 zoom-in-95">
-            <AuthForm onSuccess={handleLoginSuccess} />
-          </div>
-        </div>
+        <>
+          <About />
+          {showAuthModal && (
+            <div
+              className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm"
+              onClick={() => {
+                setShowAuthModal(false);
+                setHasDismissedAuthModal(true);
+              }}
+            >
+              <div
+                className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[420px] bg-white rounded-xl shadow-2xl p-6 animate-in fade-in-0 zoom-in-95"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <AuthForm onSuccess={handleLoginSuccess} />
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {/* 主页面 */}
-      <SidebarProvider>
-        {/* 侧边栏 */}
-        <AppSideBar
-          activeConversationId={activeConversationId}
-          setActiveConversationId={setActiveConversationId}
-        />
+      {isLogin && (
+        <SidebarProvider>
+          {/* 侧边栏 */}
+          <AppSideBar
+            activeConversationId={activeConversationId}
+            setActiveConversationId={setActiveConversationId}
+          />
 
-        {/* 主内容区 */}
-        <SidebarInset className="max-h-screen overflow-y-auto scrollbar-hide">
-          <div className="flex flex-1 flex-col gap-4 p-2 select-none items-center justify-center">
-            <div className="" style={{ width: "100%", height: "100%" }}>
-              <Outlet/>
+          {/* 主内容区 */}
+          <SidebarInset className="max-h-screen overflow-y-auto scrollbar-hide">
+            <div className="flex flex-1 flex-col gap-4 p-2 select-none items-center justify-center">
+              <div className="" style={{ width: "100%", height: "100%" }}>
+                <Outlet/>
+              </div>
             </div>
-          </div>
-        </SidebarInset>
-      </SidebarProvider>
+          </SidebarInset>
+        </SidebarProvider>
+      )}
 
       {/* 文本选择工具栏 */}
       <TextSelectionToolbar target=".markdown-container" />
