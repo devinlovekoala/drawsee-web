@@ -14,8 +14,6 @@ function useFlowTools() {
 
 	const { fitView, getViewport, setViewport } = useReactFlow();
   
-  // 性能优化：防抖机制，避免频繁调用布局
-  const layoutTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastLayoutCallRef = useRef<number>(0);
 
 	/**
@@ -66,31 +64,8 @@ function useFlowTools() {
   }, [getViewport, setViewport]);
 
   const executeLayout = useCallback((nodes: Node[], edges: Edge[], updateServer: boolean = false, resetHeight: boolean = false) => {
-    // 性能优化：防抖机制，避免在短时间内频繁调用布局
-    const now = Date.now();
-    const timeSinceLastCall = now - lastLayoutCallRef.current;
-    
-    // 如果距离上次调用时间太短（小于100ms），延迟执行
-    if (timeSinceLastCall < 100 && !updateServer) {
-      if (layoutTimeoutRef.current) {
-        clearTimeout(layoutTimeoutRef.current);
-      }
-      
-      // 延迟执行布局
-      layoutTimeoutRef.current = setTimeout(() => {
-        lastLayoutCallRef.current = Date.now();
-        const { nodes: layoutedNodes } = entitreeFlexLayout(nodes, edges, updateServer, resetHeight);
-        return layoutedNodes;
-      }, 50);
-      
-      // 返回原节点，避免空返回
-      return nodes;
-    }
-    
-    // 立即执行布局
-    lastLayoutCallRef.current = now;
-    
-    // 执行布局计算
+    // 立即执行布局，确保新增节点位置不会落在默认坐标
+    lastLayoutCallRef.current = Date.now();
     const { nodes: layoutedNodes } = entitreeFlexLayout(nodes, edges, updateServer, resetHeight);
     
     return layoutedNodes;
