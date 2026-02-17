@@ -2,7 +2,7 @@ import React from 'react';
 
 const Footer: React.FC = () => {
   const currentYear = new Date().getFullYear();
-  const icpRecord = "ICP 备案号待补充";
+  const icpRecord = "京ICP备2025117098号-1";
   const icpLink = "https://beian.miit.gov.cn/";
 
   return (
@@ -107,7 +107,7 @@ const Footer: React.FC = () => {
           
           {/* 版权信息 */}
           <div className="mt-12 pt-8 border-t border-blue-100 text-center text-gray-500 text-sm">
-            <p>© {currentYear} DrawSee。保留所有权利。</p>
+            <p>© {currentYear} DrawSee 保留所有权利</p>
             <div className="mt-4 flex flex-col items-center gap-3 text-xs text-gray-500">
               <a
                 href={icpLink}
