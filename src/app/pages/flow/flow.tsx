@@ -37,6 +37,7 @@ import ResourceNode from "./components/node/resource/ResourceNode";
 import FlowLeftToolBar from "./components/FlowLeftToolBar";
 import { FLOW_RETURN_INFO_KEY, TASK_KEY_PREFIX } from "@/common/constant/storage-key.constant";
 import { useViewportChange } from "./hooks/useViewportChange";
+import { useAppContext } from "@/app/contexts/AppContext";
 
 type CircuitReturnInfo = {
   designId?: string;
@@ -117,6 +118,7 @@ function normalizeNodeType(apiType: string | undefined | null): string {
 
 function Flow() {
   const navigate = useNavigate();
+  const { openDeleteNodeDialog, deleteDialogState } = useAppContext();
   const [isLoading, setIsLoading] = useState<boolean>(true);
   // 当前选中的节点
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
@@ -190,6 +192,19 @@ function Flow() {
     }
     flowInputRef.current?.applySuggestion(suggestion.trim());
   }, []);
+
+  const canDeleteSelectedNode = useMemo(() => {
+    if (!selectedNode) return false;
+    if (selectedNode.id === rootNodeId) return false;
+    const selectedId = String(selectedNode.id);
+    const hasChildNode = elements.nodes.some((node) => {
+      if (!node?.data) return false;
+      const parentId = node.data.parentId;
+      if (parentId === undefined || parentId === null) return false;
+      return String(parentId) === selectedId;
+    });
+    return !hasChildNode;
+  }, [elements.nodes, rootNodeId, selectedNode]);
   
   // 处理返回班级列表
   const handleBackToCourses = useCallback(() => {
@@ -217,6 +232,11 @@ function Flow() {
     }
     navigate(targetPath, { state: { convId, fromFlow: true } });
   }, [circuitReturnInfo, navigate, convId]);
+
+  const handleDeleteSelectedNode = useCallback(() => {
+    if (!selectedNode || !canDeleteSelectedNode || deleteDialogState.isOpen) return;
+    openDeleteNodeDialog(selectedNode.id);
+  }, [selectedNode, canDeleteSelectedNode, deleteDialogState.isOpen, openDeleteNodeDialog]);
   
   // 使用临时查询节点Hook
   const {
@@ -812,6 +832,25 @@ function Flow() {
     console.error('reactflow onError', code, message);
   }, []);
 
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (!canDeleteSelectedNode || !selectedNode) return;
+      if (deleteDialogState.isOpen) return;
+      const target = event.target as HTMLElement | null;
+      const tagName = target?.tagName?.toLowerCase();
+      const isEditable = target?.isContentEditable;
+      if (tagName === 'input' || tagName === 'textarea' || isEditable) {
+        return;
+      }
+      if (event.key === 'Delete' || event.key === 'Backspace') {
+        event.preventDefault();
+        openDeleteNodeDialog(selectedNode.id);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [canDeleteSelectedNode, selectedNode, deleteDialogState.isOpen, openDeleteNodeDialog]);
+
   // 初始化
   const onInit = useCallback(() => {
     if (elements.nodes.length === 0) return;
@@ -976,10 +1015,12 @@ function Flow() {
             <Panel position={"top-right"}>
                 <FlowRightToolBar
                   onRelayout={() => handleRelayout(false)}
-                showDetailPanel={showDetailPanel}
-                onToggleDetailPanel={toggleDetailPanel}
-                canReturnToCircuit={Boolean(circuitReturnInfo)}
-                onReturnToCircuit={handleReturnToCircuit}
+                  showDetailPanel={showDetailPanel}
+                  onToggleDetailPanel={toggleDetailPanel}
+                  canDeleteSelected={canDeleteSelectedNode}
+                  onDeleteSelected={handleDeleteSelectedNode}
+                  canReturnToCircuit={Boolean(circuitReturnInfo)}
+                  onReturnToCircuit={handleReturnToCircuit}
               />
             </Panel>
             {/* 顶部左侧工具栏 */}

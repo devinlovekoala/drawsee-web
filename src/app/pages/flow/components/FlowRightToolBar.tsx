@@ -1,4 +1,4 @@
-import { RefreshCcw, PanelRight, PanelRightClose, ZoomIn, ZoomOut, Eye, ArrowLeft } from 'lucide-react';
+import { RefreshCcw, PanelRight, PanelRightClose, ZoomIn, ZoomOut, Eye, ArrowLeft, Trash2 } from 'lucide-react';
 import { useReactFlow } from '@xyflow/react';
 import { useAdaptiveZoom } from '../hooks/useAdaptiveZoom';
 
@@ -6,6 +6,8 @@ interface FlowToolBarProps {
   onRelayout: () => void;
   showDetailPanel: boolean;
   onToggleDetailPanel: () => void;
+  canDeleteSelected?: boolean;
+  onDeleteSelected?: () => void;
   canReturnToCircuit?: boolean;
   onReturnToCircuit?: () => void;
 }
@@ -14,6 +16,8 @@ function FlowRightToolBar({
   onRelayout, 
   showDetailPanel,
   onToggleDetailPanel,
+  canDeleteSelected = false,
+  onDeleteSelected,
   canReturnToCircuit = false,
   onReturnToCircuit
 }: FlowToolBarProps) {
@@ -79,6 +83,18 @@ function FlowRightToolBar({
         <RefreshCcw className="mr-2" size={16} />
         重新布局
       </button>
+
+      {/* 删除选中节点 */}
+      {canDeleteSelected && onDeleteSelected && (
+        <button
+          onClick={onDeleteSelected}
+          className="flex items-center text-red-700 bg-white hover:bg-red-50 active:bg-red-100 transition duration-200 rounded-lg px-2 py-1 shadow-[0_0_0_1px_rgba(239,68,68,0.4)] transform hover:scale-105 h-8"
+          title="删除选中节点"
+        >
+          <Trash2 className="mr-2" size={16} />
+          删除节点
+        </button>
+      )}
 
       {/* 详情面板切换按钮 */}
       <button
