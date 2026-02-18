@@ -18,7 +18,6 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useCallback, useEffect, useState } from "react";
 import { useAppContext } from "@/app/contexts/AppContext";
 import { FlowLocationState } from "@/app/contexts/FlowContext";
-import { LOGIN_FLAG_KEY } from "@/common/constant/storage-key.constant";
 import { AgentMenu } from "./agent-menu/AgentMenu";
 
 // 定义一个导航事件类型
@@ -148,7 +147,6 @@ function AppSideBar({activeConversationId, setActiveConversationId, className}: 
 					<div className="cursor-pointer relative m-3 mb-3 hidden transition-all md:flex justify-start items-center shrink-0"
 						onClick={() => {
 							setActiveConversationId(null);
-							sessionStorage.removeItem(LOGIN_FLAG_KEY);
 							handleCustomNavigation('/about');
 						}}
 					>

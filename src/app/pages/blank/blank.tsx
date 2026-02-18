@@ -10,7 +10,6 @@ import { getSolverWays } from '@/api/methods/tool.methods';
 import { ModelSelector } from "./components/ModelSelector";
 import { ModelType } from "../flow/components/input/FlowInputPanel";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Switch } from "@/app/components/ui/switch";
 import MathKeyboard from "@/app/components/ui/math-keyboard";
 import LaTeXRenderer from "@/app/components/ui/latex-renderer";
 
