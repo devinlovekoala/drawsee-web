@@ -23,7 +23,8 @@ function AnswerPointNode({ data, ...props }: ExtendedNodeProps<'answer-point' | 
   const classId = location.state?.classId as string || null;
   
   const [isGenerated, setIsGenerated] = useState(data.isGenerated || false);
-  const [selectedModel, setSelectedModel] = useState<ModelType>('deepseekV3'); // 默认使用DeepSeek模型
+  const initialModel = (data as { mode?: ModelType })?.mode;
+  const [selectedModel, setSelectedModel] = useState<ModelType>(initialModel || 'deepseekV3'); // 默认使用DeepSeek模型
   const [isLoading, setIsLoading] = useState(false); // 添加加载状态
   const [isEditing, setIsEditing] = useState(false); // 添加编辑状态
   const [editedText, setEditedText] = useState(data.text || ''); // 编辑内容
@@ -55,7 +56,20 @@ function AnswerPointNode({ data, ...props }: ExtendedNodeProps<'answer-point' | 
   // 处理模型变更
   const handleModelChange = useCallback((model: ModelType) => {
     setSelectedModel(model);
-  }, []);
+    addChatTask({
+      type: 'data',
+      data: {
+        nodeId: parseInt(props.id),
+        mode: model
+      }
+    });
+  }, [addChatTask, props.id]);
+
+  useEffect(() => {
+    if (data.mode && data.mode !== selectedModel) {
+      setSelectedModel(data.mode as ModelType);
+    }
+  }, [data.mode, selectedModel]);
   
   // 当进入编辑模式时，自动聚焦文本区域并调整其高度
   useEffect(() => {

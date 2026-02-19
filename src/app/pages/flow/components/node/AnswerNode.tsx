@@ -1,7 +1,7 @@
 import { toast } from 'sonner';
 import { BaseNode, ExtendedNodeProps } from './base/BaseNode';
 import { useFlowContext } from '@/app/contexts/FlowContext';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState, useEffect } from 'react';
 import { AiTaskType, CreateAiTaskDTO } from '@/api/types/flow.types';
 import { createAiTask } from '@/api/methods/flow.methods';
 import { useAppContext } from '@/app/contexts/AppContext';
@@ -25,7 +25,8 @@ function AnswerNode({ data, ...props }: ExtendedNodeProps<'answer'>) {
   const {handleAiTaskCountPlus} = useAppContext();
   const { subtype, isDone } = data;
   const [isGenerated, setIsGenerated] = useState(data.isGenerated || false);
-  const [selectedModel, setSelectedModel] = useState<ModelType>('deepseekV3'); // 默认使用DeepSeekV3模型
+  const initialModel = (data as { mode?: ModelType })?.mode;
+  const [selectedModel, setSelectedModel] = useState<ModelType>(initialModel || 'deepseekV3'); // 默认使用DeepSeekV3模型
   const location = useLocation();
   const classId = location.state?.classId as string || null;
 
@@ -84,7 +85,20 @@ function AnswerNode({ data, ...props }: ExtendedNodeProps<'answer'>) {
   // 处理模型变更
   const handleModelChange = useCallback((model: ModelType) => {
     setSelectedModel(model);
-  }, []);
+    addChatTask({
+      type: 'data',
+      data: {
+        nodeId: parseInt(props.id),
+        mode: model
+      }
+    });
+  }, [addChatTask, props.id]);
+
+  useEffect(() => {
+    if (data.mode && data.mode !== selectedModel) {
+      setSelectedModel(data.mode as ModelType);
+    }
+  }, [data.mode, selectedModel]);
 
   // 模型选择器组件 - 使用紧凑样式
   const modelSelectorElement = useMemo(() => (

@@ -9,6 +9,7 @@ import { useAppContext } from '@/app/contexts/AppContext';
 import CopyButton from '../../button/CopyButton';
 import DownloadImgButton from '../../button/DownloadImgButton';
 import { Trash2 } from 'lucide-react';
+import { useFlowContext } from '@/app/contexts/FlowContext';
 
 // 缩放阈值常量 - 调整为更高的阈值，让更多情况下显示大标题
 const ZOOM_THRESHOLD = 0.55; // 从0.40提高到0.55，让更多缩放级别下显示醒目标题
@@ -148,6 +149,7 @@ export const BaseNode = React.memo(function BaseNode<T extends NodeType>({
   };
   const { getViewport } = useReactFlow();
   const { nodeWidth, openDeleteNodeDialog } = useAppContext();
+  const { isChatting } = useFlowContext();
   const nodeRef = useRef<HTMLDivElement>(null);
 
   // 获取节点类型的视觉样式
@@ -401,7 +403,7 @@ export const BaseNode = React.memo(function BaseNode<T extends NodeType>({
               <CopyButton getText={() => nodeData.text || ''} size={20} className="bg-gray-50" />
             }
             {
-              selected && canBeDeleted &&
+              selected && canBeDeleted && !isChatting &&
               <button
                 className="p-2 bg-red-50 rounded-lg text-red-600 hover:bg-red-100 active:bg-red-200 transition-colors duration-200"
                 title="删除节点"

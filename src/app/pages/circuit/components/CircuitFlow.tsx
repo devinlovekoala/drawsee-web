@@ -1334,6 +1334,11 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
   const [digitalSimModalVisible, setDigitalSimModalVisible] = useState(false);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [currentModel, setCurrentModel] = useState<FlowModelType>(selectedModel as FlowModelType);
+  useEffect(() => {
+    if (selectedModel && selectedModel !== currentModel) {
+      setCurrentModel(selectedModel as FlowModelType);
+    }
+  }, [selectedModel, currentModel]);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
   const hasSelectedEdge = !!selectedEdgeId;
   const [showElementLibrary, setShowElementLibrary] = useState<boolean>(true);

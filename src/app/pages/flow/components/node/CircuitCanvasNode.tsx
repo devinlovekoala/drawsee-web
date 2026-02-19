@@ -41,7 +41,7 @@ function CircuitCanvasNode({ data, ...props }: ExtendedNodeProps<'circuit-canvas
       return (
         <div className="circuit-canvas-container" style={{ width: '100%', height: '300px' }}>
           <CircuitFlowWithProvider 
-            selectedModel={nodeData.mode === 'doubao' ? 'doubao' : 'deepseekV3'}
+            selectedModel={nodeData.mode === 'qwen' ? 'qwen' : 'deepseekV3'}
             initialCircuitDesign={circuitDesign}
             isReadOnly={true}
           />

@@ -9,7 +9,7 @@ import { useAppContext } from "@/app/contexts/AppContext";
 import type { CircuitDesign } from '@/api/types/circuit.types';
 import '@/app/components/text-selection/TextSelectionToolbar.css';
 import { Node as FlowNode } from "@xyflow/react";
-import { DeepSeek, Doubao } from "./ModelIcons";
+import { DeepSeek, Qwen } from "./ModelIcons";
 import { DropdownOption, SelectDropdown } from "./SelectDropdown";
 import { useLocation } from 'react-router-dom';
 
@@ -23,7 +23,7 @@ interface FlowInputPanelProps {
   selectedNode: FlowNode | null;
 }
 
-export type ModelType = 'deepseekV3' | 'doubao';
+export type ModelType = 'deepseekV3' | 'qwen';
 
 export interface FlowInputPanelHandle {
   applySuggestion: (text: string) => void;
@@ -44,10 +44,10 @@ ref) {
   // 新增模型选项
   const modelOptions = useMemo<DropdownOption[]>(() => [
     {
-      name: '豆包',
-      description: '豆包大语言模型',
-      icon: Doubao.Color,
-      type: 'doubao' satisfies ModelType
+      name: 'Qwen',
+      description: 'Qwen 大语言模型',
+      icon: Qwen.Color,
+      type: 'qwen' satisfies ModelType
     },
     {
       name: 'DeepSeekV3',

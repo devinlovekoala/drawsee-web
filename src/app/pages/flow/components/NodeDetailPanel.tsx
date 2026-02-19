@@ -100,6 +100,8 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
   const [forceRefresh, setForceRefresh] = useState(0); // 添加强制刷新状态
   const [lastUpdatedAt, setLastUpdatedAt] = useState<number>(0); // 跟踪上次更新时间
   const scrollRef = useRef<HTMLDivElement>(null); // 用于自动滚动
+  const [autoScrollEnabled, setAutoScrollEnabled] = useState(true);
+  const autoScrollThreshold = 80;
   const { handleAiTaskCountPlus } = useAppContext();
   const { convId, chat } = useFlowContext();
   const [pdfDetailLoading, setPdfDetailLoading] = useState(false);
@@ -253,7 +255,7 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
           setNodeContentKey(prev => prev + 1);
           
           // 自动滚动到底部
-          if (scrollRef.current) {
+          if (scrollRef.current && autoScrollEnabled) {
             scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
           }
         }
@@ -267,7 +269,7 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
         }
       };
     }
-  }, [selectedNode?.id, nodeData?.process]); // 只监听关键状态
+  }, [selectedNode?.id, nodeData?.process, autoScrollEnabled]); // 只监听关键状态
 
   // 专门监听selectedNode的文本变化，确保最实时的更新
   useEffect(() => {
@@ -284,14 +286,14 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
           
           // 自动滚动到底部
           setTimeout(() => {
-            if (scrollRef.current) {
+            if (scrollRef.current && autoScrollEnabled) {
               scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
             }
           }, 10);
         }
       }
     }
-  }, [selectedNode?.data?.text, selectedNode?.id, getLatestNodeData, lastTextContent]);
+  }, [selectedNode?.data?.text, selectedNode?.id, getLatestNodeData, lastTextContent, autoScrollEnabled]);
 
   // 当选中的节点改变时，重置文本内容跟踪
   useEffect(() => {
@@ -299,10 +301,26 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
       const currentText = getStringField(selectedNode.data, 'text') || '';
       setLastTextContent(currentText);
       setNodeContentKey(prev => prev + 1);
+      setAutoScrollEnabled(true);
     } else {
       setLastTextContent('');
+      setAutoScrollEnabled(true);
     }
   }, [selectedNode?.id]);
+
+  const handleScroll = useCallback(() => {
+    if (!scrollRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
+    const nearBottom = scrollHeight - scrollTop - clientHeight <= autoScrollThreshold;
+    setAutoScrollEnabled(nearBottom);
+  }, [autoScrollThreshold]);
+
+  const resolveSelectedModel = useCallback(() => {
+    const latestNode = selectedNode?.id && getLatestNodeData ? getLatestNodeData(selectedNode.id) : selectedNode;
+    const currentNodeData = latestNode?.data as NodeData<NodeType> | undefined;
+    const mode = getStringField(currentNodeData, 'mode');
+    return (mode && typeof mode === 'string') ? mode : 'deepseekV3';
+  }, [selectedNode, getLatestNodeData]);
 
   // 格式化时间
   const formattedDate = useMemo(() => {
@@ -417,8 +435,9 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
     if (!mode) return null;
     
     const modeMap: Record<string, string> = {
-      'deepseekV3': 'DeepSeek V3',
-      'doubao': '豆包',
+      deepseekV3: 'DeepSeek V3',
+      qwen: 'Qwen',
+      qwenVision: 'Qwen Vision',
     };
     
     return modeMap[mode] || mode;
@@ -613,7 +632,7 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
             </div>
           }>
             <CircuitFlowWithProvider 
-              selectedModel={getStringField(nodeData, 'mode') === 'doubao' ? 'doubao' : 'deepseekV3'}
+              selectedModel={getStringField(nodeData, 'mode') === 'qwen' ? 'qwen' : 'deepseekV3'}
               initialCircuitDesign={circuitInfo.circuitDesign}
               isReadOnly={true}
             />
@@ -678,7 +697,7 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
         promptParams: {},
         convId: typeof convId === 'number' ? convId : null,
         parentId: parentNodeId,
-        model: 'deepseekV3',
+        model: resolveSelectedModel(),
         classId: null
       };
       const response = await createAiTask(dto);
@@ -700,7 +719,7 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
     } finally {
       setPdfDetailLoading(false);
     }
-  }, [selectedNode, text, convId, handleAiTaskCountPlus, pdfDetailLoading, chat]);
+  }, [selectedNode, text, convId, handleAiTaskCountPlus, pdfDetailLoading, chat, resolveSelectedModel]);
 
   // 早期返回：当没有选中节点时
   if (!selectedNode || !nodeData) {
@@ -773,7 +792,7 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
       </div>
 
       {/* 内容区域 */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-4 space-y-4">
         {/* 基本信息 */}
         <div className="space-y-3">
           {/* 节点标题 */}

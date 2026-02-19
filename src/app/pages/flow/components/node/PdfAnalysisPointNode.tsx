@@ -17,12 +17,13 @@ import { ModelType } from '../input/FlowInputPanel';
 export default function PdfAnalysisPointNode(props: ExtendedNodeProps<'PDF_ANALYSIS_POINT'> | ExtendedNodeProps<'pdf-circuit-point'>) {
   const { data, id } = props;
   const [loading, setLoading] = useState(false);
-  const [selectedModel, setSelectedModel] = useState<ModelType>('deepseekV3');
+  const initialModel = (data as { mode?: ModelType })?.mode;
+  const [selectedModel, setSelectedModel] = useState<ModelType>(initialModel || 'deepseekV3');
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(data.text || '');
   
   const { handleAiTaskCountPlus } = useAppContext();
-  const { convId } = useFlowContext();
+  const { convId, addChatTask } = useFlowContext();
   
   // 检查是否已生成详情
   const isGenerated = (data as any).isGenerated || false;
@@ -36,7 +37,20 @@ export default function PdfAnalysisPointNode(props: ExtendedNodeProps<'PDF_ANALY
   // 模型选择处理
   const handleModelChange = (model: ModelType) => {
     setSelectedModel(model);
+    addChatTask({
+      type: 'data',
+      data: {
+        nodeId: Number(id),
+        mode: model
+      }
+    });
   };
+
+  useEffect(() => {
+    if (data.mode && data.mode !== selectedModel) {
+      setSelectedModel(data.mode as ModelType);
+    }
+  }, [data.mode, selectedModel]);
 
   // 处理PDF分析详情任务
   const handlePdfAnalysisDetailChat = async () => {

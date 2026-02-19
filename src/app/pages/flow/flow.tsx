@@ -195,6 +195,7 @@ function Flow() {
 
   const canDeleteSelectedNode = useMemo(() => {
     if (!selectedNode) return false;
+    if (isChatting || isLoading) return false;
     if (selectedNode.id === rootNodeId) return false;
     const selectedId = String(selectedNode.id);
     const hasChildNode = elements.nodes.some((node) => {
@@ -204,7 +205,7 @@ function Flow() {
       return String(parentId) === selectedId;
     });
     return !hasChildNode;
-  }, [elements.nodes, rootNodeId, selectedNode]);
+  }, [elements.nodes, rootNodeId, selectedNode, isChatting, isLoading]);
   
   // 处理返回班级列表
   const handleBackToCourses = useCallback(() => {
@@ -234,9 +235,9 @@ function Flow() {
   }, [circuitReturnInfo, navigate, convId]);
 
   const handleDeleteSelectedNode = useCallback(() => {
-    if (!selectedNode || !canDeleteSelectedNode || deleteDialogState.isOpen) return;
+    if (!selectedNode || !canDeleteSelectedNode || deleteDialogState.isOpen || isChatting || isLoading) return;
     openDeleteNodeDialog(selectedNode.id);
-  }, [selectedNode, canDeleteSelectedNode, deleteDialogState.isOpen, openDeleteNodeDialog]);
+  }, [selectedNode, canDeleteSelectedNode, deleteDialogState.isOpen, openDeleteNodeDialog, isChatting, isLoading]);
   
   // 使用临时查询节点Hook
   const {

@@ -4,7 +4,7 @@ import {
   ChevronDownIcon,
 } from '@heroicons/react/24/outline';
 import { ModelType } from '../../flow/components/input/FlowInputPanel';
-import { DeepSeek, Doubao } from '@lobehub/icons';
+import { DeepSeek, Qwen } from '@lobehub/icons';
 
 interface ModelSelectorProps {
   selectedModel: ModelType;
@@ -20,10 +20,10 @@ const modelOptions = [
     type: 'deepseekV3' satisfies ModelType
   },
   {
-    name: '豆包',
-    description: '豆包-1.5-pro-32k大语言模型',
-    icon: Doubao.Color,
-    type: 'doubao' satisfies ModelType
+    name: 'Qwen',
+    description: 'Qwen 大语言模型',
+    icon: Qwen.Color,
+    type: 'qwen' satisfies ModelType
   }
 ];
 

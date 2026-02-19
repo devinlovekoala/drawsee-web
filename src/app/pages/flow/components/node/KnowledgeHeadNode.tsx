@@ -3,7 +3,7 @@ import { useFlowContext } from '@/app/contexts/FlowContext';
 import { CreateAiTaskDTO } from '@/api/types/flow.types';
 import { toast } from 'sonner';
 import { createAiTask } from '@/api/methods/flow.methods';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useAppContext } from '@/app/contexts/AppContext';
 import { ModelType } from '../input/FlowInputPanel';
 import { ModelSelector } from '../../../blank/components/ModelSelector';
@@ -18,12 +18,26 @@ function KnowledgeHeadNode({ showSourceHandle, showTargetHandle, data, ...props 
   const classId = location.state?.classId as string || null;
 
   const [isGenerated, setIsGenerated] = useState(data.isGenerated || false);
-  const [selectedModel, setSelectedModel] = useState<ModelType>('deepseekV3'); // 默认使用DeepSeekV3模型
+  const initialModel = (data as { mode?: ModelType })?.mode;
+  const [selectedModel, setSelectedModel] = useState<ModelType>(initialModel || 'deepseekV3'); // 默认使用DeepSeekV3模型
 
   // 处理模型变更
   const handleModelChange = useCallback((model: ModelType) => {
     setSelectedModel(model);
-  }, []);
+    addChatTask({
+      type: 'data',
+      data: {
+        nodeId: parseInt(props.id),
+        mode: model
+      }
+    });
+  }, [addChatTask, props.id]);
+
+  useEffect(() => {
+    if (data.mode && data.mode !== selectedModel) {
+      setSelectedModel(data.mode as ModelType);
+    }
+  }, [data.mode, selectedModel]);
 
   const handleKnowledgeDetailChat = () => {
     if (isChatting) {
