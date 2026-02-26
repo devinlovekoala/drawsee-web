@@ -8,6 +8,34 @@ export interface ConversationVO {
   updatedAt: number;
 }
 
+export interface ConversationShareVO {
+  id: number;
+  convId: number;
+  userId: number;
+  classId: number | null;
+  shareToken: string;
+  sharePath: string;
+  allowContinue: boolean;
+  viewCount: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface ShareConversationVO {
+  conversation: ConversationVO;
+  nodes: NodeVO[];
+  share: ConversationShareVO;
+}
+
+export interface ConversationForkVO {
+  conversation: ConversationVO;
+}
+
+export interface CreateConversationShareDTO {
+  classId?: number | null;
+  allowContinue?: boolean;
+}
+
 interface BaseNodeData {
   title: string;
   text: string;

@@ -37,6 +37,10 @@ const router = createBrowserRouter([
         element: <Flow />
       },
       {
+        path: '/share/:shareToken',
+        element: <Flow />
+      },
+      {
         path: '/course',
         element: <Course />
       },

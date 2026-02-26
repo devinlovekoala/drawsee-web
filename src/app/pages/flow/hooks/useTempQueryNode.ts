@@ -41,7 +41,7 @@ function debounce<F extends (...args: Parameters<F>) => ReturnType<F>>(func: F, 
 }
 
 function useTempQueryNode(
-	convId: number,
+	convId: number | null,
 	isChatting: boolean,
 	selectedNode: Node | null,
 	rootNodeId: string | null,
@@ -65,6 +65,10 @@ function useTempQueryNode(
   const [canNotInputReason, setCanNotInputReason] = useState<string | null>(null);
   // 判断当前是否可以输入（根据选中节点类型和SSE处理状态）
   const canInput = useMemo(() => {
+    if (!convId) {
+      setCanNotInputReason('登录后可追问');
+      return false;
+    }
     // 如果正在处理SSE消息，禁止输入
     if (isChatting) {
       setCanNotInputReason('正在chatting，无法追问');
@@ -190,6 +194,11 @@ function useTempQueryNode(
     convIdValue,
     executeLayoutFn
   ) => {
+    if (!convIdValue) {
+      latestNodesAndEdgesWithTempQueryNode.current = elementsValue;
+      setUpdateCounter(prev => prev + 1);
+      return;
+    }
     if (!parentId || !canInputValue) {
       latestNodesAndEdgesWithTempQueryNode.current = elementsValue;
       setUpdateCounter(prev => prev + 1); // 触发重新渲染

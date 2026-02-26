@@ -5,12 +5,12 @@ import {
   SidebarProvider,
 } from "@/app/components/ui/sidebar.tsx";
 import {useCallback, useEffect, useState} from "react";
-import {FIRST_ENTER_KEY, LOGIN_FLAG_KEY, TOKEN_KEY} from "@/common/constant/storage-key.constant.ts";
+import {FIRST_ENTER_KEY, LOGIN_FLAG_KEY, TOKEN_KEY, SHARE_CONTINUE_TOKEN_KEY} from "@/common/constant/storage-key.constant.ts";
 import {checkLogin} from "@/api/methods/auth.methods.ts";
 import {toast} from "sonner";
 import {ConversationVO, CreateAiTaskVO} from "@/api/types/flow.types.ts";
 import {useRequest} from "alova/client";
-import {getConversations, deleteNode, deleteConversation} from "@/api/methods/flow.methods.ts";
+import {getConversations, deleteNode, deleteConversation, forkSharedConversation} from "@/api/methods/flow.methods.ts";
 import AuthForm from "@/app/components/form/auth-form.tsx";
 import { FlowLocationState } from "@/app/contexts/FlowContext";
 import AppSideBar from "./components/AppSideBar";
@@ -65,6 +65,7 @@ function App() {
   });
 
   const location = useLocation();
+  const isShareRoute = location.pathname.startsWith('/share/');
   
   // 数据获取接口，初始化时不会自动发送请求，需要手动调用send()方法，force: true表示不使用缓存
   const {send} = useRequest(getConversations(), {immediate: false, force: true});
@@ -78,6 +79,21 @@ function App() {
       toast.error(`获取会话数据失败，${error.message}`);
     });
   }, [send]);
+
+  const handleShareContinue = useCallback(async () => {
+    if (!isLogin) return;
+    const shareToken = sessionStorage.getItem(SHARE_CONTINUE_TOKEN_KEY);
+    if (!shareToken) return;
+    sessionStorage.removeItem(SHARE_CONTINUE_TOKEN_KEY);
+    try {
+      const data = await forkSharedConversation(shareToken);
+      getConvData();
+      navigate('/flow', { state: { convId: data.conversation.id } as FlowLocationState });
+    } catch (error: any) {
+      console.error('继续分享会话失败:', error);
+      toast.error('继续分享会话失败，请稍后重试');
+    }
+  }, [getConvData, isLogin, navigate]);
 
   // 页面刷新或前进后退时，重新获取conversation数据和用户信息
   useEffect(() => {
@@ -112,6 +128,10 @@ function App() {
       window.removeEventListener('popstate', handlePopState);
     };
   }, [getConvData, location.pathname]);
+
+  useEffect(() => {
+    handleShareContinue();
+  }, [handleShareContinue]);
 
   useEffect(() => {
     // 如果是第一次进入本网页，那么跳转到about页面
@@ -411,7 +431,7 @@ function App() {
       handleAiTaskCountPlus
     }}>
       {/* 登录模态框 */}
-      {!isLogin && (
+      {!isLogin && !isShareRoute && (
         <>
           <About />
           {showAuthModal && (
@@ -434,13 +454,21 @@ function App() {
       )}
 
       {/* 主页面 */}
-      {isLogin && (
+      {(isLogin || isShareRoute) && (
         <SidebarProvider>
           {/* 侧边栏 */}
-          <AppSideBar
-            activeConversationId={activeConversationId}
-            setActiveConversationId={setActiveConversationId}
-          />
+          <div className="relative">
+            <AppSideBar
+              activeConversationId={activeConversationId}
+              setActiveConversationId={setActiveConversationId}
+              className={!isLogin && isShareRoute ? 'pointer-events-none opacity-75' : undefined}
+            />
+            {!isLogin && isShareRoute && (
+              <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-gradient-to-b from-white/40 to-white/80 text-xs text-neutral-600">
+                登录后解锁侧边栏功能
+              </div>
+            )}
+          </div>
 
           {/* 主内容区 */}
           <SidebarInset className="max-h-screen overflow-y-auto scrollbar-hide">

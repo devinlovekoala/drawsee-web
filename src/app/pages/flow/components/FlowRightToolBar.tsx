@@ -1,4 +1,4 @@
-import { RefreshCcw, PanelRight, PanelRightClose, ZoomIn, ZoomOut, Eye, ArrowLeft, Trash2 } from 'lucide-react';
+import { RefreshCcw, PanelRight, PanelRightClose, ZoomIn, ZoomOut, Eye, ArrowLeft, Trash2, Share2 } from 'lucide-react';
 import { useReactFlow } from '@xyflow/react';
 import { useAdaptiveZoom } from '../hooks/useAdaptiveZoom';
 
@@ -10,6 +10,8 @@ interface FlowToolBarProps {
   onDeleteSelected?: () => void;
   canReturnToCircuit?: boolean;
   onReturnToCircuit?: () => void;
+  canShare?: boolean;
+  onShare?: () => void;
 }
 
 function FlowRightToolBar({ 
@@ -19,7 +21,9 @@ function FlowRightToolBar({
   canDeleteSelected = false,
   onDeleteSelected,
   canReturnToCircuit = false,
-  onReturnToCircuit
+  onReturnToCircuit,
+  canShare = false,
+  onShare
 }: FlowToolBarProps) {
   const { zoomIn, zoomOut, getNodes } = useReactFlow();
   const { switchToOverviewMode, switchToDetailMode } = useAdaptiveZoom();
@@ -93,6 +97,17 @@ function FlowRightToolBar({
         >
           <Trash2 className="mr-2" size={16} />
           删除节点
+        </button>
+      )}
+
+      {/* 分享会话 */}
+      {canShare && onShare && (
+        <button
+          onClick={onShare}
+          className="flex items-center text-blue-700 bg-white hover:bg-blue-50 active:bg-blue-100 transition duration-200 rounded-lg px-2 py-1 shadow-[0_0_0_1px_rgba(59,130,246,0.4)] transform hover:scale-105 h-8"
+        >
+          <Share2 className="mr-2" size={16} />
+          分享
         </button>
       )}
 

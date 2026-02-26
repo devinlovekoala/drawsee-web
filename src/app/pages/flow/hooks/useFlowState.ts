@@ -43,7 +43,7 @@ const normalizeNodeType = (apiType: string | undefined | null): string => {
  * 流程图状态管理Hook
  * 负责管理节点、边、消息处理和临时节点操作
  */
-function useFlowState(convId: number, selectedNode?: Node | null, setSelectedNode?: (node: Node | null) => void) {
+function useFlowState(convId: number | null, selectedNode?: Node | null, setSelectedNode?: (node: Node | null) => void) {
 
   // 工具函数
   const {executeFitView, adjustViewportToShowLatestContent, executeLayout} = useFlowTools();
@@ -461,7 +461,9 @@ function useFlowState(convId: number, selectedNode?: Node | null, setSelectedNod
         case 'title': {
           const title = task.data as string;
           // 直接更新标题，不需要通过任务队列
-          handleTitleUpdate(convId, title);
+          if (convId) {
+            handleTitleUpdate(convId, title);
+          }
           break;
         }
         // 完成
@@ -598,6 +600,7 @@ function useFlowState(convId: number, selectedNode?: Node | null, setSelectedNod
    * 启动聊天
    */
   const chat = useCallback((taskId: number) => {
+    if (!convId) return;
     // 如果正在聊天，则不进行处理
     if (isChatting) {
       toast.error('正在聊天中，请先完成当前对话');

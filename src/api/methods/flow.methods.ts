@@ -5,7 +5,11 @@ import {
     CreateAiTaskDTO,
     CreateAiTaskVO,
     NodeVO,
-    NodeToUpdate
+    NodeToUpdate,
+    ConversationShareVO,
+    ShareConversationVO,
+    ConversationForkVO,
+    CreateConversationShareDTO
 } from "@/api/types/flow.types.ts";
 
 export const getConversations =
@@ -35,3 +39,13 @@ export const deleteNode =
 
 export const deleteConversation =
   (convId: string) => alova.Delete(`/flow/conversations/${convId}`)
+
+export const createConversationShare =
+  (convId: number, dto?: CreateConversationShareDTO) =>
+    alova.Post<ConversationShareVO>(`/flow/conversations/${convId}/share`, dto ?? {});
+
+export const getSharedConversation =
+  (shareToken: string) => alova.Get<ShareConversationVO>(`/share/${shareToken}`);
+
+export const forkSharedConversation =
+  (shareToken: string) => alova.Post<ConversationForkVO>(`/share/${shareToken}/fork`);

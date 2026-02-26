@@ -7,11 +7,14 @@ import { FlowLocationState } from '@/app/contexts/FlowContext';
 
 interface FlowLeftToolBarProps {
   onBack?: () => void; // 新增返回班级列表的回调函数
+  convId?: number | null; // 会话ID，可由父组件直接传入
 }
 
-function FlowLeftToolBar({ onBack }: FlowLeftToolBarProps) {
+function FlowLeftToolBar({ onBack, convId: convIdProp }: FlowLeftToolBarProps) {
   const [isCollapsed, setIsCollapsed] = useState(true);
-  const { convId } = useLocation().state as FlowLocationState;
+  const location = useLocation();
+  // 优先使用props传入的convId，否则从location.state获取（安全处理null情况）
+  const convId = convIdProp ?? (location.state as FlowLocationState | null)?.convId;
   const { openDeleteConversationDialog, toggleSideBar, openSideBar } = useAppContext();
 
   const toggleCollapse = () => {

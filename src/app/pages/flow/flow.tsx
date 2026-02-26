@@ -14,10 +14,10 @@ import PdfAnalysisPointNode from "./components/node/PdfAnalysisPointNode";
 import PdfAnalysisDetailNode from "./components/node/PdfAnalysisDetailNode";
 import NodeDetailPanel from "./components/NodeDetailPanel";
 import {useCallback, useState, useEffect, useRef, useMemo} from "react";
-import {useLocation, useNavigate} from "react-router-dom";
+import {useLocation, useNavigate, useParams} from "react-router-dom";
 import {useWatcher} from "alova/client";
-import {getNodesByConvId, updateNodesPositionAndHeight} from "@/api/methods/flow.methods.ts";
-import type { NodeVO as ApiNodeVO, NodeToUpdate, NodeType } from '@/api/types/flow.types';
+import {getNodesByConvId, updateNodesPositionAndHeight, getSharedConversation, forkSharedConversation} from "@/api/methods/flow.methods.ts";
+import type { NodeVO as ApiNodeVO, NodeToUpdate, NodeType, ShareConversationVO } from '@/api/types/flow.types';
 import { LoadingSpinner } from './components/loading/LoadingSpinner';
 import useFlowState from './hooks/useFlowState';
 import { FlowInputPanel, type FlowInputPanelHandle } from './components/input/FlowInputPanel';
@@ -33,9 +33,10 @@ import './styles/index.css';
 import { COMPACT_NODE_HEIGHT, COMPACT_NODE_WIDTH, TEMP_QUERY_NODE_ID_PREFIX } from "./constants";
 import { FlowContext, FlowLocationState } from "@/app/contexts/FlowContext";
 import FlowRightToolBar from "./components/FlowRightToolBar";
+import ShareConversationModal from "./components/ShareConversationModal";
 import ResourceNode from "./components/node/resource/ResourceNode";
 import FlowLeftToolBar from "./components/FlowLeftToolBar";
-import { FLOW_RETURN_INFO_KEY, TASK_KEY_PREFIX } from "@/common/constant/storage-key.constant";
+import { FLOW_RETURN_INFO_KEY, TASK_KEY_PREFIX, SHARE_CONTINUE_TOKEN_KEY } from "@/common/constant/storage-key.constant";
 import { useViewportChange } from "./hooks/useViewportChange";
 import { useAppContext } from "@/app/contexts/AppContext";
 
@@ -118,8 +119,11 @@ function normalizeNodeType(apiType: string | undefined | null): string {
 
 function Flow() {
   const navigate = useNavigate();
-  const { openDeleteNodeDialog, deleteDialogState } = useAppContext();
+  const { openDeleteNodeDialog, deleteDialogState, isLogin } = useAppContext();
+  const { shareToken } = useParams<{ shareToken: string }>();
+  const isShareMode = Boolean(shareToken);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [shareInfo, setShareInfo] = useState<ShareConversationVO | null>(null);
   // 当前选中的节点
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   // 用户输入
@@ -127,6 +131,7 @@ function Flow() {
   const flowInputRef = useRef<FlowInputPanelHandle>(null);
   // 显示详情面板
   const [showDetailPanel, setShowDetailPanel] = useState<boolean>(true);
+  const [isShareModalOpen, setIsShareModalOpen] = useState<boolean>(false);
   // 强制会话切换标记 - 最高优先级标记，用于bypass所有保护机制
   const isForceSwitching = useRef<boolean>(false);
   
@@ -134,6 +139,7 @@ function Flow() {
   const location = useLocation();
   const locationState = location.state as FlowLocationState;
   const convId = locationState?.convId;
+  const convIdSafe = convId ?? 0;
   const taskIdFromLocation = locationState?.taskId;
   const classId = locationState?.classId || 
     (convId ? sessionStorage.getItem(`circuit_class_id_${convId}`) : null); // 从sessionStorage获取班级ID
@@ -167,7 +173,7 @@ function Flow() {
     chat,
     setElements,
     addChatTask
-  } = useFlowState(convId, selectedNode, protectedSetSelectedNode);
+  } = useFlowState(convId ?? null, selectedNode, protectedSetSelectedNode);
   const circuitReturnInfo = useMemo<CircuitReturnInfo | null>(() => {
     if (!convId) return null;
     const stored = sessionStorage.getItem(`circuit_return_info_${convId}`);
@@ -194,6 +200,7 @@ function Flow() {
   }, []);
 
   const canDeleteSelectedNode = useMemo(() => {
+    if (isShareMode) return false;
     if (!selectedNode) return false;
     if (isChatting || isLoading) return false;
     if (selectedNode.id === rootNodeId) return false;
@@ -208,6 +215,14 @@ function Flow() {
   }, [elements.nodes, rootNodeId, selectedNode, isChatting, isLoading]);
   
   // 处理返回班级列表
+  const handleOpenShareModal = useCallback(() => {
+    if (!convId) {
+      toast.error("当前会话未创建，无法分享");
+      return;
+    }
+    setIsShareModalOpen(true);
+  }, [convId]);
+
   const handleBackToCourses = useCallback(() => {
     // 如果有班级ID，返回到课程页面
     if (classId) {
@@ -246,13 +261,53 @@ function Flow() {
     parentIdOfTempQueryNode,
     addTempQueryNodeTask,
     nodesAndEdgesNoneTempQueryNode
-  } = useTempQueryNode(convId, isChatting, selectedNode, rootNodeId, elements, setElements);
+  } = useTempQueryNode(convId ?? null, isChatting, selectedNode, rootNodeId, elements, setElements);
+  const canInputForShare = isShareMode ? false : canInput;
+  const canNotInputReasonForShare = isShareMode
+    ? (isLogin ? '请点击继续会话后进行追问' : '登录后可继续会话与追问')
+    : canNotInputReason;
+  const addTempQueryNodeTaskForShare = isShareMode ? (() => {}) : addTempQueryNodeTask;
+  const parentIdOfTempQueryNodeForShare = isShareMode ? null : parentIdOfTempQueryNode;
 
   // 使用FlowTools Hook
   const {executeLayout} = useFlowTools();
   
   // 使用自适应缩放Hook
   const { smartFitView } = useAdaptiveZoom();
+
+  const shareUrl = useMemo(() => {
+    if (!shareToken) return '';
+    const path = shareInfo?.share?.sharePath || `/share/${shareToken}`;
+    return `${window.location.origin}${path}`;
+  }, [shareToken, shareInfo]);
+
+  const handleCopyShare = useCallback(async () => {
+    if (!shareUrl) return;
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      toast.success('分享链接已复制');
+    } catch (error) {
+      console.error('复制分享链接失败:', error);
+      toast.error('复制失败，请手动复制');
+    }
+  }, [shareUrl]);
+
+  const handleContinueShare = useCallback(async () => {
+    if (!shareToken || !shareInfo?.share?.allowContinue) return;
+    if (!isLogin) {
+      sessionStorage.setItem(SHARE_CONTINUE_TOKEN_KEY, shareToken);
+      toast.info('请先登录，再继续会话');
+      navigate('/');
+      return;
+    }
+    try {
+      const data = await forkSharedConversation(shareToken);
+      navigate('/flow', { state: { convId: data.conversation.id } as FlowLocationState });
+    } catch (error) {
+      console.error('继续会话失败:', error);
+      toast.error('继续会话失败，请稍后重试');
+    }
+  }, [shareToken, shareInfo, isLogin, navigate]);
 
   // 获取最新的节点数据的函数
   const getLatestNodeData = useCallback((nodeId: string): Node | null => {
@@ -485,6 +540,7 @@ function Flow() {
 
   // 监听convId变化，立即重置所有状态 - 确保会话切换正常
   useEffect(() => {
+    if (isShareMode) return;
     console.log('🔄 会话切换检测到，convId变化为:', convId);
     
     // 🚀 启用最高优先级强制切换模式，bypass所有保护机制
@@ -528,7 +584,7 @@ function Flow() {
   }, [convId]);
 
   // 获取节点数据，当convId变化时，重新发送请求
-  const {send} = useWatcher(getNodesByConvId(convId), [convId], {immediate: true, force: true})
+  const {send} = useWatcher(getNodesByConvId(convIdSafe), [convId], {immediate: Boolean(convId) && !isShareMode, force: true})
     .onSuccess(async (event) => {
       const apiNodes = event.data as ApiNodeVO[];
       // 如果没有节点数据，直接设置为空并结束加载
@@ -672,6 +728,7 @@ function Flow() {
   
   // 监听节点删除事件
   useEffect(() => {
+    if (isShareMode) return;
     const handleNodeDeleted = () => {
       setIsLoading(true);
       setSelectedNode(null);
@@ -684,7 +741,76 @@ function Flow() {
     return () => {
       window.removeEventListener('node-deleted', handleNodeDeleted as EventListener);
     };
-  }, [send]);
+  }, [send, isShareMode]);
+
+  useEffect(() => {
+    if (!isShareMode || !shareToken) return;
+    const loadShared = async () => {
+      setIsLoading(true);
+      try {
+        const shared = await getSharedConversation(shareToken);
+        setShareInfo(shared);
+        const apiNodes = shared.nodes;
+        if (!apiNodes || apiNodes.length === 0) {
+          setElements({ nodes: [], edges: [] });
+          setSelectedNode(null);
+          setIsLoading(false);
+          return;
+        }
+        const flowNodes = apiNodes.map((node) => {
+          const normalizedType = normalizeNodeType(node.type as unknown as string);
+          const data = {
+            parentId: node.parentId,
+            convId: node.convId,
+            userId: node.userId,
+            createdAt: node.createdAt,
+            updatedAt: node.updatedAt,
+            ...(node.height !== null ? { height: node.height } : {}),
+            ...(normalizedType !== 'root' ? node.data : {})
+          } as any;
+          if (normalizedType !== 'root') {
+            data.layoutWidth = COMPACT_NODE_WIDTH;
+            data.layoutHeight = COMPACT_NODE_HEIGHT;
+          }
+          if (
+            (normalizedType === 'answer-detail' || normalizedType === 'ANSWER_DETAIL' ||
+              normalizedType === 'circuit-analyze' || normalizedType === 'circuit-detail' || normalizedType === 'knowledge-detail' ||
+              normalizedType === 'PDF_ANALYSIS_DETAIL') &&
+            node.data.text && typeof node.data.text === 'string' && node.data.text.length > 0
+          ) {
+            data.isGenerated = true;
+            data.process = 'completed';
+          }
+          return {
+            id: node.id.toString(),
+            type: normalizedType as any,
+            position: node.position,
+            data,
+            draggable: false,
+            connectable: false,
+            selectable: true,
+          } as any;
+        });
+        const flowEdges = flowNodes
+          .filter(node => node.data.parentId !== null)
+          .map(node => ({
+            id: `e${node.data.parentId!}-${node.id}`,
+            source: node.data.parentId!.toString(),
+            target: node.id,
+            type: 'smoothstep',
+          }));
+        const layoutedNodes = executeLayout(flowNodes, flowEdges, false);
+        setElements({ nodes: layoutedNodes, edges: flowEdges });
+        setSelectedNode(null);
+        setTimeout(() => setIsLoading(false), 200);
+      } catch (error) {
+        console.error('获取分享会话失败:', error);
+        toast.error('分享链接无效或已失效');
+        setIsLoading(false);
+      }
+    };
+    loadShared();
+  }, [isShareMode, shareToken, executeLayout, setElements]);
 
   const elementsRef = useRef<Node[]>([]);
   useEffect(() => {
@@ -971,8 +1097,8 @@ function Flow() {
               height: '100%',
               position: 'relative'
             }} // 背景样式和尺寸限制
-            nodesDraggable={true} // 允许节点拖拽
-            draggable={true} // 允许节点拖拽
+            nodesDraggable={!isShareMode} // 允许节点拖拽
+            draggable={!isShareMode} // 允许节点拖拽
             selectionKeyCode={null} // 取消选择快捷键
             multiSelectionKeyCode={null} // 取消多选快捷键
             deleteKeyCode={null} // 取消删除快捷键
@@ -1006,12 +1132,51 @@ function Flow() {
                 selectedNode={selectedNode}
                 prompt={userInput}
                 setPrompt={setUserInput}
-                canInput={canInput}
-                canNotInputReason={canNotInputReason}
-                addTempQueryNodeTask={addTempQueryNodeTask}
-                parentIdOfTempQueryNode={parentIdOfTempQueryNode}
+                canInput={canInputForShare}
+                canNotInputReason={canNotInputReasonForShare}
+                addTempQueryNodeTask={addTempQueryNodeTaskForShare}
+                parentIdOfTempQueryNode={parentIdOfTempQueryNodeForShare}
               />
             </Panel>
+            {isShareMode && (
+              <Panel position={"top-left"}>
+                <div
+                  className="flex flex-wrap items-center gap-2 rounded-xl border border-blue-100 bg-blue-50/90 px-3 py-2 text-xs text-blue-800 shadow-sm backdrop-blur"
+                  style={{
+                    marginLeft: 52,
+                    maxWidth: showDetailPanel ? 'calc(100vw - 520px)' : 'calc(100vw - 200px)',
+                    transition: 'max-width 150ms ease'
+                  }}
+                >
+                  <span className="font-medium">分享访问模式</span>
+                  {!isLogin && <span className="text-blue-700/80">登录后可使用全部应用功能</span>}
+                  <div className="flex items-center gap-2">
+                    <button
+                      className="rounded-full bg-white px-2 py-1 text-xs text-blue-700 shadow-sm"
+                      onClick={handleCopyShare}
+                    >
+                      复制链接
+                    </button>
+                    {shareInfo?.share?.allowContinue && (
+                      <button
+                        className="rounded-full bg-blue-600 px-2 py-1 text-xs text-white shadow-sm"
+                        onClick={handleContinueShare}
+                      >
+                        继续会话
+                      </button>
+                    )}
+                    {!isLogin && (
+                      <button
+                        className="rounded-full border border-blue-300 px-2 py-1 text-xs text-blue-700 shadow-sm"
+                        onClick={() => navigate('/')}
+                      >
+                        登录/注册
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </Panel>
+            )}
             {/* 顶部右侧工具栏 */}
             <Panel position={"top-right"}>
                 <FlowRightToolBar
@@ -1022,16 +1187,26 @@ function Flow() {
                   onDeleteSelected={handleDeleteSelectedNode}
                   canReturnToCircuit={Boolean(circuitReturnInfo)}
                   onReturnToCircuit={handleReturnToCircuit}
+                  canShare={!isShareMode && Boolean(convId)}
+                  onShare={handleOpenShareModal}
               />
             </Panel>
             {/* 顶部左侧工具栏 */}
             <Panel position={"top-left"}>
               <FlowLeftToolBar 
                 onBack={classId ? handleBackToCourses : undefined}
+                convId={convId}
               />
             </Panel>
           </ReactFlow>
         </div>
+
+        <ShareConversationModal
+          isOpen={isShareModalOpen}
+          convId={convId}
+          classId={classId}
+          onClose={() => setIsShareModalOpen(false)}
+        />
         
         {/* 右侧详情面板 - 确保不阻塞主应用交互 */}
         {showDetailPanel && (
