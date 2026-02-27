@@ -38,7 +38,7 @@ const ShareConversationModal = ({ isOpen, convId, classId, onClose }: ShareConve
     try {
       const payload: CreateConversationShareDTO = {
         allowContinue,
-        classId: classId ? Number(classId) : undefined
+        classId: classId ?? undefined
       };
       const data = await createConversationShare(convId, payload);
       setShareInfo(data);

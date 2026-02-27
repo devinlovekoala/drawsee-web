@@ -32,7 +32,7 @@ export interface ConversationForkVO {
 }
 
 export interface CreateConversationShareDTO {
-  classId?: number | null;
+  classId?: string | null;
   allowContinue?: boolean;
 }
 
