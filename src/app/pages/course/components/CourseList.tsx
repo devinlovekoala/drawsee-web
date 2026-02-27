@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { CourseVO, PaginationParams } from '@/api/types/course.types';
-import { getSystemCourses } from '@/api/methods/course.methods';
+import { getUserCourses } from '@/api/methods/course.methods';
 import { toast } from 'sonner';
 import CourseCard from './CourseCard';
 import { Loader2 } from 'lucide-react';
@@ -22,8 +22,8 @@ export function CourseList({ refreshTrigger = 0 }: CourseListProps) {
   const fetchCourses = async () => {
     setIsLoading(true);
     try {
-      // 获取所有可访问的班级课程
-      const result = await getSystemCourses(pagination);
+      // 获取所有已加入的班级课程
+      const result = await getUserCourses(pagination);
       setCourses(result.items);
       setTotalPages(result.totalPages);
     } catch (error) {
@@ -48,7 +48,7 @@ export function CourseList({ refreshTrigger = 0 }: CourseListProps) {
 
   return (
     <div className="w-full">
-      <h2 className="text-xl font-semibold text-neutral-800 mb-6">可访问的班级</h2>
+      <h2 className="text-xl font-semibold text-neutral-800 mb-6">已加入的班级</h2>
       
       {isLoading && pagination.page === 1 ? (
         <div className="flex flex-col items-center justify-center min-h-[200px]">
@@ -57,7 +57,7 @@ export function CourseList({ refreshTrigger = 0 }: CourseListProps) {
         </div>
       ) : courses.length === 0 ? (
         <div className="bg-neutral-100/70 border border-neutral-200 rounded-xl p-8 text-center">
-          <p className="text-neutral-600">暂无可访问的班级</p>
+          <p className="text-neutral-600">暂无已加入的班级</p>
         </div>
       ) : (
         <>

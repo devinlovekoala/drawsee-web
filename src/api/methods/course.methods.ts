@@ -8,7 +8,10 @@ import {
     JoinCourseDTO,
     PaginatedResponse,
     PaginationParams,
-    UpdateCourseDTO
+    UpdateCourseDTO,
+    CourseResourceVO,
+    CourseResourceType,
+    CreateCourseResourceDTO
 } from "@/api/types/course.types.ts";
 
 /**
@@ -89,3 +92,23 @@ export const getCourseProgress =
 export const createKnowledgeBaseForCourse = 
   (id: string, createKnowledgeBaseDTO: CreateKnowledgeBaseDTO) =>
     alova.Post<string>(`/courses/${id}/knowledge-base`, createKnowledgeBaseDTO);
+/**
+ * 获取课程资源
+ */
+export const getCourseResources =
+  (id: string, type?: CourseResourceType) =>
+    alova.Get<CourseResourceVO[]>(`/courses/${id}/resources`, { params: { type } });
+
+/**
+ * 创建课程资源
+ */
+export const createCourseResource =
+  (id: string, dto: CreateCourseResourceDTO) =>
+    alova.Post<number>(`/courses/${id}/resources`, dto);
+
+/**
+ * 删除课程资源
+ */
+export const deleteCourseResource =
+  (id: string, resourceId: number) =>
+    alova.Delete<boolean>(`/courses/${id}/resources/${resourceId}`);

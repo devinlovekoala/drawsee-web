@@ -22,8 +22,8 @@ export interface CourseVO {
     name: string;
     description: string;
     classCode: string;
-    code: string;
-    subject: string;
+    code?: string;
+    subject?: string;
     creatorId: number;
     creatorRole: string;
     createdAt: Date;
@@ -64,8 +64,8 @@ export interface PaginatedResponse<T> {
 export interface CreateCourseDTO {
     name: string;
     description?: string;
-    code: string;
-    subject: string;
+    code?: string;
+    subject?: string;
 }
 
 export interface JoinCourseDTO {
@@ -75,10 +75,42 @@ export interface JoinCourseDTO {
 export interface UpdateCourseDTO {
     name: string;
     description?: string;
+    code?: string;
+    subject?: string;
 }
 
 export interface CreateKnowledgeBaseDTO {
     name: string;
     description?: string;
     subject: string;
+}
+export type CourseResourceType = 'COURSEWARE' | 'TASK' | 'CIRCUIT_REF';
+
+export interface CourseResourceVO {
+    id: number;
+    courseId: string;
+    type: CourseResourceType;
+    title: string;
+    description?: string;
+    content?: string;
+    fileUrl?: string;
+    fileName?: string;
+    fileSize?: number;
+    coverUrl?: string;
+    dueAt?: Date;
+    createdBy: number;
+    createdAt: Date;
+    updatedAt: Date;
+}
+
+export interface CreateCourseResourceDTO {
+    type: CourseResourceType;
+    title: string;
+    description?: string;
+    content?: string;
+    fileUrl?: string;
+    fileName?: string;
+    fileSize?: number;
+    coverUrl?: string;
+    dueAt?: Date;
 }

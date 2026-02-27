@@ -3,7 +3,7 @@ import { Users, Book, Clock, ArrowUpRight, CircuitBoard } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 // 根据课程主题生成颜色
-const getColorsBySubject = (subject: string) => {
+const getColorsBySubject = (subject?: string) => {
   const subjectMap: Record<string, { bg: string; text: string; border: string; icon: string }> = {
     '数学': {
       bg: 'bg-blue-50',
@@ -67,7 +67,7 @@ const getColorsBySubject = (subject: string) => {
     }
   };
 
-  return subjectMap[subject] || {
+  return subjectMap[subject || ""] || {
     bg: 'bg-indigo-50',
     text: 'text-indigo-800',
     border: 'border-indigo-200',
@@ -84,7 +84,7 @@ const isCircuitAnalysisCourse = (course: CourseVO): boolean => {
     'CircuitAnalysis', 
     '电路分析', 
     '电子电路分析'
-  ].includes(course.subject);
+  ].includes(course.subject || "");
   
   // 判断课程名称是否包含电路分析相关词汇
   const nameCheck = [
@@ -119,23 +119,7 @@ export function CourseCard({ course }: CourseCardProps) {
   };
 
   const handleCourseClick = () => {
-    if (isCircuitAnalysis) {
-      // 电路分析课程直接导航到电路分析页面
-      navigate('/circuit', {
-        state: {
-          classId: course.id // 传递班级ID
-        }
-      });
-    } else {
-      // 其他课程导航到通用对话页面
-      navigate('/blank', { 
-        state: { 
-          agentType: 'GENERAL',
-          agentName: '昭析智能助手',
-          classId: course.id // 传递班级ID
-        } 
-      });
-    }
+    navigate(`/course/${course.id}`);
   };
 
   return (
@@ -178,7 +162,7 @@ export function CourseCard({ course }: CourseCardProps) {
           <span>创建于 {formatDate(course.createdAt)}</span>
         </div>
         <div className={`text-xs ${colors.text} px-2 py-1 rounded-full ${colors.bg} border ${colors.border}`}>
-          {isCircuitAnalysis ? '电路分析' : course.subject}
+          {isCircuitAnalysis ? '电路分析' : (course.subject || '未设置')}
         </div>
       </div>
     </div>

@@ -40,7 +40,12 @@ const alova = createAlova({
     } else {
       // 处理嵌套的响应结构
       // 后端返回格式：{code: 200, data: {code: 0, data: [...], message: "..."}}
-      if (json.data && typeof json.data === 'object' && json.data.code !== undefined) {
+      if (
+        json.data &&
+        typeof json.data === 'object' &&
+        typeof json.data.code === 'number' &&
+        'data' in json.data
+      ) {
         // 检查内层的错误码
         if (json.data.code !== 0) {
           throw new Error(json.data.message || '业务处理失败');
