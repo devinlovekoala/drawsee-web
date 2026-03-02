@@ -66,6 +66,37 @@ const clipSuggestionText = (text: string, maxLength: number): string => {
   return `${text.slice(0, maxLength)}...`;
 };
 
+const stripMarkdownText = (input: string): string => {
+  return input
+    .replace(/\$\$[\s\S]*?\$\$/g, ' ')
+    .replace(/\$(.*?)\$/g, ' ')
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/#{1,6}\s+/g, '')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/[*_~`>#-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+};
+
+const extractCircuitWarmupIntro = (rawText?: string): string => {
+  if (!rawText) return '';
+  const normalized = rawText.replace(/\r\n/g, '\n');
+
+  // 优先提取“预热导语”章节
+  const warmupMatch = normalized.match(/###\s*预热导语\s*\n([\s\S]*?)(?=\n\s*#{2,3}\s*|$)/);
+  if (warmupMatch?.[1]) {
+    return stripMarkdownText(warmupMatch[1]);
+  }
+
+  // 兜底：如果存在“追问方向概览”，取其前面的正文作为导语
+  const splitByFollowup = normalized.split(/###\s*追问方向概览/);
+  if (splitByFollowup[0]) {
+    return stripMarkdownText(splitByFollowup[0]);
+  }
+
+  return stripMarkdownText(normalized);
+};
+
 export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeData, onApplySuggestion }: NodeDetailPanelProps) {
   const nodeData = selectedNode?.data as NodeData<NodeType>;
   const [nodeContentKey, setNodeContentKey] = useState(0); // 用于强制重新渲染
@@ -634,6 +665,14 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
   }, [selectedNode?.id, nodeData, getLatestNodeData, forceRefresh, lastUpdatedAt]);
 
   const { title, text, angle, objectName, urls, fileUrl, fileType } = nodeFields;
+  const circuitWarmupIntro = useMemo(() => extractCircuitWarmupIntro(text), [text]);
+  const shouldRenderCircuitWarmupOnly = useMemo(() => {
+    if (nodeTypeValue !== 'circuit-analyze') return false;
+    const raw = typeof text === 'string' ? text : '';
+    const hasFollowupSection = /###\s*追问方向概览/.test(raw);
+    const hasFollowupSuggestions = followUpInfo.suggestions.length > 0;
+    return hasFollowupSection && hasFollowupSuggestions;
+  }, [nodeTypeValue, text, followUpInfo.suggestions.length]);
 
   const pdfFollowUpLabel = useMemo(() => {
     const labelSource = (typeof title === 'string' && title.trim().length > 0) ? title.trim() :
@@ -835,6 +874,49 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
           </div>
           <div className="prose prose-sm max-w-none" key={`content-${nodeContentKey}-${selectedNode.id}-${forceRefresh}-${lastUpdatedAt}`}>
             {(() => {
+              if (shouldRenderCircuitWarmupOnly) {
+                return (
+                  <div className="space-y-3">
+                    <div className="p-4 rounded-2xl border border-gray-200 bg-white shadow-sm">
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                        预热导语
+                      </p>
+                      <p className="mt-2 text-sm text-gray-700 leading-relaxed whitespace-pre-line">
+                        {circuitWarmupIntro || '模型正在分析该电路，请稍候...'}
+                      </p>
+                    </div>
+                  </div>
+                );
+              }
+
+              if (
+                nodeTypeValue === 'circuit-detail' ||
+                nodeTypeValue === 'answer-detail' ||
+                nodeTypeValue === 'ANSWER_DETAIL' ||
+                nodeTypeValue === 'knowledge-detail'
+              ) {
+                const detailLabel = nodeTypeValue === 'circuit-detail'
+                  ? '电路分析详情'
+                  : (nodeTypeValue === 'knowledge-detail' ? '知识点详情' : '详细解答');
+                return (
+                  <div className="space-y-3">
+                    <div className="p-4 rounded-2xl border border-gray-200 bg-white shadow-sm">
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                        {detailLabel}
+                      </p>
+                      {title && (
+                        <p className="mt-1 text-base font-semibold text-gray-900">
+                          {title}
+                        </p>
+                      )}
+                    </div>
+                    <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50/50 shadow-sm">
+                      {renderStreamContent()}
+                    </div>
+                  </div>
+                );
+              }
+
               // PDF分析点/详情节点的专属展示
               if (isPdfAnalysisPointNode) {
                 return (

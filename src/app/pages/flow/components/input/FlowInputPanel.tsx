@@ -29,6 +29,28 @@ export interface FlowInputPanelHandle {
   applySuggestion: (text: string) => void;
 }
 
+const stripMarkdownText = (input: string): string => {
+  return input
+    .replace(/\$\$[\s\S]*?\$\$/g, ' ')
+    .replace(/\$(.*?)\$/g, ' ')
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/#{1,6}\s+/g, '')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/[*_~`>#-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+};
+
+const extractCircuitWarmupIntro = (rawText: string): string => {
+  const normalized = rawText.replace(/\r\n/g, '\n');
+  const warmupMatch = normalized.match(/###\s*预热导语\s*\n([\s\S]*?)(?=\n\s*#{2,3}\s*|$)/);
+  if (warmupMatch?.[1]) {
+    return stripMarkdownText(warmupMatch[1]);
+  }
+  const splitByFollowup = normalized.split(/###\s*追问方向概览/);
+  return stripMarkdownText(splitByFollowup[0] || normalized);
+};
+
 export const FlowInputPanel = forwardRef<FlowInputPanelHandle, FlowInputPanelProps>(function FlowInputPanel(
 {
   prompt,
@@ -115,6 +137,8 @@ ref) {
     const displayTitle = nodeTitle || (rawText ? rawText.slice(0, 30) : '');
     const circuitDesign = nodeData?.circuitDesign as CircuitDesign | undefined;
     const isCircuitCanvas = nodeType === 'circuit-canvas' || rawSubtype === 'circuit-canvas';
+    const isCircuitAnalyze = nodeType === 'circuit-analyze' || rawSubtype === 'circuit-analyze';
+    const isCircuitDetail = nodeType === 'circuit-detail' || rawSubtype === 'circuit-detail';
 
     const isPdfPoint = nodeType === 'PDF_ANALYSIS_POINT' || nodeType === 'pdf-circuit-point' ||
       rawSubtype === 'PDF_ANALYSIS_POINT' || rawSubtype === 'pdf-circuit-point';
@@ -126,6 +150,15 @@ ref) {
       const connectionCount = circuitDesign.connections?.length ?? 0;
       const metaTitle = circuitDesign.metadata?.title || displayTitle || '当前电路图';
       return `请基于以下电路设计回答追问：\n电路名称：${metaTitle}\n元件/连线：${elementCount} / ${connectionCount}\n问题：${basePrompt}`;
+    }
+
+    if ((isCircuitAnalyze || isCircuitDetail) && rawText) {
+      const warmupSummary = extractCircuitWarmupIntro(rawText).slice(0, 260);
+      return [
+        '请围绕当前电路分析结果继续深入回答，不要重复已有预热导语。',
+        `当前追问：${basePrompt}`,
+        warmupSummary ? `已知分析摘要：${warmupSummary}` : '',
+      ].filter(Boolean).join('\n');
     }
 
     if ((isPdfPoint || isPdfDetail) && rawText) {
