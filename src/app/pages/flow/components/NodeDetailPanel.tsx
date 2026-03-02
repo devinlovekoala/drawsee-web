@@ -1,7 +1,7 @@
 import React, { useMemo, useEffect, useState, useRef, useCallback } from 'react';
 import { Node } from '@xyflow/react';
 import { format } from 'date-fns';
-import { X, Clock, Tag, MessageSquare, Circle, CheckCircle, AlertCircle, FileText, Zap, Brain, Search, Image, BookOpen, Sparkles, Eye } from 'lucide-react';
+import { X, Clock, Tag, Circle, FileText, Zap, Sparkles, Eye } from 'lucide-react';
 import { Button, message } from 'antd';
 import MarkdownWithLatex from './markdown/MarkdownWithLatex';
 import { NodeData } from './node/types/node.types';
@@ -29,50 +29,6 @@ interface NodeDetailPanelProps {
   onApplySuggestion?: (text: string) => void;
 }
 
-// 节点类型图标映射
-const nodeTypeIcons: Record<string, React.ReactNode> = {
-  'root': <Circle className="w-4 h-4" />,
-  'query': <MessageSquare className="w-4 h-4" />,
-  'answer': <CheckCircle className="w-4 h-4" />,
-  'answer-point': <AlertCircle className="w-4 h-4" />,
-  'answer-detail': <FileText className="w-4 h-4" />,
-  'ANSWER_POINT': <AlertCircle className="w-4 h-4" />,
-  'ANSWER_DETAIL': <FileText className="w-4 h-4" />,
-  'knowledge-head': <Brain className="w-4 h-4" />,
-  'knowledge-detail': <BookOpen className="w-4 h-4" />,
-  'circuit-canvas': <Zap className="w-4 h-4" />,
-  'circuit-analyze': <Search className="w-4 h-4" />,
-  'circuit-detail': <FileText className="w-4 h-4" />,
-  'resource': <Image className="w-4 h-4" />,
-  'PDF_DOCUMENT': <FileText className="w-4 h-4" />,
-  'PDF_ANALYSIS_POINT': <Search className="w-4 h-4" />,
-  'PDF_ANALYSIS_DETAIL': <FileText className="w-4 h-4" />,
-  'pdf-circuit-point': <Search className="w-4 h-4" />,
-  'pdf-circuit-detail': <FileText className="w-4 h-4" />,
-};
-
-// 节点类型中文名映射
-const nodeTypeNames: Record<string, string> = {
-  'root': '根节点',
-  'query': '用户问题',
-  'answer': '智能回答',
-  'answer-point': '回答角度',
-  'answer-detail': '详细回答',
-  'ANSWER_POINT': '回答角度',
-  'ANSWER_DETAIL': '详细回答',
-  'knowledge-head': '知识要点',
-  'knowledge-detail': '知识详情',
-  'circuit-canvas': '电路画布',
-  'circuit-analyze': '电路分析',
-  'circuit-detail': '电路详情',
-  'resource': '资源节点',
-  'PDF_DOCUMENT': 'PDF文档',
-  'PDF_ANALYSIS_POINT': 'PDF分析点',
-  'PDF_ANALYSIS_DETAIL': 'PDF分析详情',
-  'pdf-circuit-point': 'PDF分析点',
-  'pdf-circuit-detail': 'PDF分析详情',
-};
-
 // 安全获取字符串字段
 const getStringField = (obj: any, field: string): string | undefined => {
   return obj && typeof obj[field] === 'string' ? obj[field] : undefined;
@@ -88,9 +44,26 @@ const getBooleanField = (obj: any, field: string): boolean | undefined => {
   return obj && typeof obj[field] === 'boolean' ? obj[field] : undefined;
 };
 
-// 安全获取数字字段
-const getNumberField = (obj: any, field: string): number | undefined => {
-  return obj && typeof obj[field] === 'number' ? obj[field] : undefined;
+const normalizeSuggestionText = (value: string): string => {
+  return value
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/[*_~`>#-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+};
+
+const isNoisySuggestion = (raw: string): boolean => {
+  const text = raw.trim();
+  if (!text) return true;
+  const hasMarkdownSignal = /[*_~`#>\n]/.test(text);
+  const isTooLong = text.length > 140;
+  const lineCount = text.split('\n').length;
+  return isTooLong || lineCount > 2 || hasMarkdownSignal;
+};
+
+const clipSuggestionText = (text: string, maxLength: number): string => {
+  if (text.length <= maxLength) return text;
+  return `${text.slice(0, maxLength)}...`;
 };
 
 export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeData, onApplySuggestion }: NodeDetailPanelProps) {
@@ -477,11 +450,9 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
     return {
       title: getStringField(currentNodeData, 'title'),
       text: getStringField(currentNodeData, 'text'),
-      subtype: getStringField(currentNodeData, 'subtype'),
       angle: getStringField(currentNodeData, 'angle'),
       objectName: getStringField(currentNodeData, 'objectName'),
       urls: getArrayField(currentNodeData, 'urls'),
-      parentId: getNumberField(currentNodeData, 'parentId'),
       fileUrl: getStringField(currentNodeData, 'fileUrl'),
       fileType: getStringField(currentNodeData, 'fileType')
     };
@@ -662,7 +633,7 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
     return { suggestions, contextTitle };
   }, [selectedNode?.id, nodeData, getLatestNodeData, forceRefresh, lastUpdatedAt]);
 
-  const { title, text, subtype, angle, objectName, urls, parentId, fileUrl, fileType } = nodeFields;
+  const { title, text, angle, objectName, urls, fileUrl, fileType } = nodeFields;
 
   const pdfFollowUpLabel = useMemo(() => {
     const labelSource = (typeof title === 'string' && title.trim().length > 0) ? title.trim() :
@@ -724,7 +695,7 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
   // 早期返回：当没有选中节点时
   if (!selectedNode || !nodeData) {
     return (
-      <div className="w-96 bg-white border-l border-gray-200 h-full flex items-center justify-center text-gray-500">
+      <div className="w-full bg-white border-l border-gray-200 h-full flex items-center justify-center text-gray-500">
         <div className="text-center">
           <Circle className="w-12 h-12 mx-auto mb-4 text-gray-300" />
           <p className="text-lg font-medium text-gray-400">未选择节点</p>
@@ -758,21 +729,22 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
     <div 
       className="bg-white border-l border-gray-200 h-full flex flex-col flex-shrink-0" 
       style={{ 
-        width: '384px',
-        maxWidth: '384px',
-        minWidth: '384px',
+        width: '100%',
+        maxWidth: '100%',
+        minWidth: 0,
         zIndex: 10,
         position: 'relative',
-        pointerEvents: 'auto'
+        pointerEvents: 'auto',
+        userSelect: 'text',
+        WebkitUserSelect: 'text'
       }}
       onClick={(e) => e.stopPropagation()}
     >
       {/* 头部 */}
       <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gray-50">
         <div className="flex items-center space-x-2">
-          {nodeTypeIcons[nodeTypeValue] || <Circle className="w-4 h-4" />}
           <h2 className="text-lg font-semibold text-gray-800">
-            {nodeTypeNames[nodeTypeValue] || '未知节点'}
+            节点详情
           </h2>
           {/* 显示生成状态指示器 */}
           {isGenerating && (
@@ -792,7 +764,7 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
       </div>
 
       {/* 内容区域 */}
-      <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-4 space-y-4 select-text">
         {/* 基本信息 */}
         <div className="space-y-3">
           {/* 节点标题 */}
@@ -1043,12 +1015,18 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
             </div>
             <div className="flex flex-col gap-2">
               {followUpInfo.suggestions.map((item, index) => {
-                const followUpText = typeof item.followUp === 'string' ? item.followUp.trim() : '';
-                const hintText = typeof item.hint === 'string' ? item.hint.trim() : '';
-                const titleText = typeof item.title === 'string' ? item.title.trim() : '';
-                const primary = followUpText || hintText || titleText;
-                const secondary = hintText && hintText !== primary ? hintText : '';
-                const payload = primary;
+                const rawFollowUp = typeof item.followUp === 'string' ? item.followUp : '';
+                const rawHint = typeof item.hint === 'string' ? item.hint : '';
+                const rawTitle = typeof item.title === 'string' ? item.title : '';
+                const followUpText = normalizeSuggestionText(rawFollowUp);
+                const hintText = normalizeSuggestionText(rawHint);
+                const titleText = normalizeSuggestionText(rawTitle);
+                const preferFollowUp = Boolean(followUpText) && !isNoisySuggestion(rawFollowUp);
+                const primary = preferFollowUp ? followUpText : (titleText || hintText || followUpText);
+                const secondaryCandidate = hintText && hintText !== primary ? hintText : '';
+                const secondary = clipSuggestionText(secondaryCandidate, 80);
+                const payload = clipSuggestionText(primary, 180);
+                const displayPrimary = clipSuggestionText(primary, 120);
                 return (
                   <button
                     key={`${item.title || 'suggestion'}-${index}`}
@@ -1076,9 +1054,9 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
                         </span>
                       )}
                     </div>
-                    {primary && (
+                    {displayPrimary && (
                       <p className="mt-1 text-sm leading-snug text-slate-800">
-                        {primary}
+                        {displayPrimary}
                       </p>
                     )}
                     {secondary && (
@@ -1094,16 +1072,10 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
         )}
 
         {/* 特殊属性 */}
-        {(subtype || angle || objectName || urls || circuitInfo?.pointDescription || circuitInfo?.detailContent) && (
+        {(angle || objectName || urls || circuitInfo?.pointDescription || circuitInfo?.detailContent) && (
           <div className="border-t border-gray-100 pt-4">
             <h4 className="text-sm font-medium text-gray-700 mb-3">附加信息</h4>
             <div className="space-y-2">
-              {subtype && (
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-600">子类型</span>
-                  <span className="font-medium text-gray-800">{subtype}</span>
-                </div>
-              )}
               {angle && (
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-gray-600">分析角度</span>
@@ -1189,26 +1161,6 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
           </div>
         )}
 
-        {/* 技术信息 */}
-        <div className="border-t border-gray-100 pt-4">
-          <h4 className="text-sm font-medium text-gray-700 mb-3">技术信息</h4>
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <span className="text-gray-600">节点ID</span>
-              <p className="font-mono text-xs text-gray-800 mt-1">{selectedNode.id}</p>
-            </div>
-            <div>
-              <span className="text-gray-600">节点类型</span>
-              <p className="font-mono text-xs text-gray-800 mt-1">{selectedNode.type}</p>
-            </div>
-            {parentId && (
-              <div className="col-span-2">
-                <span className="text-gray-600">父节点ID</span>
-                <p className="font-mono text-xs text-gray-800 mt-1">{parentId}</p>
-              </div>
-            )}
-          </div>
-        </div>
       </div>
 
     </div>

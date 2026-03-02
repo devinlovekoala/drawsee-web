@@ -2,7 +2,7 @@
 
 import React, { memo, useMemo, useEffect, useState, useCallback } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
-import { CircuitElement, CircuitElementType, ComponentVisualConfig } from '@/api/types/circuit.types';
+import { CircuitElement, CircuitElementType } from '@/api/types/circuit.types';
 import { SimulationMeasurementResult } from '../simulation/types';
 
 // 端口类型定义
@@ -135,10 +135,107 @@ const defaultPorts: Record<string, Port[]> = {
   ],
   [CircuitElementType.DIGITAL_DFF]: [
     { id: 'd', name: 'D', type: 'input', position: { side: 'left', x: 0, y: 40 } },
+    { id: 'pre', name: 'PRE', type: 'input', position: { side: 'top', x: 25, y: 0 } },
+    { id: 'clr', name: 'CLR', type: 'input', position: { side: 'top', x: 75, y: 0 } },
     { id: 'clk', name: 'CLK', type: 'input', position: { side: 'bottom', x: 50, y: 100 } },
-    { id: 'q', name: 'Q', type: 'output', position: { side: 'right', x: 100, y: 40 } }
+    { id: 'q', name: 'Q', type: 'output', position: { side: 'right', x: 100, y: 32 } },
+    { id: 'qn', name: 'Q̄', type: 'output', position: { side: 'right', x: 100, y: 68 } },
   ],
 };
+
+Object.assign(defaultPorts, {
+  [CircuitElementType.PULSE_SOURCE]: defaultPorts[CircuitElementType.AC_SOURCE],
+  [CircuitElementType.PWM_SOURCE]: defaultPorts[CircuitElementType.AC_SOURCE],
+  [CircuitElementType.SINE_SOURCE]: defaultPorts[CircuitElementType.AC_SOURCE],
+  [CircuitElementType.DIODE_ZENER]: defaultPorts[CircuitElementType.DIODE],
+  [CircuitElementType.DIODE_LED]: defaultPorts[CircuitElementType.DIODE],
+  [CircuitElementType.DIODE_SCHOTTKY]: defaultPorts[CircuitElementType.DIODE],
+  [CircuitElementType.DIGITAL_AND3]: [
+    { id: 'in1', name: '输入A', type: 'input', position: { side: 'left', x: 0, y: 22 } },
+    { id: 'in2', name: '输入B', type: 'input', position: { side: 'left', x: 0, y: 50 } },
+    { id: 'in3', name: '输入C', type: 'input', position: { side: 'left', x: 0, y: 78 } },
+    { id: 'out', name: '输出', type: 'output', position: { side: 'right', x: 100, y: 50 } },
+  ],
+  [CircuitElementType.DIGITAL_AND4]: [
+    { id: 'in1', name: '输入A', type: 'input', position: { side: 'left', x: 0, y: 17 } },
+    { id: 'in2', name: '输入B', type: 'input', position: { side: 'left', x: 0, y: 39 } },
+    { id: 'in3', name: '输入C', type: 'input', position: { side: 'left', x: 0, y: 61 } },
+    { id: 'in4', name: '输入D', type: 'input', position: { side: 'left', x: 0, y: 83 } },
+    { id: 'out', name: '输出', type: 'output', position: { side: 'right', x: 100, y: 50 } },
+  ],
+  [CircuitElementType.DIGITAL_OR3]: [
+    { id: 'in1', name: '输入A', type: 'input', position: { side: 'left', x: 0, y: 22 } },
+    { id: 'in2', name: '输入B', type: 'input', position: { side: 'left', x: 0, y: 50 } },
+    { id: 'in3', name: '输入C', type: 'input', position: { side: 'left', x: 0, y: 78 } },
+    { id: 'out', name: '输出', type: 'output', position: { side: 'right', x: 100, y: 50 } },
+  ],
+  [CircuitElementType.DIGITAL_OR4]: [
+    { id: 'in1', name: '输入A', type: 'input', position: { side: 'left', x: 0, y: 17 } },
+    { id: 'in2', name: '输入B', type: 'input', position: { side: 'left', x: 0, y: 39 } },
+    { id: 'in3', name: '输入C', type: 'input', position: { side: 'left', x: 0, y: 61 } },
+    { id: 'in4', name: '输入D', type: 'input', position: { side: 'left', x: 0, y: 83 } },
+    { id: 'out', name: '输出', type: 'output', position: { side: 'right', x: 100, y: 50 } },
+  ],
+  [CircuitElementType.DIGITAL_BUF]: [
+    { id: 'in', name: '输入', type: 'input', position: { side: 'left', x: 0, y: 50 } },
+    { id: 'out', name: '输出', type: 'output', position: { side: 'right', x: 100, y: 50 } },
+  ],
+  [CircuitElementType.DIGITAL_TRI]: [
+    { id: 'in', name: 'IN', type: 'input', position: { side: 'left', x: 0, y: 32 } },
+    { id: 'oe', name: 'OE', type: 'input', position: { side: 'left', x: 0, y: 70 } },
+    { id: 'out', name: 'OUT', type: 'output', position: { side: 'right', x: 100, y: 50 } },
+  ],
+  [CircuitElementType.DIGITAL_SCHMITT_NOT]: [
+    { id: 'in', name: '输入', type: 'input', position: { side: 'left', x: 0, y: 50 } },
+    { id: 'out', name: '输出', type: 'output', position: { side: 'right', x: 100, y: 50 } },
+  ],
+  [CircuitElementType.DIGITAL_NAND3]: [
+    { id: 'in1', name: '输入A', type: 'input', position: { side: 'left', x: 0, y: 22 } },
+    { id: 'in2', name: '输入B', type: 'input', position: { side: 'left', x: 0, y: 50 } },
+    { id: 'in3', name: '输入C', type: 'input', position: { side: 'left', x: 0, y: 78 } },
+    { id: 'out', name: '输出', type: 'output', position: { side: 'right', x: 100, y: 50 } },
+  ],
+  [CircuitElementType.DIGITAL_NAND4]: [
+    { id: 'in1', name: '输入A', type: 'input', position: { side: 'left', x: 0, y: 17 } },
+    { id: 'in2', name: '输入B', type: 'input', position: { side: 'left', x: 0, y: 39 } },
+    { id: 'in3', name: '输入C', type: 'input', position: { side: 'left', x: 0, y: 61 } },
+    { id: 'in4', name: '输入D', type: 'input', position: { side: 'left', x: 0, y: 83 } },
+    { id: 'out', name: '输出', type: 'output', position: { side: 'right', x: 100, y: 50 } },
+  ],
+  [CircuitElementType.DIGITAL_NOR3]: [
+    { id: 'in1', name: '输入A', type: 'input', position: { side: 'left', x: 0, y: 22 } },
+    { id: 'in2', name: '输入B', type: 'input', position: { side: 'left', x: 0, y: 50 } },
+    { id: 'in3', name: '输入C', type: 'input', position: { side: 'left', x: 0, y: 78 } },
+    { id: 'out', name: '输出', type: 'output', position: { side: 'right', x: 100, y: 50 } },
+  ],
+  [CircuitElementType.DIGITAL_NOR4]: [
+    { id: 'in1', name: '输入A', type: 'input', position: { side: 'left', x: 0, y: 17 } },
+    { id: 'in2', name: '输入B', type: 'input', position: { side: 'left', x: 0, y: 39 } },
+    { id: 'in3', name: '输入C', type: 'input', position: { side: 'left', x: 0, y: 61 } },
+    { id: 'in4', name: '输入D', type: 'input', position: { side: 'left', x: 0, y: 83 } },
+    { id: 'out', name: '输出', type: 'output', position: { side: 'right', x: 100, y: 50 } },
+  ],
+  [CircuitElementType.DIGITAL_JKFF]: [
+    { id: 'j', name: 'J', type: 'input', position: { side: 'left', x: 0, y: 22 } },
+    { id: 'k', name: 'K', type: 'input', position: { side: 'left', x: 0, y: 78 } },
+    { id: 'clk', name: 'CLK', type: 'input', position: { side: 'bottom', x: 50, y: 100 } },
+    { id: 'q', name: 'Q', type: 'output', position: { side: 'right', x: 100, y: 25 } },
+    { id: 'qn', name: 'Q̄', type: 'output', position: { side: 'right', x: 100, y: 75 } },
+  ],
+  [CircuitElementType.DIGITAL_TFF]: [
+    { id: 't', name: 'T', type: 'input', position: { side: 'left', x: 0, y: 45 } },
+    { id: 'clk', name: 'CLK', type: 'input', position: { side: 'bottom', x: 50, y: 100 } },
+    { id: 'q', name: 'Q', type: 'output', position: { side: 'right', x: 100, y: 30 } },
+    { id: 'qn', name: 'Q̄', type: 'output', position: { side: 'right', x: 100, y: 70 } },
+  ],
+  [CircuitElementType.DIGITAL_SRFF]: [
+    { id: 's', name: 'S', type: 'input', position: { side: 'left', x: 0, y: 30 } },
+    { id: 'r', name: 'R', type: 'input', position: { side: 'left', x: 0, y: 70 } },
+    { id: 'clk', name: 'CLK', type: 'input', position: { side: 'bottom', x: 50, y: 100 } },
+    { id: 'q', name: 'Q', type: 'output', position: { side: 'right', x: 100, y: 30 } },
+    { id: 'qn', name: 'Q̄', type: 'output', position: { side: 'right', x: 100, y: 70 } },
+  ],
+});
 
 // 为每种元件类型定义默认端口配置函数
 const getDefaultPorts = (elementType: string): Port[] => {
@@ -146,7 +243,7 @@ const getDefaultPorts = (elementType: string): Port[] => {
 };
 
 // 为了解决没有SVG组件问题，直接内嵌SVG组件
-const SVGComponents: Record<CircuitElementType, React.FC<React.SVGProps<SVGSVGElement>>> = {
+const SVGComponents: Partial<Record<CircuitElementType, React.FC<React.SVGProps<SVGSVGElement>>>> = {
   [CircuitElementType.RESISTOR]: (props: React.SVGProps<SVGSVGElement>) => (
     <svg {...props} viewBox="0 0 60 20" fill="none" xmlns="http://www.w3.org/2000/svg">
       <path d="M5,10 H15 M45,10 H55" stroke="currentColor" strokeWidth="2" />
@@ -378,6 +475,29 @@ const SVGComponents: Record<CircuitElementType, React.FC<React.SVGProps<SVGSVGEl
   )
 };
 
+Object.assign(SVGComponents, {
+  [CircuitElementType.PULSE_SOURCE]: SVGComponents[CircuitElementType.AC_SOURCE],
+  [CircuitElementType.PWM_SOURCE]: SVGComponents[CircuitElementType.AC_SOURCE],
+  [CircuitElementType.SINE_SOURCE]: SVGComponents[CircuitElementType.AC_SOURCE],
+  [CircuitElementType.DIODE_ZENER]: SVGComponents[CircuitElementType.DIODE],
+  [CircuitElementType.DIODE_LED]: SVGComponents[CircuitElementType.DIODE],
+  [CircuitElementType.DIODE_SCHOTTKY]: SVGComponents[CircuitElementType.DIODE],
+  [CircuitElementType.DIGITAL_AND3]: SVGComponents[CircuitElementType.DIGITAL_AND],
+  [CircuitElementType.DIGITAL_AND4]: SVGComponents[CircuitElementType.DIGITAL_AND],
+  [CircuitElementType.DIGITAL_OR3]: SVGComponents[CircuitElementType.DIGITAL_OR],
+  [CircuitElementType.DIGITAL_OR4]: SVGComponents[CircuitElementType.DIGITAL_OR],
+  [CircuitElementType.DIGITAL_BUF]: SVGComponents[CircuitElementType.DIGITAL_NOT],
+  [CircuitElementType.DIGITAL_TRI]: SVGComponents[CircuitElementType.DIGITAL_NOT],
+  [CircuitElementType.DIGITAL_SCHMITT_NOT]: SVGComponents[CircuitElementType.DIGITAL_NOT],
+  [CircuitElementType.DIGITAL_NAND3]: SVGComponents[CircuitElementType.DIGITAL_NAND],
+  [CircuitElementType.DIGITAL_NAND4]: SVGComponents[CircuitElementType.DIGITAL_NAND],
+  [CircuitElementType.DIGITAL_NOR3]: SVGComponents[CircuitElementType.DIGITAL_NOR],
+  [CircuitElementType.DIGITAL_NOR4]: SVGComponents[CircuitElementType.DIGITAL_NOR],
+  [CircuitElementType.DIGITAL_JKFF]: SVGComponents[CircuitElementType.DIGITAL_DFF],
+  [CircuitElementType.DIGITAL_TFF]: SVGComponents[CircuitElementType.DIGITAL_DFF],
+  [CircuitElementType.DIGITAL_SRFF]: SVGComponents[CircuitElementType.DIGITAL_DFF],
+});
+
 // 使用React.memo包裹电路节点组件，避免不必要的重渲染
 export const CircuitNode = memo(({ data, selected, id }: NodeProps<CircuitNodeData>) => {
   const [rotation, setRotation] = useState<number>(0);
@@ -433,7 +553,7 @@ export const CircuitNode = memo(({ data, selected, id }: NodeProps<CircuitNodeDa
   // 使用useMemo缓存SVG组件
   const SvgComponent = useMemo(() => {
     const validType = data.type || CircuitElementType.RESISTOR;
-    return SVGComponents[validType] || SVGComponents[CircuitElementType.RESISTOR];
+    return (SVGComponents[validType] || SVGComponents[CircuitElementType.RESISTOR] || (() => null)) as React.FC<React.SVGProps<SVGSVGElement>>;
   }, [data.type]);
   
   // 获取端口的位置样式
@@ -565,13 +685,20 @@ export const CircuitNode = memo(({ data, selected, id }: NodeProps<CircuitNodeDa
   
   // 获取元件类型名称，使用useMemo优化
   const elementTypeName = useMemo(() => {
-    const typeNames = {
+    const typeNames: Partial<Record<CircuitElementType, string>> = {
       [CircuitElementType.RESISTOR]: '电阻',
       [CircuitElementType.CAPACITOR]: '电容',
       [CircuitElementType.INDUCTOR]: '电感',
       [CircuitElementType.VOLTAGE_SOURCE]: '电压源',
       [CircuitElementType.CURRENT_SOURCE]: '电流源',
+      [CircuitElementType.AC_SOURCE]: '交流源',
+      [CircuitElementType.PULSE_SOURCE]: '脉冲源',
+      [CircuitElementType.PWM_SOURCE]: 'PWM源',
+      [CircuitElementType.SINE_SOURCE]: '正弦源',
       [CircuitElementType.DIODE]: '二极管',
+      [CircuitElementType.DIODE_ZENER]: '稳压二极管',
+      [CircuitElementType.DIODE_LED]: 'LED',
+      [CircuitElementType.DIODE_SCHOTTKY]: '肖特基',
       [CircuitElementType.TRANSISTOR_NPN]: 'NPN晶体管',
       [CircuitElementType.TRANSISTOR_PNP]: 'PNP晶体管',
       [CircuitElementType.GROUND]: '接地',
@@ -581,8 +708,30 @@ export const CircuitNode = memo(({ data, selected, id }: NodeProps<CircuitNodeDa
       [CircuitElementType.AMMETER]: '电流表',
       [CircuitElementType.VOLTMETER]: '电压表',
       [CircuitElementType.OSCILLOSCOPE]: '示波器',
+      [CircuitElementType.DIGITAL_AND]: 'AND',
+      [CircuitElementType.DIGITAL_AND3]: 'AND3',
+      [CircuitElementType.DIGITAL_AND4]: 'AND4',
+      [CircuitElementType.DIGITAL_OR]: 'OR',
+      [CircuitElementType.DIGITAL_OR3]: 'OR3',
+      [CircuitElementType.DIGITAL_OR4]: 'OR4',
+      [CircuitElementType.DIGITAL_NOT]: 'NOT',
+      [CircuitElementType.DIGITAL_BUF]: 'BUF',
+      [CircuitElementType.DIGITAL_TRI]: 'TRI',
+      [CircuitElementType.DIGITAL_SCHMITT_NOT]: 'S-NOT',
+      [CircuitElementType.DIGITAL_NAND]: 'NAND',
+      [CircuitElementType.DIGITAL_NAND3]: 'NAND3',
+      [CircuitElementType.DIGITAL_NAND4]: 'NAND4',
+      [CircuitElementType.DIGITAL_NOR]: 'NOR',
+      [CircuitElementType.DIGITAL_NOR3]: 'NOR3',
+      [CircuitElementType.DIGITAL_NOR4]: 'NOR4',
+      [CircuitElementType.DIGITAL_XOR]: 'XOR',
+      [CircuitElementType.DIGITAL_XNOR]: 'XNOR',
+      [CircuitElementType.DIGITAL_DFF]: 'DFF',
+      [CircuitElementType.DIGITAL_JKFF]: 'JK',
+      [CircuitElementType.DIGITAL_TFF]: 'TFF',
+      [CircuitElementType.DIGITAL_SRFF]: 'SR',
     };
-    return typeNames[data.type] || '元件';
+    return typeNames[data.type as CircuitElementType] || '元件';
   }, [data.type]);
 
   // 考虑到元件的旋转，处理端口位置

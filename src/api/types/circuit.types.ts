@@ -8,7 +8,13 @@ export enum CircuitElementType {
   VOLTAGE_SOURCE = 'dc_source',
   CURRENT_SOURCE = 'current_source',
   AC_SOURCE = 'ac_source',
+  PULSE_SOURCE = 'pulse_source',
+  PWM_SOURCE = 'pwm_source',
+  SINE_SOURCE = 'sine_source',
   DIODE = 'diode',
+  DIODE_ZENER = 'diode_zener',
+  DIODE_LED = 'diode_led',
+  DIODE_SCHOTTKY = 'diode_schottky',
   TRANSISTOR_NPN = 'bjt',
   TRANSISTOR_PNP = 'bjt_pnp',
   OPAMP = 'opamp',
@@ -22,13 +28,27 @@ export enum CircuitElementType {
   DIGITAL_OUTPUT = 'digital_output',
   DIGITAL_CLOCK = 'digital_clock',
   DIGITAL_AND = 'digital_and',
+  DIGITAL_AND3 = 'digital_and3',
+  DIGITAL_AND4 = 'digital_and4',
   DIGITAL_OR = 'digital_or',
+  DIGITAL_OR3 = 'digital_or3',
+  DIGITAL_OR4 = 'digital_or4',
   DIGITAL_NOT = 'digital_not',
+  DIGITAL_BUF = 'digital_buf',
+  DIGITAL_TRI = 'digital_tri',
+  DIGITAL_SCHMITT_NOT = 'digital_schmitt_not',
   DIGITAL_NAND = 'digital_nand',
+  DIGITAL_NAND3 = 'digital_nand3',
+  DIGITAL_NAND4 = 'digital_nand4',
   DIGITAL_NOR = 'digital_nor',
+  DIGITAL_NOR3 = 'digital_nor3',
+  DIGITAL_NOR4 = 'digital_nor4',
   DIGITAL_XOR = 'digital_xor',
   DIGITAL_XNOR = 'digital_xnor',
-  DIGITAL_DFF = 'digital_dff'
+  DIGITAL_DFF = 'digital_dff',
+  DIGITAL_JKFF = 'digital_jkff',
+  DIGITAL_TFF = 'digital_tff',
+  DIGITAL_SRFF = 'digital_srff'
 }
 
 // 基础坐标类型
@@ -148,6 +168,30 @@ export const ComponentVisualConfig: Record<CircuitElementType, ComponentVisualCo
     width: 40,
     height: 40
   },
+  [CircuitElementType.PULSE_SOURCE]: {
+    width: 40,
+    height: 40
+  },
+  [CircuitElementType.PWM_SOURCE]: {
+    width: 40,
+    height: 40
+  },
+  [CircuitElementType.SINE_SOURCE]: {
+    width: 40,
+    height: 40
+  },
+  [CircuitElementType.DIODE_ZENER]: {
+    width: 40,
+    height: 40
+  },
+  [CircuitElementType.DIODE_LED]: {
+    width: 40,
+    height: 40
+  },
+  [CircuitElementType.DIODE_SCHOTTKY]: {
+    width: 40,
+    height: 40
+  },
   [CircuitElementType.WIRE]: {
     width: 40,
     height: 40
@@ -184,11 +228,39 @@ export const ComponentVisualConfig: Record<CircuitElementType, ComponentVisualCo
     width: 60,
     height: 40
   },
+  [CircuitElementType.DIGITAL_AND3]: {
+    width: 60,
+    height: 44
+  },
+  [CircuitElementType.DIGITAL_AND4]: {
+    width: 60,
+    height: 48
+  },
   [CircuitElementType.DIGITAL_OR]: {
     width: 60,
     height: 40
   },
+  [CircuitElementType.DIGITAL_OR3]: {
+    width: 60,
+    height: 44
+  },
+  [CircuitElementType.DIGITAL_OR4]: {
+    width: 60,
+    height: 48
+  },
   [CircuitElementType.DIGITAL_NOT]: {
+    width: 60,
+    height: 40
+  },
+  [CircuitElementType.DIGITAL_BUF]: {
+    width: 60,
+    height: 40
+  },
+  [CircuitElementType.DIGITAL_TRI]: {
+    width: 60,
+    height: 42
+  },
+  [CircuitElementType.DIGITAL_SCHMITT_NOT]: {
     width: 60,
     height: 40
   },
@@ -196,9 +268,25 @@ export const ComponentVisualConfig: Record<CircuitElementType, ComponentVisualCo
     width: 60,
     height: 40
   },
+  [CircuitElementType.DIGITAL_NAND3]: {
+    width: 60,
+    height: 44
+  },
+  [CircuitElementType.DIGITAL_NAND4]: {
+    width: 60,
+    height: 48
+  },
   [CircuitElementType.DIGITAL_NOR]: {
     width: 60,
     height: 40
+  },
+  [CircuitElementType.DIGITAL_NOR3]: {
+    width: 60,
+    height: 44
+  },
+  [CircuitElementType.DIGITAL_NOR4]: {
+    width: 60,
+    height: 48
   },
   [CircuitElementType.DIGITAL_XOR]: {
     width: 60,
@@ -211,6 +299,18 @@ export const ComponentVisualConfig: Record<CircuitElementType, ComponentVisualCo
   [CircuitElementType.DIGITAL_DFF]: {
     width: 60,
     height: 40
+  },
+  [CircuitElementType.DIGITAL_JKFF]: {
+    width: 64,
+    height: 44
+  },
+  [CircuitElementType.DIGITAL_TFF]: {
+    width: 64,
+    height: 44
+  },
+  [CircuitElementType.DIGITAL_SRFF]: {
+    width: 64,
+    height: 44
   }
 };
 

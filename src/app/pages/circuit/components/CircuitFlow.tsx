@@ -74,14 +74,20 @@ const edgeTypes = {
 };
 
 // 元件命名前缀
-const elementNamePrefixes: Record<CircuitElementType, string> = {
+const elementNamePrefixes: Partial<Record<CircuitElementType, string>> = {
   [CircuitElementType.RESISTOR]: 'R',
   [CircuitElementType.CAPACITOR]: 'C',
   [CircuitElementType.INDUCTOR]: 'L',
   [CircuitElementType.VOLTAGE_SOURCE]: 'V',
   [CircuitElementType.CURRENT_SOURCE]: 'I',
   [CircuitElementType.AC_SOURCE]: 'VAC',
+  [CircuitElementType.PULSE_SOURCE]: 'VPULSE',
+  [CircuitElementType.PWM_SOURCE]: 'VPWM',
+  [CircuitElementType.SINE_SOURCE]: 'VSIN',
   [CircuitElementType.DIODE]: 'D',
+  [CircuitElementType.DIODE_ZENER]: 'DZ',
+  [CircuitElementType.DIODE_LED]: 'LED',
+  [CircuitElementType.DIODE_SCHOTTKY]: 'DS',
   [CircuitElementType.TRANSISTOR_NPN]: 'Q',
   [CircuitElementType.TRANSISTOR_PNP]: 'Q',
   [CircuitElementType.GROUND]: 'GND',
@@ -95,13 +101,27 @@ const elementNamePrefixes: Record<CircuitElementType, string> = {
   [CircuitElementType.DIGITAL_OUTPUT]: 'DOUT',
   [CircuitElementType.DIGITAL_CLOCK]: 'CLK',
   [CircuitElementType.DIGITAL_AND]: 'AND',
+  [CircuitElementType.DIGITAL_AND3]: 'AND3',
+  [CircuitElementType.DIGITAL_AND4]: 'AND4',
   [CircuitElementType.DIGITAL_OR]: 'OR',
+  [CircuitElementType.DIGITAL_OR3]: 'OR3',
+  [CircuitElementType.DIGITAL_OR4]: 'OR4',
   [CircuitElementType.DIGITAL_NOT]: 'NOT',
+  [CircuitElementType.DIGITAL_BUF]: 'BUF',
+  [CircuitElementType.DIGITAL_TRI]: 'TRI',
+  [CircuitElementType.DIGITAL_SCHMITT_NOT]: 'SCHMITT',
   [CircuitElementType.DIGITAL_NAND]: 'NAND',
+  [CircuitElementType.DIGITAL_NAND3]: 'NAND3',
+  [CircuitElementType.DIGITAL_NAND4]: 'NAND4',
   [CircuitElementType.DIGITAL_NOR]: 'NOR',
+  [CircuitElementType.DIGITAL_NOR3]: 'NOR3',
+  [CircuitElementType.DIGITAL_NOR4]: 'NOR4',
   [CircuitElementType.DIGITAL_XOR]: 'XOR',
   [CircuitElementType.DIGITAL_XNOR]: 'XNOR',
-  [CircuitElementType.DIGITAL_DFF]: 'DFF'
+  [CircuitElementType.DIGITAL_DFF]: 'DFF',
+  [CircuitElementType.DIGITAL_JKFF]: 'JK',
+  [CircuitElementType.DIGITAL_TFF]: 'TFF',
+  [CircuitElementType.DIGITAL_SRFF]: 'SR'
 };
 
 const serializeCircuitDesignSnapshot = (design?: CircuitDesign | null): string => JSON.stringify({
@@ -148,7 +168,10 @@ const analogElementCategories: ElementCategory[] = [
     elements: [
       { type: CircuitElementType.VOLTAGE_SOURCE, name: '电压源 (V)', shortcut: 'V' },
       { type: CircuitElementType.CURRENT_SOURCE, name: '电流源 (I)', shortcut: 'I' },
-      { type: CircuitElementType.AC_SOURCE, name: '交流信号源 (AC)', shortcut: 'A' }
+      { type: CircuitElementType.AC_SOURCE, name: '交流信号源 (AC)', shortcut: 'A' },
+      { type: CircuitElementType.PULSE_SOURCE, name: '脉冲源 (VPULSE)', shortcut: 'PULSE' },
+      { type: CircuitElementType.PWM_SOURCE, name: 'PWM源 (VPWM)', shortcut: 'PWM' },
+      { type: CircuitElementType.SINE_SOURCE, name: '正弦源 (VSIN)', shortcut: 'SIN' }
     ]
   },
   {
@@ -157,6 +180,9 @@ const analogElementCategories: ElementCategory[] = [
     icon: <ApartmentOutlined />,
     elements: [
       { type: CircuitElementType.DIODE, name: '二极管 (D)', shortcut: 'D' },
+      { type: CircuitElementType.DIODE_ZENER, name: '稳压二极管', shortcut: 'DZ' },
+      { type: CircuitElementType.DIODE_LED, name: '发光二极管', shortcut: 'LED' },
+      { type: CircuitElementType.DIODE_SCHOTTKY, name: '肖特基二极管', shortcut: 'DS' },
       { type: CircuitElementType.TRANSISTOR_NPN, name: 'NPN 晶体管', shortcut: 'N' },
       { type: CircuitElementType.TRANSISTOR_PNP, name: 'PNP 晶体管', shortcut: 'P' }
     ]
@@ -198,10 +224,21 @@ const digitalElementCategories: ElementCategory[] = [
     icon: <GatewayOutlined />,
     elements: [
       { type: CircuitElementType.DIGITAL_AND, name: '与门 (AND)', shortcut: 'AND' },
+      { type: CircuitElementType.DIGITAL_AND3, name: '三输入与门 (AND3)', shortcut: 'AND3' },
+      { type: CircuitElementType.DIGITAL_AND4, name: '四输入与门 (AND4)', shortcut: 'AND4' },
       { type: CircuitElementType.DIGITAL_OR, name: '或门 (OR)', shortcut: 'OR' },
+      { type: CircuitElementType.DIGITAL_OR3, name: '三输入或门 (OR3)', shortcut: 'OR3' },
+      { type: CircuitElementType.DIGITAL_OR4, name: '四输入或门 (OR4)', shortcut: 'OR4' },
       { type: CircuitElementType.DIGITAL_NOT, name: '非门 (NOT)', shortcut: 'NOT' },
+      { type: CircuitElementType.DIGITAL_BUF, name: '缓冲器 (BUF)', shortcut: 'BUF' },
+      { type: CircuitElementType.DIGITAL_TRI, name: '三态缓冲器 (TRI)', shortcut: 'TRI' },
+      { type: CircuitElementType.DIGITAL_SCHMITT_NOT, name: '史密特触发反相器', shortcut: 'SCH' },
       { type: CircuitElementType.DIGITAL_NAND, name: '与非门 (NAND)', shortcut: 'NAND' },
+      { type: CircuitElementType.DIGITAL_NAND3, name: '三输入与非门 (NAND3)', shortcut: 'NAND3' },
+      { type: CircuitElementType.DIGITAL_NAND4, name: '四输入与非门 (NAND4)', shortcut: 'NAND4' },
       { type: CircuitElementType.DIGITAL_NOR, name: '或非门 (NOR)', shortcut: 'NOR' },
+      { type: CircuitElementType.DIGITAL_NOR3, name: '三输入或非门 (NOR3)', shortcut: 'NOR3' },
+      { type: CircuitElementType.DIGITAL_NOR4, name: '四输入或非门 (NOR4)', shortcut: 'NOR4' },
       { type: CircuitElementType.DIGITAL_XOR, name: '异或门 (XOR)', shortcut: 'XOR' },
       { type: CircuitElementType.DIGITAL_XNOR, name: '同或门 (XNOR)', shortcut: 'XNOR' }
     ]
@@ -211,7 +248,10 @@ const digitalElementCategories: ElementCategory[] = [
     label: '时序单元',
     icon: <HddOutlined />,
     elements: [
-      { type: CircuitElementType.DIGITAL_DFF, name: 'D 触发器', shortcut: 'DFF' }
+      { type: CircuitElementType.DIGITAL_DFF, name: 'D 触发器', shortcut: 'DFF' },
+      { type: CircuitElementType.DIGITAL_JKFF, name: 'JK 触发器', shortcut: 'JK' },
+      { type: CircuitElementType.DIGITAL_TFF, name: 'T 触发器', shortcut: 'TFF' },
+      { type: CircuitElementType.DIGITAL_SRFF, name: 'SR 触发器', shortcut: 'SR' }
     ]
   }
 ];
@@ -225,7 +265,13 @@ const analogElementMenuItems: MenuItemConfig[] = [
   { key: CircuitElementType.VOLTAGE_SOURCE, label: '电压源 (V)' },
   { key: CircuitElementType.CURRENT_SOURCE, label: '电流源 (I)' },
   { key: CircuitElementType.AC_SOURCE, label: '交流信号源 (AC)' },
+  { key: CircuitElementType.PULSE_SOURCE, label: '脉冲源 (VPULSE)' },
+  { key: CircuitElementType.PWM_SOURCE, label: 'PWM源 (VPWM)' },
+  { key: CircuitElementType.SINE_SOURCE, label: '正弦源 (VSIN)' },
   { key: CircuitElementType.DIODE, label: '二极管 (D)' },
+  { key: CircuitElementType.DIODE_ZENER, label: '稳压二极管' },
+  { key: CircuitElementType.DIODE_LED, label: '发光二极管' },
+  { key: CircuitElementType.DIODE_SCHOTTKY, label: '肖特基二极管' },
   { key: CircuitElementType.TRANSISTOR_NPN, label: 'NPN 晶体管' },
   { key: CircuitElementType.TRANSISTOR_PNP, label: 'PNP 晶体管' },
   { key: CircuitElementType.GROUND, label: '接地 (GND)' },
@@ -240,13 +286,27 @@ const digitalElementMenuItems: MenuItemConfig[] = [
   { key: CircuitElementType.DIGITAL_OUTPUT, label: '数字输出 (OUT)' },
   { key: CircuitElementType.DIGITAL_CLOCK, label: '时钟源 (CLK)' },
   { key: CircuitElementType.DIGITAL_AND, label: '与门 (AND)' },
+  { key: CircuitElementType.DIGITAL_AND3, label: '三输入与门 (AND3)' },
+  { key: CircuitElementType.DIGITAL_AND4, label: '四输入与门 (AND4)' },
   { key: CircuitElementType.DIGITAL_OR, label: '或门 (OR)' },
+  { key: CircuitElementType.DIGITAL_OR3, label: '三输入或门 (OR3)' },
+  { key: CircuitElementType.DIGITAL_OR4, label: '四输入或门 (OR4)' },
   { key: CircuitElementType.DIGITAL_NOT, label: '非门 (NOT)' },
+  { key: CircuitElementType.DIGITAL_BUF, label: '缓冲器 (BUF)' },
+  { key: CircuitElementType.DIGITAL_TRI, label: '三态缓冲器 (TRI)' },
+  { key: CircuitElementType.DIGITAL_SCHMITT_NOT, label: '史密特触发反相器' },
   { key: CircuitElementType.DIGITAL_NAND, label: '与非门 (NAND)' },
+  { key: CircuitElementType.DIGITAL_NAND3, label: '三输入与非门 (NAND3)' },
+  { key: CircuitElementType.DIGITAL_NAND4, label: '四输入与非门 (NAND4)' },
   { key: CircuitElementType.DIGITAL_NOR, label: '或非门 (NOR)' },
+  { key: CircuitElementType.DIGITAL_NOR3, label: '三输入或非门 (NOR3)' },
+  { key: CircuitElementType.DIGITAL_NOR4, label: '四输入或非门 (NOR4)' },
   { key: CircuitElementType.DIGITAL_XOR, label: '异或门 (XOR)' },
   { key: CircuitElementType.DIGITAL_XNOR, label: '同或门 (XNOR)' },
-  { key: CircuitElementType.DIGITAL_DFF, label: 'D 触发器 (DFF)' }
+  { key: CircuitElementType.DIGITAL_DFF, label: 'D 触发器 (DFF)' },
+  { key: CircuitElementType.DIGITAL_JKFF, label: 'JK 触发器' },
+  { key: CircuitElementType.DIGITAL_TFF, label: 'T 触发器' },
+  { key: CircuitElementType.DIGITAL_SRFF, label: 'SR 触发器' }
 ];
 
 const getElementCategories = (mode: CircuitWorkspaceMode): ElementCategory[] => {
@@ -367,8 +427,11 @@ const defaultPorts = {
   ],
   [CircuitElementType.DIGITAL_DFF]: [
     { id: 'd', name: 'D', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 40, align: 'center' as const } },
+    { id: 'pre', name: 'PRE', type: 'input' as const, position: { side: 'top' as const, x: 25, y: 0, align: 'center' as const } },
+    { id: 'clr', name: 'CLR', type: 'input' as const, position: { side: 'top' as const, x: 75, y: 0, align: 'center' as const } },
     { id: 'clk', name: 'CLK', type: 'input' as const, position: { side: 'bottom' as const, x: 50, y: 100, align: 'center' as const } },
-    { id: 'q', name: 'Q', type: 'output' as const, position: { side: 'right' as const, x: 100, y: 40, align: 'center' as const } }
+    { id: 'q', name: 'Q', type: 'output' as const, position: { side: 'right' as const, x: 100, y: 32, align: 'center' as const } },
+    { id: 'qn', name: 'Q̄', type: 'output' as const, position: { side: 'right' as const, x: 100, y: 68, align: 'center' as const } }
   ],
   [CircuitElementType.JUNCTION]: [
     { id: 'port-left', name: 'Left', type: 'bidirectional' as const, position: { side: 'left' as const, x: 0, y: 50, align: 'center' as const } },
@@ -378,18 +441,115 @@ const defaultPorts = {
   ],
 };
 
+const createThreeInputGatePorts = () => ([
+  { id: 'in1', name: '输入A', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 22, align: 'center' as const } },
+  { id: 'in2', name: '输入B', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 50, align: 'center' as const } },
+  { id: 'in3', name: '输入C', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 78, align: 'center' as const } },
+  { id: 'out', name: '输出', type: 'output' as const, position: { side: 'right' as const, x: 100, y: 50, align: 'center' as const } },
+]);
+
+const createFourInputGatePorts = () => ([
+  { id: 'in1', name: '输入A', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 17, align: 'center' as const } },
+  { id: 'in2', name: '输入B', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 39, align: 'center' as const } },
+  { id: 'in3', name: '输入C', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 61, align: 'center' as const } },
+  { id: 'in4', name: '输入D', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 83, align: 'center' as const } },
+  { id: 'out', name: '输出', type: 'output' as const, position: { side: 'right' as const, x: 100, y: 50, align: 'center' as const } },
+]);
+
+Object.assign(defaultPorts, {
+  [CircuitElementType.PULSE_SOURCE]: [
+    { id: 'positive', name: '正极', type: 'output' as const, position: { side: 'right' as const, x: 100, y: 50, align: 'center' as const } },
+    { id: 'negative', name: '负极', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 50, align: 'center' as const } },
+  ],
+  [CircuitElementType.PWM_SOURCE]: [
+    { id: 'positive', name: '正极', type: 'output' as const, position: { side: 'right' as const, x: 100, y: 50, align: 'center' as const } },
+    { id: 'negative', name: '负极', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 50, align: 'center' as const } },
+  ],
+  [CircuitElementType.SINE_SOURCE]: [
+    { id: 'positive', name: '正极', type: 'output' as const, position: { side: 'right' as const, x: 100, y: 50, align: 'center' as const } },
+    { id: 'negative', name: '负极', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 50, align: 'center' as const } },
+  ],
+  [CircuitElementType.DIODE_ZENER]: [
+    { id: 'anode', name: '阳极', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 50, align: 'center' as const } },
+    { id: 'cathode', name: '阴极', type: 'output' as const, position: { side: 'right' as const, x: 100, y: 50, align: 'center' as const } },
+  ],
+  [CircuitElementType.DIODE_LED]: [
+    { id: 'anode', name: '阳极', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 50, align: 'center' as const } },
+    { id: 'cathode', name: '阴极', type: 'output' as const, position: { side: 'right' as const, x: 100, y: 50, align: 'center' as const } },
+  ],
+  [CircuitElementType.DIODE_SCHOTTKY]: [
+    { id: 'anode', name: '阳极', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 50, align: 'center' as const } },
+    { id: 'cathode', name: '阴极', type: 'output' as const, position: { side: 'right' as const, x: 100, y: 50, align: 'center' as const } },
+  ],
+  [CircuitElementType.DIGITAL_AND3]: createThreeInputGatePorts(),
+  [CircuitElementType.DIGITAL_AND4]: createFourInputGatePorts(),
+  [CircuitElementType.DIGITAL_OR3]: createThreeInputGatePorts(),
+  [CircuitElementType.DIGITAL_OR4]: createFourInputGatePorts(),
+  [CircuitElementType.DIGITAL_BUF]: [
+    { id: 'in', name: '输入', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 50, align: 'center' as const } },
+    { id: 'out', name: '输出', type: 'output' as const, position: { side: 'right' as const, x: 100, y: 50, align: 'center' as const } },
+  ],
+  [CircuitElementType.DIGITAL_TRI]: [
+    { id: 'in', name: 'IN', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 32, align: 'center' as const } },
+    { id: 'oe', name: 'OE', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 70, align: 'center' as const } },
+    { id: 'out', name: 'OUT', type: 'output' as const, position: { side: 'right' as const, x: 100, y: 50, align: 'center' as const } },
+  ],
+  [CircuitElementType.DIGITAL_SCHMITT_NOT]: [
+    { id: 'in', name: '输入', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 50, align: 'center' as const } },
+    { id: 'out', name: '输出', type: 'output' as const, position: { side: 'right' as const, x: 100, y: 50, align: 'center' as const } },
+  ],
+  [CircuitElementType.DIGITAL_NAND3]: createThreeInputGatePorts(),
+  [CircuitElementType.DIGITAL_NAND4]: createFourInputGatePorts(),
+  [CircuitElementType.DIGITAL_NOR3]: createThreeInputGatePorts(),
+  [CircuitElementType.DIGITAL_NOR4]: createFourInputGatePorts(),
+  [CircuitElementType.DIGITAL_JKFF]: [
+    { id: 'j', name: 'J', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 22, align: 'center' as const } },
+    { id: 'k', name: 'K', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 78, align: 'center' as const } },
+    { id: 'clk', name: 'CLK', type: 'input' as const, position: { side: 'bottom' as const, x: 50, y: 100, align: 'center' as const } },
+    { id: 'q', name: 'Q', type: 'output' as const, position: { side: 'right' as const, x: 100, y: 25, align: 'center' as const } },
+    { id: 'qn', name: 'Q̄', type: 'output' as const, position: { side: 'right' as const, x: 100, y: 75, align: 'center' as const } },
+  ],
+  [CircuitElementType.DIGITAL_TFF]: [
+    { id: 't', name: 'T', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 45, align: 'center' as const } },
+    { id: 'clk', name: 'CLK', type: 'input' as const, position: { side: 'bottom' as const, x: 50, y: 100, align: 'center' as const } },
+    { id: 'q', name: 'Q', type: 'output' as const, position: { side: 'right' as const, x: 100, y: 30, align: 'center' as const } },
+    { id: 'qn', name: 'Q̄', type: 'output' as const, position: { side: 'right' as const, x: 100, y: 70, align: 'center' as const } },
+  ],
+  [CircuitElementType.DIGITAL_SRFF]: [
+    { id: 's', name: 'S', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 30, align: 'center' as const } },
+    { id: 'r', name: 'R', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 70, align: 'center' as const } },
+    { id: 'clk', name: 'CLK', type: 'input' as const, position: { side: 'bottom' as const, x: 50, y: 100, align: 'center' as const } },
+    { id: 'q', name: 'Q', type: 'output' as const, position: { side: 'right' as const, x: 100, y: 30, align: 'center' as const } },
+    { id: 'qn', name: 'Q̄', type: 'output' as const, position: { side: 'right' as const, x: 100, y: 70, align: 'center' as const } },
+  ],
+});
+
 const DIGITAL_ELEMENT_TYPES = new Set<CircuitElementType>([
   CircuitElementType.DIGITAL_INPUT,
   CircuitElementType.DIGITAL_OUTPUT,
   CircuitElementType.DIGITAL_CLOCK,
   CircuitElementType.DIGITAL_AND,
+  CircuitElementType.DIGITAL_AND3,
+  CircuitElementType.DIGITAL_AND4,
   CircuitElementType.DIGITAL_OR,
+  CircuitElementType.DIGITAL_OR3,
+  CircuitElementType.DIGITAL_OR4,
   CircuitElementType.DIGITAL_NOT,
+  CircuitElementType.DIGITAL_BUF,
+  CircuitElementType.DIGITAL_TRI,
+  CircuitElementType.DIGITAL_SCHMITT_NOT,
   CircuitElementType.DIGITAL_NAND,
+  CircuitElementType.DIGITAL_NAND3,
+  CircuitElementType.DIGITAL_NAND4,
   CircuitElementType.DIGITAL_NOR,
+  CircuitElementType.DIGITAL_NOR3,
+  CircuitElementType.DIGITAL_NOR4,
   CircuitElementType.DIGITAL_XOR,
   CircuitElementType.DIGITAL_XNOR,
   CircuitElementType.DIGITAL_DFF,
+  CircuitElementType.DIGITAL_JKFF,
+  CircuitElementType.DIGITAL_TFF,
+  CircuitElementType.DIGITAL_SRFF,
 ]);
 
 const ANALOG_ELEMENT_TYPES = new Set<CircuitElementType>([
@@ -399,7 +559,13 @@ const ANALOG_ELEMENT_TYPES = new Set<CircuitElementType>([
   CircuitElementType.VOLTAGE_SOURCE,
   CircuitElementType.CURRENT_SOURCE,
   CircuitElementType.AC_SOURCE,
+  CircuitElementType.PULSE_SOURCE,
+  CircuitElementType.PWM_SOURCE,
+  CircuitElementType.SINE_SOURCE,
   CircuitElementType.DIODE,
+  CircuitElementType.DIODE_ZENER,
+  CircuitElementType.DIODE_LED,
+  CircuitElementType.DIODE_SCHOTTKY,
   CircuitElementType.TRANSISTOR_NPN,
   CircuitElementType.TRANSISTOR_PNP,
   CircuitElementType.GROUND,
@@ -410,8 +576,8 @@ const ANALOG_ELEMENT_TYPES = new Set<CircuitElementType>([
 ]);
 
 const ANALOG_COLUMN_GROUPS: CircuitElementType[][] = [
-  [CircuitElementType.VOLTAGE_SOURCE, CircuitElementType.CURRENT_SOURCE, CircuitElementType.AC_SOURCE],
-  [CircuitElementType.RESISTOR, CircuitElementType.CAPACITOR, CircuitElementType.INDUCTOR, CircuitElementType.DIODE],
+  [CircuitElementType.VOLTAGE_SOURCE, CircuitElementType.CURRENT_SOURCE, CircuitElementType.AC_SOURCE, CircuitElementType.PULSE_SOURCE, CircuitElementType.PWM_SOURCE, CircuitElementType.SINE_SOURCE],
+  [CircuitElementType.RESISTOR, CircuitElementType.CAPACITOR, CircuitElementType.INDUCTOR, CircuitElementType.DIODE, CircuitElementType.DIODE_ZENER, CircuitElementType.DIODE_LED, CircuitElementType.DIODE_SCHOTTKY],
   [CircuitElementType.TRANSISTOR_NPN, CircuitElementType.TRANSISTOR_PNP, CircuitElementType.OPAMP],
   [CircuitElementType.AMMETER, CircuitElementType.VOLTMETER, CircuitElementType.OSCILLOSCOPE, CircuitElementType.GROUND],
 ];
@@ -438,6 +604,8 @@ const supplyUccPattern = /(UCC|VCC|VDD|VSS|VBAT|SUPPLY)/i;
 
 const labelTypeHints: Array<{ keywords: RegExp; type: CircuitElementType }> = [
   { keywords: /NAND/i, type: CircuitElementType.DIGITAL_NAND },
+  { keywords: /BUF/i, type: CircuitElementType.DIGITAL_BUF },
+  { keywords: /TRI/i, type: CircuitElementType.DIGITAL_TRI },
   { keywords: /NOR/i, type: CircuitElementType.DIGITAL_NOR },
   { keywords: /XNOR/i, type: CircuitElementType.DIGITAL_XNOR },
   { keywords: /XOR/i, type: CircuitElementType.DIGITAL_XOR },
@@ -483,6 +651,9 @@ const sanitizeAnalogElements = (
       (
         element.type === CircuitElementType.VOLTAGE_SOURCE ||
         element.type === CircuitElementType.AC_SOURCE ||
+        element.type === CircuitElementType.PULSE_SOURCE ||
+        element.type === CircuitElementType.PWM_SOURCE ||
+        element.type === CircuitElementType.SINE_SOURCE ||
         element.type === CircuitElementType.CURRENT_SOURCE ||
         element.type === CircuitElementType.VOLTMETER
       )
@@ -1202,21 +1373,15 @@ const measurementElementTypes = new Set<CircuitElementType>([
   CircuitElementType.OSCILLOSCOPE,
 ]);
 
-const nonConfigurableDigitalTypes = new Set<CircuitElementType>([
-  CircuitElementType.DIGITAL_AND,
-  CircuitElementType.DIGITAL_OR,
-  CircuitElementType.DIGITAL_NOT,
-  CircuitElementType.DIGITAL_NAND,
-  CircuitElementType.DIGITAL_NOR,
-  CircuitElementType.DIGITAL_XOR,
-  CircuitElementType.DIGITAL_XNOR,
-  CircuitElementType.DIGITAL_DFF,
-]);
+const nonConfigurableDigitalTypes = new Set<CircuitElementType>([]);
 
 const powerSourceElementTypes = new Set<CircuitElementType>([
   CircuitElementType.VOLTAGE_SOURCE,
   CircuitElementType.CURRENT_SOURCE,
   CircuitElementType.AC_SOURCE,
+  CircuitElementType.PULSE_SOURCE,
+  CircuitElementType.PWM_SOURCE,
+  CircuitElementType.SINE_SOURCE,
 ]);
 
 const measurementTypeLabels: Partial<Record<CircuitElementType, string>> = {
@@ -2007,7 +2172,13 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
         [CircuitElementType.VOLTAGE_SOURCE]: '5V',
         [CircuitElementType.CURRENT_SOURCE]: '10mA',
         [CircuitElementType.AC_SOURCE]: '1Vpp@1kHz',
+        [CircuitElementType.PULSE_SOURCE]: '0,5,1ns,1ns,1ns,5ns,10ns',
+        [CircuitElementType.PWM_SOURCE]: '1kHz@50%',
+        [CircuitElementType.SINE_SOURCE]: '1V@1kHz',
         [CircuitElementType.DIODE]: '',
+        [CircuitElementType.DIODE_ZENER]: '',
+        [CircuitElementType.DIODE_LED]: '',
+        [CircuitElementType.DIODE_SCHOTTKY]: '',
         [CircuitElementType.TRANSISTOR_NPN]: '',
         [CircuitElementType.TRANSISTOR_PNP]: '',
         [CircuitElementType.GROUND]: '',
@@ -2019,13 +2190,27 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
         [CircuitElementType.DIGITAL_OUTPUT]: '',
         [CircuitElementType.DIGITAL_CLOCK]: '10ns',
         [CircuitElementType.DIGITAL_AND]: '',
+        [CircuitElementType.DIGITAL_AND3]: '',
+        [CircuitElementType.DIGITAL_AND4]: '',
         [CircuitElementType.DIGITAL_OR]: '',
+        [CircuitElementType.DIGITAL_OR3]: '',
+        [CircuitElementType.DIGITAL_OR4]: '',
         [CircuitElementType.DIGITAL_NOT]: '',
+        [CircuitElementType.DIGITAL_BUF]: '',
+        [CircuitElementType.DIGITAL_TRI]: '',
+        [CircuitElementType.DIGITAL_SCHMITT_NOT]: '',
         [CircuitElementType.DIGITAL_NAND]: '',
+        [CircuitElementType.DIGITAL_NAND3]: '',
+        [CircuitElementType.DIGITAL_NAND4]: '',
         [CircuitElementType.DIGITAL_NOR]: '',
+        [CircuitElementType.DIGITAL_NOR3]: '',
+        [CircuitElementType.DIGITAL_NOR4]: '',
         [CircuitElementType.DIGITAL_XOR]: '',
         [CircuitElementType.DIGITAL_XNOR]: '',
-        [CircuitElementType.DIGITAL_DFF]: ''
+        [CircuitElementType.DIGITAL_DFF]: '',
+        [CircuitElementType.DIGITAL_JKFF]: '',
+        [CircuitElementType.DIGITAL_TFF]: '',
+        [CircuitElementType.DIGITAL_SRFF]: ''
       };
       
       const elementValue = defaultValues[type] || '';
@@ -2136,7 +2321,13 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
           [CircuitElementType.VOLTAGE_SOURCE]: '5V',
           [CircuitElementType.CURRENT_SOURCE]: '10mA',
           [CircuitElementType.AC_SOURCE]: '1Vpp@1kHz',
+          [CircuitElementType.PULSE_SOURCE]: '0,5,1ns,1ns,1ns,5ns,10ns',
+          [CircuitElementType.PWM_SOURCE]: '1kHz@50%',
+          [CircuitElementType.SINE_SOURCE]: '1V@1kHz',
           [CircuitElementType.DIODE]: '',
+          [CircuitElementType.DIODE_ZENER]: '',
+          [CircuitElementType.DIODE_LED]: '',
+          [CircuitElementType.DIODE_SCHOTTKY]: '',
           [CircuitElementType.TRANSISTOR_NPN]: '',
           [CircuitElementType.TRANSISTOR_PNP]: '',
           [CircuitElementType.GROUND]: '',
@@ -2144,6 +2335,20 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
           [CircuitElementType.AMMETER]: '0A',
           [CircuitElementType.VOLTMETER]: '0V',
           [CircuitElementType.OSCILLOSCOPE]: 'CH1',
+          [CircuitElementType.DIGITAL_AND3]: '',
+          [CircuitElementType.DIGITAL_AND4]: '',
+          [CircuitElementType.DIGITAL_OR3]: '',
+          [CircuitElementType.DIGITAL_OR4]: '',
+          [CircuitElementType.DIGITAL_BUF]: '',
+          [CircuitElementType.DIGITAL_TRI]: '',
+          [CircuitElementType.DIGITAL_SCHMITT_NOT]: '',
+          [CircuitElementType.DIGITAL_NAND3]: '',
+          [CircuitElementType.DIGITAL_NAND4]: '',
+          [CircuitElementType.DIGITAL_NOR3]: '',
+          [CircuitElementType.DIGITAL_NOR4]: '',
+          [CircuitElementType.DIGITAL_JKFF]: '',
+          [CircuitElementType.DIGITAL_TFF]: '',
+          [CircuitElementType.DIGITAL_SRFF]: '',
         };
         
         // 根据节点类型获取默认端口配置
@@ -3203,15 +3408,21 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
           
           // 确保element属性正确更新
           if (updatedData.element) {
+            const nextElement = (updates.element || {}) as Partial<CircuitElement>;
+            const mergedProperties = {
+              ...updatedData.element.properties,
+              ...(nextElement.properties || {}),
+            };
             updatedData.element = {
               ...updatedData.element,
-              label: updates.label || updatedData.element.label,
-              value: updates.value || updatedData.element.value,
+              ...nextElement,
+              label: updates.label ?? nextElement.label ?? updatedData.element.label,
+              value: updates.value ?? nextElement.value ?? updatedData.element.value,
               properties: {
-                ...updatedData.element.properties,
-                label: updates.label || updatedData.element.properties?.label,
-                value: updates.value || updatedData.element.properties?.value
-              }
+                ...mergedProperties,
+                label: updates.label ?? nextElement.label ?? mergedProperties.label,
+                value: updates.value ?? nextElement.value ?? mergedProperties.value,
+              },
             };
           }
           
@@ -3792,7 +4003,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
         {activeMeasurementResult ? (
           <div className="space-y-4">
             <div className="text-xs text-gray-500">
-              仪表类型：{measurementTypeLabels[activeMeasurementResult.type] || activeMeasurementResult.type}
+              仪表类型：{measurementTypeLabels[activeMeasurementResult.elementType as CircuitElementType] || activeMeasurementResult.elementType}
             </div>
             {activeMeasurementResult.nets && activeMeasurementResult.nets.length > 0 && (
               <div className="text-[11px] text-gray-500 flex flex-wrap gap-2">

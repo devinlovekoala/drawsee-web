@@ -55,6 +55,9 @@ const getElementIcon = (type: CircuitElementType) => {
         </svg>
       );
     case CircuitElementType.AC_SOURCE:
+    case CircuitElementType.PULSE_SOURCE:
+    case CircuitElementType.PWM_SOURCE:
+    case CircuitElementType.SINE_SOURCE:
       return (
         <svg {...svgProps}>
           <circle cx="20" cy="20" r="15" strokeWidth="2" fill="none" />
@@ -64,6 +67,9 @@ const getElementIcon = (type: CircuitElementType) => {
         </svg>
       );
     case CircuitElementType.DIODE:
+    case CircuitElementType.DIODE_ZENER:
+    case CircuitElementType.DIODE_LED:
+    case CircuitElementType.DIODE_SCHOTTKY:
       return (
         <svg {...svgProps}>
           <path d="M5,20 L15,20" strokeWidth="2" />
@@ -172,6 +178,10 @@ const getElementIcon = (type: CircuitElementType) => {
         </svg>
       );
     case CircuitElementType.DIGITAL_AND:
+    case CircuitElementType.DIGITAL_AND3:
+    case CircuitElementType.DIGITAL_AND4:
+    case CircuitElementType.DIGITAL_NAND3:
+    case CircuitElementType.DIGITAL_NAND4:
     case CircuitElementType.DIGITAL_NAND:
       return (
         <svg {...svgProps} viewBox="0 0 60 40">
@@ -181,6 +191,10 @@ const getElementIcon = (type: CircuitElementType) => {
         </svg>
       );
     case CircuitElementType.DIGITAL_OR:
+    case CircuitElementType.DIGITAL_OR3:
+    case CircuitElementType.DIGITAL_OR4:
+    case CircuitElementType.DIGITAL_NOR3:
+    case CircuitElementType.DIGITAL_NOR4:
     case CircuitElementType.DIGITAL_NOR:
       return (
         <svg {...svgProps} viewBox="0 0 60 40">
@@ -190,6 +204,9 @@ const getElementIcon = (type: CircuitElementType) => {
         </svg>
       );
     case CircuitElementType.DIGITAL_NOT:
+    case CircuitElementType.DIGITAL_BUF:
+    case CircuitElementType.DIGITAL_TRI:
+    case CircuitElementType.DIGITAL_SCHMITT_NOT:
       return (
         <svg {...svgProps} viewBox="0 0 40 40">
           <path d="M5,20 L15,20" strokeWidth="2" />
@@ -207,6 +224,9 @@ const getElementIcon = (type: CircuitElementType) => {
         </svg>
       );
     case CircuitElementType.DIGITAL_DFF:
+    case CircuitElementType.DIGITAL_JKFF:
+    case CircuitElementType.DIGITAL_TFF:
+    case CircuitElementType.DIGITAL_SRFF:
       return (
         <svg {...svgProps} viewBox="0 0 50 40">
           <rect x="10" y="10" width="30" height="20" rx="4" strokeWidth="2" fill="none" />
@@ -215,7 +235,11 @@ const getElementIcon = (type: CircuitElementType) => {
         </svg>
       );
     default:
-      return null;
+      return (
+        <svg {...svgProps}>
+          <rect x="8" y="8" width="24" height="24" rx="4" strokeWidth="2" fill="none" />
+        </svg>
+      );
   }
 };
 

@@ -17,6 +17,7 @@ export type TempQueryNodeTask = {
 // 定义允许用户追问的节点类型
 const ALLOWED_PARENT_TYPES: NodeType[] = [
   'root', 
+  'query',
   'knowledge-detail', 
   'answer-detail', 
   'ANSWER_DETAIL',

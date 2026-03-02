@@ -30,10 +30,17 @@ export function getElementUnit(type?: CircuitElementType | string): string {
     case CircuitElementType.INDUCTOR:
       return 'H';
     case CircuitElementType.VOLTAGE_SOURCE:
+    case CircuitElementType.AC_SOURCE:
+    case CircuitElementType.PULSE_SOURCE:
+    case CircuitElementType.PWM_SOURCE:
+    case CircuitElementType.SINE_SOURCE:
       return 'V';
     case CircuitElementType.CURRENT_SOURCE:
       return 'A';
     case CircuitElementType.DIODE:
+    case CircuitElementType.DIODE_ZENER:
+    case CircuitElementType.DIODE_LED:
+    case CircuitElementType.DIODE_SCHOTTKY:
       return '';
     case CircuitElementType.TRANSISTOR_NPN:
     case CircuitElementType.TRANSISTOR_PNP:
@@ -89,8 +96,22 @@ export function getElementTypeName(type?: CircuitElementType | string): string {
       return '电压源';
     case CircuitElementType.CURRENT_SOURCE:
       return '电流源';
+    case CircuitElementType.AC_SOURCE:
+      return '交流信号源';
+    case CircuitElementType.PULSE_SOURCE:
+      return '脉冲源';
+    case CircuitElementType.PWM_SOURCE:
+      return 'PWM源';
+    case CircuitElementType.SINE_SOURCE:
+      return '正弦源';
     case CircuitElementType.DIODE:
       return '二极管';
+    case CircuitElementType.DIODE_ZENER:
+      return '稳压二极管';
+    case CircuitElementType.DIODE_LED:
+      return '发光二极管';
+    case CircuitElementType.DIODE_SCHOTTKY:
+      return '肖特基二极管';
     case CircuitElementType.TRANSISTOR_NPN:
       return 'NPN三极管';
     case CircuitElementType.TRANSISTOR_PNP:
@@ -134,20 +155,48 @@ export function getElementTypeName(type?: CircuitElementType | string): string {
       return '时钟源';
     case CircuitElementType.DIGITAL_AND:
       return '与门 (AND)';
+    case CircuitElementType.DIGITAL_AND3:
+      return '三输入与门 (AND3)';
+    case CircuitElementType.DIGITAL_AND4:
+      return '四输入与门 (AND4)';
     case CircuitElementType.DIGITAL_OR:
       return '或门 (OR)';
+    case CircuitElementType.DIGITAL_OR3:
+      return '三输入或门 (OR3)';
+    case CircuitElementType.DIGITAL_OR4:
+      return '四输入或门 (OR4)';
     case CircuitElementType.DIGITAL_NOT:
       return '非门 (NOT)';
+    case CircuitElementType.DIGITAL_BUF:
+      return '缓冲器 (BUF)';
+    case CircuitElementType.DIGITAL_TRI:
+      return '三态缓冲器 (TRI)';
+    case CircuitElementType.DIGITAL_SCHMITT_NOT:
+      return '施密特反相器';
     case CircuitElementType.DIGITAL_NAND:
       return '与非门 (NAND)';
+    case CircuitElementType.DIGITAL_NAND3:
+      return '三输入与非门 (NAND3)';
+    case CircuitElementType.DIGITAL_NAND4:
+      return '四输入与非门 (NAND4)';
     case CircuitElementType.DIGITAL_NOR:
       return '或非门 (NOR)';
+    case CircuitElementType.DIGITAL_NOR3:
+      return '三输入或非门 (NOR3)';
+    case CircuitElementType.DIGITAL_NOR4:
+      return '四输入或非门 (NOR4)';
     case CircuitElementType.DIGITAL_XOR:
       return '异或门 (XOR)';
     case CircuitElementType.DIGITAL_XNOR:
       return '同或门 (XNOR)';
     case CircuitElementType.DIGITAL_DFF:
       return 'D 触发器';
+    case CircuitElementType.DIGITAL_JKFF:
+      return 'JK 触发器';
+    case CircuitElementType.DIGITAL_TFF:
+      return 'T 触发器';
+    case CircuitElementType.DIGITAL_SRFF:
+      return 'SR 触发器';
     case CircuitElementType.WIRE:
       return '导线';
     case CircuitElementType.JUNCTION:
@@ -187,6 +236,13 @@ export function getDefaultElementValue(type: CircuitElementType | string): strin
       return '1mH';
     case CircuitElementType.VOLTAGE_SOURCE:
       return '5V';
+    case CircuitElementType.AC_SOURCE:
+    case CircuitElementType.SINE_SOURCE:
+      return '1V';
+    case CircuitElementType.PULSE_SOURCE:
+      return '0,5,1ns,1ns,1ns,5ns,10ns';
+    case CircuitElementType.PWM_SOURCE:
+      return '1kHz@50%';
     case CircuitElementType.CURRENT_SOURCE:
       return '1A';
     case EXTENDED_ELEMENT_TYPES.BATTERY:

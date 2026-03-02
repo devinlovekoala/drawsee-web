@@ -3,13 +3,27 @@ import { DigitalSimulationPlan, DigitalStimulusEvent, DigitalClockConfig, Digita
 
 const DIGITAL_GATE_TYPES = new Set<CircuitElementType>([
   CircuitElementType.DIGITAL_AND,
+  CircuitElementType.DIGITAL_AND3,
+  CircuitElementType.DIGITAL_AND4,
   CircuitElementType.DIGITAL_OR,
+  CircuitElementType.DIGITAL_OR3,
+  CircuitElementType.DIGITAL_OR4,
   CircuitElementType.DIGITAL_NOT,
+  CircuitElementType.DIGITAL_BUF,
+  CircuitElementType.DIGITAL_TRI,
+  CircuitElementType.DIGITAL_SCHMITT_NOT,
   CircuitElementType.DIGITAL_NAND,
+  CircuitElementType.DIGITAL_NAND3,
+  CircuitElementType.DIGITAL_NAND4,
   CircuitElementType.DIGITAL_NOR,
+  CircuitElementType.DIGITAL_NOR3,
+  CircuitElementType.DIGITAL_NOR4,
   CircuitElementType.DIGITAL_XOR,
   CircuitElementType.DIGITAL_XNOR,
   CircuitElementType.DIGITAL_DFF,
+  CircuitElementType.DIGITAL_JKFF,
+  CircuitElementType.DIGITAL_TFF,
+  CircuitElementType.DIGITAL_SRFF,
 ]);
 
 const DIGITAL_IO_TYPES = new Set<CircuitElementType>([
@@ -63,6 +77,14 @@ const parseNumericDuration = (raw: string | number | undefined, fallback: number
     unit === 'ps' ? 1e-3 :
     1;
   return Math.max(magnitude * factor, 1);
+};
+
+const parseDelayNs = (raw: unknown, fallback = 5) => {
+  if (typeof raw === 'number' && Number.isFinite(raw)) return Math.max(raw, 0);
+  if (typeof raw !== 'string') return fallback;
+  const parsed = Number(raw.trim());
+  if (Number.isFinite(parsed)) return Math.max(parsed, 0);
+  return fallback;
 };
 
 const parseStimulusSequence = (value: string | undefined) => {
@@ -343,13 +365,37 @@ export const buildDigitalSimulationPlan = (design: CircuitDesign): DigitalSimula
       const port = byId.get(id) || ports[fallbackIndex];
       return port ? requireNet(element, port.id) : null;
     };
+    const elementProps = (element.properties || {}) as Record<string, unknown>;
+    const tpd = parseDelayNs(elementProps.tpdNs, 5);
+    const delayPrefix = tpd > 0 ? `#${tpd} ` : '';
     switch (type) {
       case CircuitElementType.DIGITAL_AND: {
         const in1 = pick('in1');
         const in2 = pick('in2', 1);
         const out = pick('out', 2);
         if (in1 && in2 && out) {
-          assignLines.push(`assign ${out} = ${in1} & ${in2};`);
+          assignLines.push(`assign ${delayPrefix}${out} = ${in1} & ${in2};`);
+        }
+        break;
+      }
+      case CircuitElementType.DIGITAL_AND3: {
+        const in1 = pick('in1');
+        const in2 = pick('in2', 1);
+        const in3 = pick('in3', 2);
+        const out = pick('out', 3);
+        if (in1 && in2 && in3 && out) {
+          assignLines.push(`assign ${delayPrefix}${out} = ${in1} & ${in2} & ${in3};`);
+        }
+        break;
+      }
+      case CircuitElementType.DIGITAL_AND4: {
+        const in1 = pick('in1');
+        const in2 = pick('in2', 1);
+        const in3 = pick('in3', 2);
+        const in4 = pick('in4', 3);
+        const out = pick('out', 4);
+        if (in1 && in2 && in3 && in4 && out) {
+          assignLines.push(`assign ${delayPrefix}${out} = ${in1} & ${in2} & ${in3} & ${in4};`);
         }
         break;
       }
@@ -358,7 +404,28 @@ export const buildDigitalSimulationPlan = (design: CircuitDesign): DigitalSimula
         const in2 = pick('in2', 1);
         const out = pick('out', 2);
         if (in1 && in2 && out) {
-          assignLines.push(`assign ${out} = ${in1} | ${in2};`);
+          assignLines.push(`assign ${delayPrefix}${out} = ${in1} | ${in2};`);
+        }
+        break;
+      }
+      case CircuitElementType.DIGITAL_OR3: {
+        const in1 = pick('in1');
+        const in2 = pick('in2', 1);
+        const in3 = pick('in3', 2);
+        const out = pick('out', 3);
+        if (in1 && in2 && in3 && out) {
+          assignLines.push(`assign ${delayPrefix}${out} = ${in1} | ${in2} | ${in3};`);
+        }
+        break;
+      }
+      case CircuitElementType.DIGITAL_OR4: {
+        const in1 = pick('in1');
+        const in2 = pick('in2', 1);
+        const in3 = pick('in3', 2);
+        const in4 = pick('in4', 3);
+        const out = pick('out', 4);
+        if (in1 && in2 && in3 && in4 && out) {
+          assignLines.push(`assign ${delayPrefix}${out} = ${in1} | ${in2} | ${in3} | ${in4};`);
         }
         break;
       }
@@ -366,7 +433,33 @@ export const buildDigitalSimulationPlan = (design: CircuitDesign): DigitalSimula
         const input = pick('in');
         const out = pick('out', 1);
         if (input && out) {
-          assignLines.push(`assign ${out} = ~${input};`);
+          assignLines.push(`assign ${delayPrefix}${out} = ~${input};`);
+        }
+        break;
+      }
+      case CircuitElementType.DIGITAL_SCHMITT_NOT: {
+        const input = pick('in');
+        const out = pick('out', 1);
+        if (input && out) {
+          assignLines.push(`assign ${delayPrefix}${out} = ~${input};`);
+        }
+        break;
+      }
+      case CircuitElementType.DIGITAL_BUF: {
+        const input = pick('in');
+        const out = pick('out', 1);
+        if (input && out) {
+          assignLines.push(`assign ${delayPrefix}${out} = ${input};`);
+        }
+        break;
+      }
+      case CircuitElementType.DIGITAL_TRI: {
+        const input = pick('in');
+        const oe = pick('oe', 1);
+        const out = pick('out', 2);
+        const oeActiveHigh = elementProps.oeActiveHigh !== false;
+        if (input && oe && out) {
+          assignLines.push(`assign ${delayPrefix}${out} = ${oeActiveHigh ? oe : `~${oe}`} ? ${input} : 1'bz;`);
         }
         break;
       }
@@ -375,7 +468,28 @@ export const buildDigitalSimulationPlan = (design: CircuitDesign): DigitalSimula
         const in2 = pick('in2', 1);
         const out = pick('out', 2);
         if (in1 && in2 && out) {
-          assignLines.push(`assign ${out} = ~(${in1} & ${in2});`);
+          assignLines.push(`assign ${delayPrefix}${out} = ~(${in1} & ${in2});`);
+        }
+        break;
+      }
+      case CircuitElementType.DIGITAL_NAND3: {
+        const in1 = pick('in1');
+        const in2 = pick('in2', 1);
+        const in3 = pick('in3', 2);
+        const out = pick('out', 3);
+        if (in1 && in2 && in3 && out) {
+          assignLines.push(`assign ${delayPrefix}${out} = ~(${in1} & ${in2} & ${in3});`);
+        }
+        break;
+      }
+      case CircuitElementType.DIGITAL_NAND4: {
+        const in1 = pick('in1');
+        const in2 = pick('in2', 1);
+        const in3 = pick('in3', 2);
+        const in4 = pick('in4', 3);
+        const out = pick('out', 4);
+        if (in1 && in2 && in3 && in4 && out) {
+          assignLines.push(`assign ${delayPrefix}${out} = ~(${in1} & ${in2} & ${in3} & ${in4});`);
         }
         break;
       }
@@ -384,7 +498,28 @@ export const buildDigitalSimulationPlan = (design: CircuitDesign): DigitalSimula
         const in2 = pick('in2', 1);
         const out = pick('out', 2);
         if (in1 && in2 && out) {
-          assignLines.push(`assign ${out} = ~(${in1} | ${in2});`);
+          assignLines.push(`assign ${delayPrefix}${out} = ~(${in1} | ${in2});`);
+        }
+        break;
+      }
+      case CircuitElementType.DIGITAL_NOR3: {
+        const in1 = pick('in1');
+        const in2 = pick('in2', 1);
+        const in3 = pick('in3', 2);
+        const out = pick('out', 3);
+        if (in1 && in2 && in3 && out) {
+          assignLines.push(`assign ${delayPrefix}${out} = ~(${in1} | ${in2} | ${in3});`);
+        }
+        break;
+      }
+      case CircuitElementType.DIGITAL_NOR4: {
+        const in1 = pick('in1');
+        const in2 = pick('in2', 1);
+        const in3 = pick('in3', 2);
+        const in4 = pick('in4', 3);
+        const out = pick('out', 4);
+        if (in1 && in2 && in3 && in4 && out) {
+          assignLines.push(`assign ${delayPrefix}${out} = ~(${in1} | ${in2} | ${in3} | ${in4});`);
         }
         break;
       }
@@ -393,7 +528,7 @@ export const buildDigitalSimulationPlan = (design: CircuitDesign): DigitalSimula
         const in2 = pick('in2', 1);
         const out = pick('out', 2);
         if (in1 && in2 && out) {
-          assignLines.push(`assign ${out} = ${in1} ^ ${in2};`);
+          assignLines.push(`assign ${delayPrefix}${out} = ${in1} ^ ${in2};`);
         }
         break;
       }
@@ -402,7 +537,7 @@ export const buildDigitalSimulationPlan = (design: CircuitDesign): DigitalSimula
         const in2 = pick('in2', 1);
         const out = pick('out', 2);
         if (in1 && in2 && out) {
-          assignLines.push(`assign ${out} = ~(${in1} ^ ${in2});`);
+          assignLines.push(`assign ${delayPrefix}${out} = ~(${in1} ^ ${in2});`);
         }
         break;
       }
@@ -410,11 +545,58 @@ export const buildDigitalSimulationPlan = (design: CircuitDesign): DigitalSimula
         const d = pick('d');
         const clk = pick('clk', 1);
         const q = pick('q', 2);
+        const qn = pick('qn', 3);
         if (d && clk && q) {
           const regName = assignUnique(`reg_${elementLabel(element.id, element.label || 'dff')}`);
+          const edge = elementProps.edge === 'negedge' ? 'negedge' : 'posedge';
           dffRegisters.push(`reg ${regName};`);
-          regAssignments.push(`always @(posedge ${clk}) begin ${regName} <= ${d}; end`);
-          assignLines.push(`assign ${q} = ${regName};`);
+          regAssignments.push(`always @(${edge} ${clk}) begin ${delayPrefix}${regName} <= ${d}; end`);
+          assignLines.push(`assign ${delayPrefix}${q} = ${regName};`);
+          if (qn) assignLines.push(`assign ${delayPrefix}${qn} = ~${regName};`);
+        }
+        break;
+      }
+      case CircuitElementType.DIGITAL_JKFF: {
+        const j = pick('j');
+        const k = pick('k', 1);
+        const clk = pick('clk', 2);
+        const q = pick('q', 3);
+        const qn = pick('qn', 4);
+        if (j && k && clk && q) {
+          const regName = assignUnique(`reg_${elementLabel(element.id, element.label || 'jkff')}`);
+          dffRegisters.push(`reg ${regName};`);
+          regAssignments.push(`always @(posedge ${clk}) begin case ({${j},${k}}) 2'b10: ${delayPrefix}${regName} <= 1'b1; 2'b01: ${delayPrefix}${regName} <= 1'b0; 2'b11: ${delayPrefix}${regName} <= ~${regName}; default: ${regName} <= ${regName}; endcase end`);
+          assignLines.push(`assign ${delayPrefix}${q} = ${regName};`);
+          if (qn) assignLines.push(`assign ${delayPrefix}${qn} = ~${regName};`);
+        }
+        break;
+      }
+      case CircuitElementType.DIGITAL_TFF: {
+        const t = pick('t');
+        const clk = pick('clk', 1);
+        const q = pick('q', 2);
+        const qn = pick('qn', 3);
+        if (t && clk && q) {
+          const regName = assignUnique(`reg_${elementLabel(element.id, element.label || 'tff')}`);
+          dffRegisters.push(`reg ${regName};`);
+          regAssignments.push(`always @(posedge ${clk}) begin if (${t}) ${delayPrefix}${regName} <= ~${regName}; end`);
+          assignLines.push(`assign ${delayPrefix}${q} = ${regName};`);
+          if (qn) assignLines.push(`assign ${delayPrefix}${qn} = ~${regName};`);
+        }
+        break;
+      }
+      case CircuitElementType.DIGITAL_SRFF: {
+        const s = pick('s');
+        const r = pick('r', 1);
+        const clk = pick('clk', 2);
+        const q = pick('q', 3);
+        const qn = pick('qn', 4);
+        if (s && r && clk && q) {
+          const regName = assignUnique(`reg_${elementLabel(element.id, element.label || 'srff')}`);
+          dffRegisters.push(`reg ${regName};`);
+          regAssignments.push(`always @(posedge ${clk}) begin case ({${s},${r}}) 2'b10: ${delayPrefix}${regName} <= 1'b1; 2'b01: ${delayPrefix}${regName} <= 1'b0; 2'b11: ${delayPrefix}${regName} <= 1'bx; default: ${regName} <= ${regName}; endcase end`);
+          assignLines.push(`assign ${delayPrefix}${q} = ${regName};`);
+          if (qn) assignLines.push(`assign ${delayPrefix}${qn} = ~${regName};`);
         }
         break;
       }

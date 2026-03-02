@@ -72,6 +72,7 @@ ref) {
   const classId = location.state?.classId as string || null;
   
   const [isProcessing, setIsProcessing] = useState(false);
+  const [pendingSubmit, setPendingSubmit] = useState(false);
   
   const determineTaskType = useCallback((): AiTaskType => {
     if (!selectedNode) return 'GENERAL';
@@ -173,22 +174,7 @@ ref) {
     }
   }, [prompt]);
 
-  const handleSubmit = useCallback(() => {
-    if (isProcessing) return;
-    
-    if (!canInput) {
-      toast.error(`当前无法追问，${canNotInputReason as string}`);
-      return;
-    }
-    if (prompt.trim() === "") {
-      toast.error("请输入问题");
-      return;
-    }
-    if (!parentIdOfTempQueryNode) {
-      toast.error("无法确定追问的节点");
-      return;
-    }
-
+  const submitWithParentId = useCallback((parentId: string) => {
     setIsProcessing(true);
     
     // 构建最终提交的问题文本，如果有引用则包含引用内容，并叠加节点上下文
@@ -201,14 +187,14 @@ ref) {
     const taskType: AiTaskType = determineTaskType();
     
     // 最终选择的模型
-    let finalModel = selectedModel; // 所有模式都使用选择的模型
+    const finalModel = selectedModel; // 所有模式都使用选择的模型
 
     const createAiTaskDTO = {
       type: taskType,
       prompt: finalPrompt,
       promptParams: {},
       convId: convId,
-      parentId: parseInt(parentIdOfTempQueryNode!, 10),
+      parentId: parseInt(parentId, 10),
       model: finalModel, // 使用选择的模型
       classId: classId // 传递班级ID
     } as CreateAiTaskDTO;
@@ -244,9 +230,42 @@ ref) {
     }).finally(() => {
       setIsProcessing(false);
     });
-  }, [isProcessing, prompt, quoteText, selectedModel, convId, parentIdOfTempQueryNode, 
-      setPrompt, setQuoteText, setIsExpanded, setIsAnimating, handleAiTaskCountPlus, chat, handleNewChat, classId, 
-      canInput, canNotInputReason, determineTaskType, buildPromptWithNodeContext]);
+  }, [
+    prompt, quoteText, selectedModel, convId, classId, buildPromptWithNodeContext,
+    determineTaskType, handleAiTaskCountPlus, setQuoteText, setPrompt, setIsExpanded,
+    setIsAnimating, handleNewChat, chat
+  ]);
+
+  const handleSubmit = useCallback(() => {
+    if (isProcessing) return;
+    
+    if (!canInput) {
+      toast.error(`当前无法追问，${canNotInputReason as string}`);
+      return;
+    }
+    if (prompt.trim() === "") {
+      toast.error("请输入问题");
+      return;
+    }
+    if (!parentIdOfTempQueryNode) {
+      // 新建会话后parentId可能稍后才可用，自动挂起后在可用时发送
+      setPendingSubmit(true);
+      addTempQueryNodeTask({type: 'create', text: prompt, mode: determineTaskType()});
+      return;
+    }
+    submitWithParentId(parentIdOfTempQueryNode);
+  }, [isProcessing, canInput, canNotInputReason, prompt, parentIdOfTempQueryNode, addTempQueryNodeTask, determineTaskType, submitWithParentId]);
+
+  useEffect(() => {
+    if (!pendingSubmit || isProcessing) return;
+    if (!canInput || prompt.trim() === '') {
+      setPendingSubmit(false);
+      return;
+    }
+    if (!parentIdOfTempQueryNode) return;
+    setPendingSubmit(false);
+    submitWithParentId(parentIdOfTempQueryNode);
+  }, [pendingSubmit, isProcessing, canInput, prompt, parentIdOfTempQueryNode, submitWithParentId]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {

@@ -47,6 +47,11 @@ type CircuitReturnInfo = {
   ts?: number;
 };
 
+const DETAIL_PANEL_STORAGE_KEY = 'flow_detail_panel_width';
+const DETAIL_PANEL_DEFAULT_WIDTH = 384;
+const DETAIL_PANEL_MIN_WIDTH = 320;
+const DETAIL_PANEL_MAX_WIDTH = 780;
+
 // 创建紧凑模式的节点类型
 const CompactRootNode = (props: any) => <RootNode {...props} compactMode={true} />;
 const CompactQueryNode = (props: any) => <QueryNode {...props} compactMode={true} />;
@@ -131,6 +136,13 @@ function Flow() {
   const flowInputRef = useRef<FlowInputPanelHandle>(null);
   // 显示详情面板
   const [showDetailPanel, setShowDetailPanel] = useState<boolean>(true);
+  const [detailPanelWidth, setDetailPanelWidth] = useState<number>(() => {
+    const stored = localStorage.getItem(DETAIL_PANEL_STORAGE_KEY);
+    const parsed = stored ? Number(stored) : NaN;
+    if (!Number.isFinite(parsed)) return DETAIL_PANEL_DEFAULT_WIDTH;
+    return Math.max(DETAIL_PANEL_MIN_WIDTH, Math.min(DETAIL_PANEL_MAX_WIDTH, parsed));
+  });
+  const isResizingDetailPanel = useRef(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState<boolean>(false);
   // 强制会话切换标记 - 最高优先级标记，用于bypass所有保护机制
   const isForceSwitching = useRef<boolean>(false);
@@ -1013,6 +1025,35 @@ function Flow() {
     }
   }, [showDetailPanel, selectedNode, elements.nodes]);
 
+  useEffect(() => {
+    localStorage.setItem(DETAIL_PANEL_STORAGE_KEY, String(detailPanelWidth));
+  }, [detailPanelWidth]);
+
+  const handleDetailPanelResizeStart = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    isResizingDetailPanel.current = true;
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      if (!isResizingDetailPanel.current) return;
+      const viewportWidth = window.innerWidth;
+      const nextWidth = viewportWidth - moveEvent.clientX;
+      const clampedWidth = Math.max(
+        DETAIL_PANEL_MIN_WIDTH,
+        Math.min(DETAIL_PANEL_MAX_WIDTH, nextWidth)
+      );
+      setDetailPanelWidth(clampedWidth);
+    };
+
+    const handleMouseUp = () => {
+      isResizingDetailPanel.current = false;
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  }, []);
+
   // 防止详情节点生成完毕后跳转到父节点的保护机制
   const detailNodeRef = useRef<string | null>(null);
   
@@ -1072,7 +1113,7 @@ function Flow() {
           style={{ 
             position: 'relative', 
             minWidth: 0,
-            maxWidth: showDetailPanel ? 'calc(100% - 384px)' : '100%',
+            maxWidth: showDetailPanel ? `calc(100% - ${detailPanelWidth}px)` : '100%',
             height: '100%'
           }}
         >
@@ -1144,7 +1185,7 @@ function Flow() {
                   className="flex flex-wrap items-center gap-2 rounded-xl border border-blue-100 bg-blue-50/90 px-3 py-2 text-xs text-blue-800 shadow-sm backdrop-blur"
                   style={{
                     marginLeft: 52,
-                    maxWidth: showDetailPanel ? 'calc(100vw - 520px)' : 'calc(100vw - 200px)',
+                    maxWidth: showDetailPanel ? `calc(100vw - ${detailPanelWidth + 136}px)` : 'calc(100vw - 200px)',
                     transition: 'max-width 150ms ease'
                   }}
                 >
@@ -1210,7 +1251,21 @@ function Flow() {
         
         {/* 右侧详情面板 - 确保不阻塞主应用交互 */}
         {showDetailPanel && (
-          <div className="flex-shrink-0" style={{ width: '384px' }}>
+          <>
+            <div
+              className="w-1.5 cursor-col-resize bg-transparent hover:bg-blue-200 transition-colors duration-150 flex-shrink-0"
+              onMouseDown={handleDetailPanelResizeStart}
+              onDoubleClick={() => setDetailPanelWidth(DETAIL_PANEL_DEFAULT_WIDTH)}
+              title="拖拽调整详情栏宽度，双击恢复默认宽度"
+            />
+            <div
+              className="flex-shrink-0"
+              style={{
+                width: `${detailPanelWidth}px`,
+                minWidth: `${DETAIL_PANEL_MIN_WIDTH}px`,
+                maxWidth: `${DETAIL_PANEL_MAX_WIDTH}px`
+              }}
+            >
             <NodeDetailPanel
               selectedNode={selectedNode}
               onClose={handleCloseDetailPanel}
@@ -1218,6 +1273,7 @@ function Flow() {
               onApplySuggestion={handleApplySuggestion}
             />
           </div>
+          </>
         )}
       </div>
     </FlowContext.Provider>
