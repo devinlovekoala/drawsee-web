@@ -4,7 +4,7 @@ import {
   landingWorkflowSteps
 } from '@/common/constant/landing-page.constant.ts';
 
-const AgentModesSection: React.FC = () => {
+const IntelligentWorkflowSection: React.FC = () => {
   return (
     <section id="agents" className="py-24 bg-white relative overflow-hidden">
       <div className="container mx-auto px-4">
@@ -35,16 +35,6 @@ const AgentModesSection: React.FC = () => {
           ))}
         </div>
 
-        <div className="rounded-2xl border border-indigo-100 bg-indigo-50/50 p-6 mb-8">
-          <h3 className="text-xl md:text-2xl font-bold text-indigo-700 mb-3">
-            Java 后端自研 Agent 工作流
-          </h3>
-          <p className="text-gray-700 leading-7">
-            平台以任务类型驱动后端工作流，结合班级上下文与知识库语境进行动态调度，
-            并通过流式事件持续回传节点增量和文本结果，确保学生在日常答疑与电路实践场景中获得连贯、可追问、可展开的交互体验。
-          </p>
-        </div>
-
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {landingCapabilities.map((capability) => (
             <div
@@ -67,4 +57,4 @@ const AgentModesSection: React.FC = () => {
   );
 };
 
-export default AgentModesSection;
+export default IntelligentWorkflowSection;

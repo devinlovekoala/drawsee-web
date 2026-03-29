@@ -1,63 +1,13 @@
 import React from 'react';
-
-// 扩展评价数据，确保有足够多的卡片实现流畅滚动效果
-const testimonials = [
-  {
-    quote: "DrawSee彻底改变了我的思考方式，不再局限于线性对话，每次提问都能引发新的思路。特别适合需要多角度分析的工作。",
-    author: "李远",
-    title: "产品经理",
-    avatar: "https://randomuser.me/api/portraits/men/32.jpg"
-  },
-  {
-    quote: "作为一名研究生，DrawSee帮助我组织和拓展研究思路，树状结构让知识连接更加直观。推理解题模式对论文写作特别有帮助。",
-    author: "张明",
-    title: "计算机科学研究生",
-    avatar: "https://randomuser.me/api/portraits/women/44.jpg"
-  },
-  {
-    quote: "网页生成模式太神奇了，我只需描述想要的页面，DrawSee就能生成可预览的HTML。对于快速制作原型非常实用。",
-    author: "王睿",
-    title: "UI设计师",
-    avatar: "https://randomuser.me/api/portraits/men/46.jpg"
-  },
-  {
-    quote: "目标解析模式帮我把复杂项目拆解成可管理的任务，节省了大量规划时间。多模型支持也让回答更加精准。",
-    author: "陈思",
-    title: "项目管理师",
-    avatar: "https://randomuser.me/api/portraits/women/65.jpg"
-  },
-  {
-    quote: "昭析DrawSee的直观视觉化让我能轻松理解复杂概念，极大提高了学习效率。",
-    author: "刘芳",
-    title: "高中教师",
-    avatar: "https://randomuser.me/api/portraits/women/22.jpg"
-  },
-  {
-    quote: "作为一名技术主管，我发现DrawSee极大提高了团队的创意讨论效率，尤其是在远程工作情境下。",
-    author: "赵强",
-    title: "技术主管",
-    avatar: "https://randomuser.me/api/portraits/men/55.jpg"
-  },
-  {
-    quote: "DrawSee让我轻松规划和组织内容创作流程，大幅提升了我的工作效率和创意质量。",
-    author: "孙琳",
-    title: "内容创作者",
-    avatar: "https://randomuser.me/api/portraits/women/33.jpg"
-  },
-  {
-    quote: "使用DrawSee进行头脑风暴，让我能够更全面地探索各种可能性，非常适合创意工作。",
-    author: "黄伟",
-    title: "广告创意总监",
-    avatar: "https://randomuser.me/api/portraits/men/63.jpg"
-  }
-];
+import { landingTestimonials } from '@/common/constant/landing-page.constant.ts';
 
 // 分成两组，用于两行展示
-const firstRowTestimonials = [...testimonials, ...testimonials];
-const secondRowTestimonials = [...testimonials.reverse(), ...testimonials.reverse()];
+const firstRowTestimonials = [...landingTestimonials, ...landingTestimonials];
+const secondRowTestimonials = [...landingTestimonials].reverse();
+const secondRow = [...secondRowTestimonials, ...secondRowTestimonials];
 
 const TestimonialCard: React.FC<{
-  testimonial: typeof testimonials[0],
+  testimonial: typeof landingTestimonials[0],
   variant: 'primary' | 'secondary'
 }> = ({ testimonial, variant }) => {
   const baseStyles = "flex flex-col bg-white rounded-xl shadow-xl overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1 h-full";
@@ -137,7 +87,7 @@ const TestimonialsSection: React.FC = () => {
         {/* 第二行 - 从左向右滚动 */}
         <div className="overflow-hidden py-4">
           <div className="flex animate-marquee-right">
-            {secondRowTestimonials.map((testimonial, index) => (
+            {secondRow.map((testimonial, index) => (
               <TestimonialCard
                 key={`row2-${index}`}
                 testimonial={testimonial}

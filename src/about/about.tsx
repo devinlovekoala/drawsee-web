@@ -8,7 +8,7 @@ import NavBar from "./components/NavBar.tsx";
 import HeroSection from "./components/HeroSection.tsx";
 import FeaturesSection from "./components/FeaturesSection.tsx";
 import TreeVisualSection from "./components/TreeVisualSection.tsx";
-import AgentModesSection from "./components/AgentModesSection.tsx";
+import IntelligentWorkflowSection from "./components/IntelligentWorkflowSection.tsx";
 import BenefitsSection from "./components/BenefitsSection.tsx";
 import TestimonialsSection from "./components/TestimonialsSection.tsx";
 import JoinCommunitySection from "./components/JoinCommunitySection.tsx";
@@ -170,7 +170,7 @@ function About() {
         </div>
         
         <div className="bg-gradient-section relative py-10" style={{ "--gradient-opacity": "0.05" } as React.CSSProperties}>
-          <AgentModesSection />
+          <IntelligentWorkflowSection />
         </div>
         
         <div className="relative bg-white z-10">
