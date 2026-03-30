@@ -4,7 +4,7 @@ import {
   SidebarInset,
   SidebarProvider,
 } from "@/app/components/ui/sidebar.tsx";
-import {useCallback, useEffect, useState} from "react";
+import {useCallback, useEffect, useRef, useState} from "react";
 import {FIRST_ENTER_KEY, LOGIN_FLAG_KEY, TOKEN_KEY, SHARE_CONTINUE_TOKEN_KEY} from "@/common/constant/storage-key.constant.ts";
 import {checkLogin} from "@/api/methods/auth.methods.ts";
 import {toast} from "sonner";
@@ -66,6 +66,7 @@ function App() {
 
   const location = useLocation();
   const isShareRoute = location.pathname.startsWith('/share/');
+  const lastRequireLoginLocationKeyRef = useRef<string | null>(null);
   
   // 数据获取接口，初始化时不会自动发送请求，需要手动调用send()方法，force: true表示不使用缓存
   const {send} = useRequest(getConversations(), {immediate: false, force: true});
@@ -155,11 +156,18 @@ function App() {
     }
 
     // 检查是否要求显示登录表单
-    const locationState = location.state as any;
+    const locationState = location.state as { requireLogin?: boolean; loginRequestId?: number } | null;
     if (locationState?.requireLogin) {
       setIsLogin(false);
-      setShowAuthModal(true);
-      setHasDismissedAuthModal(false);
+      const isNewRequireLoginRequest = lastRequireLoginLocationKeyRef.current !== location.key;
+
+      if (isNewRequireLoginRequest) {
+        lastRequireLoginLocationKeyRef.current = location.key;
+        setHasDismissedAuthModal(false);
+        setShowAuthModal(true);
+      } else if (!hasDismissedAuthModal && !showAuthModal) {
+        setShowAuthModal(true);
+      }
       return;
     }
 
@@ -437,15 +445,25 @@ function App() {
           {showAuthModal && (
             <div
               className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm"
-              onClick={() => {
-                setShowAuthModal(false);
-                setHasDismissedAuthModal(true);
-              }}
             >
               <div
-                className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[420px] bg-white rounded-xl shadow-2xl p-6 animate-in fade-in-0 zoom-in-95"
+                className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[420px] bg-white rounded-xl shadow-2xl p-6 animate-in fade-in-0 zoom-in-95 relative"
                 onClick={(event) => event.stopPropagation()}
               >
+                <button
+                  type="button"
+                  aria-label="关闭登录弹窗"
+                  onClick={() => {
+                    setShowAuthModal(false);
+                    setHasDismissedAuthModal(true);
+                  }}
+                  className="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
                 <AuthForm onSuccess={handleLoginSuccess} />
               </div>
             </div>

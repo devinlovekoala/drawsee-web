@@ -13,7 +13,7 @@ const CtaSection: React.FC = () => {
     // 如果已登出或未登录，则不跳转到应用页面，而是进入登录拦截模式
     if (hasLoggedOut || !isLoggedIn) {
       // 将状态设置为需要登录，App组件会检测并显示登录表单
-      navigate('/blank', { state: { requireLogin: true } });
+      navigate('/blank', { state: { requireLogin: true, loginRequestId: Date.now() } });
     } else {
       // 已登录用户直接跳转
       navigate('/blank', { state: { from: '/about' } });

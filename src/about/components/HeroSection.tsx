@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import MainImage from '../../assets/img/首页主图.png';
+import MainImage from '../../assets/img/homepage.png';
 import { LOGIN_FLAG_KEY } from '@/common/constant/storage-key.constant.ts';
 import { landingHeroStats } from '@/common/constant/landing-page.constant.ts';
 
@@ -63,7 +63,7 @@ const HeroSection: React.FC = () => {
     if (hasLoggedOut || !isLoggedIn) {
       // 此处不需要navigate到/blank，app.tsx的登录拦截会处理
       // 将状态设置为需要登录，App组件会检测并显示登录表单
-      navigate('/blank', { state: { requireLogin: true } });
+      navigate('/blank', { state: { requireLogin: true, loginRequestId: Date.now() } });
     } else {
       // 已登录用户直接跳转
       navigate('/blank', { state: { from: '/about' } });
@@ -109,13 +109,6 @@ const HeroSection: React.FC = () => {
             <p className="text-xl md:text-2xl text-gray-700 mb-8 max-w-lg">
               打破线性对话的局限，让AI交流如同在<span className="text-blue-600 font-medium">思维画布</span>上绘制<span className="text-indigo-600 font-medium">知识星图</span>，并将教师知识库、学生答疑与电路实践连接成一条连续链路。
             </p>
-
-            <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-5 mb-8 max-w-2xl">
-              <p className="text-gray-700 leading-7">
-                平台采用 Java 后端自研 Agent 工作流，系统会根据问题与上下文自动编排任务类型，
-                无需用户手动切换模式，支持班级知识库增强答疑与电路工程场景深度分析。
-              </p>
-            </div>
             
             <div className="flex flex-wrap gap-4">
               <button
