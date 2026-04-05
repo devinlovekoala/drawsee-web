@@ -1,13 +1,20 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import { Node } from 'reactflow';
 import { SimFrameResult } from '@/simulation/types/simResult';
-import { WireRenderer } from '@/simulation/renderer/WireRenderer';
-import { NodeLabelRenderer } from '@/simulation/renderer/NodeLabelRenderer';
+import { NodeLabelRenderer, RealtimeLabelDensity } from '@/simulation/renderer/NodeLabelRenderer';
 import { ScopeRenderer } from '@/simulation/renderer/ScopeRenderer';
+
+export interface RealtimeOverlayOptions {
+  showLabels?: boolean;
+  showScopePanels?: boolean;
+  labelDensity?: RealtimeLabelDensity;
+}
 
 interface CanvasOverlayProps {
   frameResult: SimFrameResult | null;
   nodes: Node[];
+  selectedNodeId?: string | null;
+  options?: RealtimeOverlayOptions;
   viewport: {
     x: number;
     y: number;
@@ -15,12 +22,16 @@ interface CanvasOverlayProps {
   };
 }
 
-const wireRenderer = new WireRenderer();
 const nodeLabelRenderer = new NodeLabelRenderer();
 const scopeRenderer = new ScopeRenderer();
 
-export const CanvasOverlay: React.FC<CanvasOverlayProps> = ({ frameResult, nodes, viewport }) => {
-  const wireCanvasRef = useRef<HTMLCanvasElement>(null);
+export const CanvasOverlay: React.FC<CanvasOverlayProps> = ({
+  frameResult,
+  nodes,
+  selectedNodeId,
+  options,
+  viewport,
+}) => {
   const hudCanvasRef = useRef<HTMLCanvasElement>(null);
 
   const bounds = useMemo(() => {
@@ -33,49 +44,51 @@ export const CanvasOverlay: React.FC<CanvasOverlayProps> = ({ frameResult, nodes
   }, [nodes]);
 
   useEffect(() => {
-    const wireCanvas = wireCanvasRef.current;
     const hudCanvas = hudCanvasRef.current;
-    if (!wireCanvas || !hudCanvas || !frameResult) return;
+    if (!hudCanvas || !frameResult) return;
 
-    wireCanvas.width = bounds.width;
-    wireCanvas.height = bounds.height;
     hudCanvas.width = bounds.width;
     hudCanvas.height = bounds.height;
 
-    const wireContext = wireCanvas.getContext('2d');
     const hudContext = hudCanvas.getContext('2d');
-    if (!wireContext || !hudContext) return;
+    if (!hudContext) return;
 
-    wireContext.clearRect(0, 0, wireCanvas.width, wireCanvas.height);
     hudContext.clearRect(0, 0, hudCanvas.width, hudCanvas.height);
 
-    wireRenderer.render(wireContext, frameResult.edgeResults, frameResult.maxVoltage, frameResult.maxCurrent, frameResult.time);
-    nodeLabelRenderer.render(hudContext, nodes, frameResult.elementResults);
-    scopeRenderer.render(hudContext, frameResult.scopePanels);
-  }, [bounds.height, bounds.width, frameResult, nodes]);
+    if (options?.showLabels ?? true) {
+      nodeLabelRenderer.render(hudContext, nodes, frameResult.elementResults, {
+        density: options?.labelDensity ?? 'adaptive',
+        selectedNodeId,
+        zoom: viewport.zoom,
+        canvasWidth: bounds.width,
+        canvasHeight: bounds.height,
+      });
+    }
+    const shouldShowScopePanels = (options?.showScopePanels ?? true) && viewport.zoom >= 0.85;
+    if (shouldShowScopePanels) {
+      scopeRenderer.render(hudContext, frameResult.scopePanels);
+    }
+  }, [
+    bounds.height,
+    bounds.width,
+    frameResult,
+    nodes,
+    options?.labelDensity,
+    options?.showScopePanels,
+    selectedNodeId,
+    viewport.zoom,
+  ]);
 
   return (
-    <>
-      <canvas
-        ref={wireCanvasRef}
-        className="pointer-events-none absolute inset-0 z-[1] opacity-95"
-        style={{
-          width: bounds.width,
-          height: bounds.height,
-          transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})`,
-          transformOrigin: '0 0',
-        }}
-      />
-      <canvas
-        ref={hudCanvasRef}
-        className="pointer-events-none absolute inset-0 z-[8]"
-        style={{
-          width: bounds.width,
-          height: bounds.height,
-          transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})`,
-          transformOrigin: '0 0',
-        }}
-      />
-    </>
+    <canvas
+      ref={hudCanvasRef}
+      className="pointer-events-none absolute inset-0 z-[8]"
+      style={{
+        width: bounds.width,
+        height: bounds.height,
+        transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})`,
+        transformOrigin: '0 0',
+      }}
+    />
   );
 };

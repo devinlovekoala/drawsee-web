@@ -1,5 +1,9 @@
 import { EdgeSimResult } from '@/simulation/types/simResult';
 
+interface WireRenderOptions {
+  showCurrentMarkers?: boolean;
+}
+
 export class WireRenderer {
   private interpolateColor(a: [number, number, number], b: [number, number, number], ratio: number) {
     const t = Math.max(0, Math.min(1, ratio));
@@ -104,7 +108,15 @@ export class WireRenderer {
     ctx.restore();
   }
 
-  render(ctx: CanvasRenderingContext2D, edges: EdgeSimResult[], maxVoltage: number, maxCurrent: number, time: number) {
+  render(
+    ctx: CanvasRenderingContext2D,
+    edges: EdgeSimResult[],
+    maxVoltage: number,
+    maxCurrent: number,
+    time: number,
+    options: WireRenderOptions = {},
+  ) {
+    const showCurrentMarkers = options.showCurrentMarkers ?? true;
     for (const edge of edges) {
       const voltageColor = this.getVoltageColor(edge.avgVoltage, maxVoltage);
       const wireWidth = this.getWireWidth(edge.current, maxCurrent);
@@ -131,7 +143,9 @@ export class WireRenderer {
       ctx.stroke();
       ctx.restore();
 
-      this.drawCurrentMarkers(ctx, edge, maxCurrent, time);
+      if (showCurrentMarkers) {
+        this.drawCurrentMarkers(ctx, edge, maxCurrent, time);
+      }
 
       ctx.save();
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.16)';

@@ -58,6 +58,7 @@ import {
 import ImageUploader from '@/app/components/ImageUploader';
 import { nanoid } from 'nanoid';
 import { CanvasOverlay, useSimLoop } from '@/simulation';
+import { RealtimeLabelDensity } from '@/simulation/renderer/NodeLabelRenderer';
 
 // 唯一节点ID生成
 let nodeIdCounter = 1;
@@ -1386,6 +1387,7 @@ const powerSourceElementTypes = new Set<CircuitElementType>([
 ]);
 
 const realtimeUnsupportedElementTypes = new Set<CircuitElementType>([]);
+const PRECISION_SIMULATION_ENABLED = false;
 
 const measurementTypeLabels: Partial<Record<CircuitElementType, string>> = {
   [CircuitElementType.AMMETER]: '电流表',
@@ -1497,6 +1499,9 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
   const [realtimeRunning, setRealtimeRunning] = useState(false);
   const [realtimeResetToken, setRealtimeResetToken] = useState(0);
   const [realtimeViewport, setRealtimeViewport] = useState({ x: 0, y: 0, zoom: 1 });
+  const [realtimeShowLabels, setRealtimeShowLabels] = useState(true);
+  const [realtimeShowScopePanels, setRealtimeShowScopePanels] = useState(true);
+  const [realtimeLabelDensity, setRealtimeLabelDensity] = useState<RealtimeLabelDensity>('adaptive');
   const [realtimeCircuitDesign, setRealtimeCircuitDesign] = useState<CircuitDesign | null>(null);
   const [simulationResults, setSimulationResults] = useState<Record<string, SimulationMeasurementResult>>({});
   const [simulationStale, setSimulationStale] = useState(false);
@@ -2467,6 +2472,12 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
     setRealtimeCircuitDesign(convertToCircuitDesign());
   }, [convertToCircuitDesign, realtimeResetToken, workspaceMode]);
 
+  useEffect(() => {
+    if (!PRECISION_SIMULATION_ENABLED && analogSimulationMode !== 'realtime') {
+      setAnalogSimulationMode('realtime');
+    }
+  }, [analogSimulationMode]);
+
   const { frameResult: realtimeFrameResult } = useSimLoop({
     enabled: workspaceMode !== 'digital' && analogSimulationMode === 'realtime' && realtimeRunning,
     design: realtimeCircuitDesign,
@@ -2803,14 +2814,13 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
       message.error('电路缺少电源器件，请添加电压源或电流源后再运行仿真');
       return;
     }
-    if (analogSimulationMode === 'realtime') {
+    if (!PRECISION_SIMULATION_ENABLED || analogSimulationMode === 'realtime') {
       const unsupportedElements = circuitDesign.elements.filter((element) =>
         realtimeUnsupportedElementTypes.has(element.type as CircuitElementType),
       );
       if (unsupportedElements.length > 0) {
         const labels = unsupportedElements.map((element) => element.label || element.id).join('、');
-        message.warning(`实时仿真暂不支持以下器件，已建议切换精确仿真：${labels}`);
-        setAnalogSimulationMode('precision');
+        message.warning(`实时仿真暂不支持以下器件：${labels}`);
         return;
       }
       const nextRunning = !realtimeRunning;
@@ -3423,7 +3433,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
   }, [isJunctionModeActive, isReadOnly, isWireModeActive]);
 
   useEffect(() => {
-    if (workspaceMode === 'digital' || analogSimulationMode === 'precision') {
+    if (workspaceMode === 'digital' || (!PRECISION_SIMULATION_ENABLED && analogSimulationMode !== 'realtime')) {
       setRealtimeRunning(false);
     }
   }, [analogSimulationMode, workspaceMode]);
@@ -3952,6 +3962,12 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
             <CanvasOverlay
               frameResult={realtimeFrameResult}
               nodes={nodes}
+              selectedNodeId={selectedNodeId}
+              options={{
+                showLabels: realtimeShowLabels,
+                showScopePanels: realtimeShowScopePanels,
+                labelDensity: realtimeLabelDensity,
+              }}
               viewport={realtimeViewport}
             />
           )}
@@ -3968,7 +3984,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
           )}
           
           <div className="flex items-center gap-3">
-            {analogSimulationMode === 'precision' && simulationStale && (
+            {PRECISION_SIMULATION_ENABLED && analogSimulationMode === 'precision' && simulationStale && (
               <span className="text-amber-600">仿真结果已失效，请重新运行</span>
             )}
             {isWireModeActive && (
@@ -3988,24 +4004,55 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
             {workspaceMode !== 'digital' && (
               <>
                 <span className="text-slate-500">
-                  模式: {analogSimulationMode === 'realtime' ? '实时仿真' : '精确仿真'}
+                  模式: 实时仿真
                 </span>
                 <Button
                   size="small"
-                  type={analogSimulationMode === 'realtime' ? 'primary' : 'default'}
+                  type="primary"
                   onClick={() => setAnalogSimulationMode('realtime')}
                 >
                   实时
                 </Button>
+                {PRECISION_SIMULATION_ENABLED && (
+                  <Button
+                    size="small"
+                    type={analogSimulationMode === 'precision' ? 'primary' : 'default'}
+                    onClick={() => setAnalogSimulationMode('precision')}
+                  >
+                    精确
+                  </Button>
+                )}
+                <span className="text-slate-500">
+                  标签: {realtimeShowLabels ? (realtimeLabelDensity === 'focused' ? '聚焦' : realtimeLabelDensity === 'adaptive' ? '自适应' : '全量') : '已隐藏'}
+                </span>
                 <Button
                   size="small"
-                  type={analogSimulationMode === 'precision' ? 'primary' : 'default'}
-                  onClick={() => setAnalogSimulationMode('precision')}
+                  type={realtimeShowLabels ? 'primary' : 'default'}
+                  onClick={() => setRealtimeShowLabels((value) => !value)}
                 >
-                  精确
+                  {realtimeShowLabels ? '隐藏标签' : '显示标签'}
                 </Button>
-                {analogSimulationMode === 'realtime' && (
+                {analogSimulationMode === 'realtime' && realtimeShowLabels && (
                   <>
+                    <Button
+                      size="small"
+                      onClick={() => {
+                        setRealtimeLabelDensity((current) => {
+                          if (current === 'focused') return 'adaptive';
+                          if (current === 'adaptive') return 'all';
+                          return 'focused';
+                        });
+                      }}
+                    >
+                      切换标签
+                    </Button>
+                    <Button
+                      size="small"
+                      type={realtimeShowScopePanels ? 'primary' : 'default'}
+                      onClick={() => setRealtimeShowScopePanels((value) => !value)}
+                    >
+                      示波面板
+                    </Button>
                     <span className="text-slate-500">
                       t={realtimeFrameResult.time.toFixed(6)}s
                     </span>
