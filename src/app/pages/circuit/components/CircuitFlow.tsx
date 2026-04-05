@@ -57,8 +57,7 @@ import {
 } from '@ant-design/icons';
 import ImageUploader from '@/app/components/ImageUploader';
 import { nanoid } from 'nanoid';
-import { CanvasOverlay, useSimLoop } from '@/simulation';
-import { RealtimeLabelDensity } from '@/simulation/renderer/NodeLabelRenderer';
+import { CanvasOverlay, RealtimeLabelMode, useSimLoop } from '@/simulation';
 
 // 唯一节点ID生成
 let nodeIdCounter = 1;
@@ -1388,6 +1387,28 @@ const powerSourceElementTypes = new Set<CircuitElementType>([
 
 const realtimeUnsupportedElementTypes = new Set<CircuitElementType>([]);
 const PRECISION_SIMULATION_ENABLED = false;
+const REALTIME_LABEL_MODE_STORAGE_KEY = 'drawsee:realtime-label-mode';
+const REALTIME_SCOPE_VISIBILITY_STORAGE_KEY = 'drawsee:realtime-show-scope-panels';
+
+const realtimeLabelModeLabels: Record<RealtimeLabelMode, string> = {
+  hidden: '隐藏',
+  focused: '仅选中',
+  adaptive: '自动',
+};
+
+const getInitialRealtimeLabelMode = (): RealtimeLabelMode => {
+  if (typeof window === 'undefined') return 'adaptive';
+  const stored = window.localStorage.getItem(REALTIME_LABEL_MODE_STORAGE_KEY);
+  return stored === 'hidden' || stored === 'focused' || stored === 'adaptive'
+    ? stored
+    : 'adaptive';
+};
+
+const getInitialRealtimeShowScopePanels = () => {
+  if (typeof window === 'undefined') return true;
+  const stored = window.localStorage.getItem(REALTIME_SCOPE_VISIBILITY_STORAGE_KEY);
+  return stored === null ? true : stored === 'true';
+};
 
 const measurementTypeLabels: Partial<Record<CircuitElementType, string>> = {
   [CircuitElementType.AMMETER]: '电流表',
@@ -1499,9 +1520,8 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
   const [realtimeRunning, setRealtimeRunning] = useState(false);
   const [realtimeResetToken, setRealtimeResetToken] = useState(0);
   const [realtimeViewport, setRealtimeViewport] = useState({ x: 0, y: 0, zoom: 1 });
-  const [realtimeShowLabels, setRealtimeShowLabels] = useState(true);
-  const [realtimeShowScopePanels, setRealtimeShowScopePanels] = useState(true);
-  const [realtimeLabelDensity, setRealtimeLabelDensity] = useState<RealtimeLabelDensity>('adaptive');
+  const [realtimeLabelMode, setRealtimeLabelMode] = useState<RealtimeLabelMode>(() => getInitialRealtimeLabelMode());
+  const [realtimeShowScopePanels, setRealtimeShowScopePanels] = useState(() => getInitialRealtimeShowScopePanels());
   const [realtimeCircuitDesign, setRealtimeCircuitDesign] = useState<CircuitDesign | null>(null);
   const [simulationResults, setSimulationResults] = useState<Record<string, SimulationMeasurementResult>>({});
   const [simulationStale, setSimulationStale] = useState(false);
@@ -2478,6 +2498,16 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
     }
   }, [analogSimulationMode]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(REALTIME_LABEL_MODE_STORAGE_KEY, realtimeLabelMode);
+  }, [realtimeLabelMode]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(REALTIME_SCOPE_VISIBILITY_STORAGE_KEY, String(realtimeShowScopePanels));
+  }, [realtimeShowScopePanels]);
+
   const { frameResult: realtimeFrameResult } = useSimLoop({
     enabled: workspaceMode !== 'digital' && analogSimulationMode === 'realtime' && realtimeRunning,
     design: realtimeCircuitDesign,
@@ -3044,27 +3074,21 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
     setNodes((nds) =>
       nds.map((node) => {
         if (node.id === selectedNodeId) {
-          // 获取当前旋转角度
-          const match = node.style?.transform?.match(/rotate\((\d+)deg\)/);
-          const currentRotation = match ? parseInt(match[1], 10) : 0;
-          
-          // 每次旋转90度
+          const currentRotation = Number(node.data?.element?.rotation || 0);
           const newRotation = (currentRotation + 90) % 360;
-          
+
           console.log(`节点 ${node.id} 旋转角度从 ${currentRotation} 变为 ${newRotation}`);
-          
+
           return {
             ...node,
-            style: {
-              ...node.style,
-              transform: `rotate(${newRotation}deg)`
-            },
             data: {
               ...node.data,
-              element: node.data.element ? {
-                ...node.data.element,
-                rotation: newRotation,
-              } : node.data.element
+              element: node.data.element
+                ? {
+                    ...node.data.element,
+                    rotation: newRotation,
+                  }
+                : node.data.element,
             }
           };
         }
@@ -3964,9 +3988,8 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
               nodes={nodes}
               selectedNodeId={selectedNodeId}
               options={{
-                showLabels: realtimeShowLabels,
+                labelMode: realtimeLabelMode,
                 showScopePanels: realtimeShowScopePanels,
-                labelDensity: realtimeLabelDensity,
               }}
               viewport={realtimeViewport}
             />
@@ -4023,29 +4046,26 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
                   </Button>
                 )}
                 <span className="text-slate-500">
-                  标签: {realtimeShowLabels ? (realtimeLabelDensity === 'focused' ? '聚焦' : realtimeLabelDensity === 'adaptive' ? '自适应' : '全量') : '已隐藏'}
+                  标签: {realtimeLabelModeLabels[realtimeLabelMode]}
                 </span>
-                <Button
-                  size="small"
-                  type={realtimeShowLabels ? 'primary' : 'default'}
-                  onClick={() => setRealtimeShowLabels((value) => !value)}
-                >
-                  {realtimeShowLabels ? '隐藏标签' : '显示标签'}
-                </Button>
-                {analogSimulationMode === 'realtime' && realtimeShowLabels && (
-                  <>
-                    <Button
-                      size="small"
-                      onClick={() => {
-                        setRealtimeLabelDensity((current) => {
-                          if (current === 'focused') return 'adaptive';
-                          if (current === 'adaptive') return 'all';
-                          return 'focused';
-                        });
-                      }}
+                <div className="inline-flex overflow-hidden rounded-md border border-slate-200 bg-white">
+                  {(['hidden', 'focused', 'adaptive'] as RealtimeLabelMode[]).map((mode) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      className={`border-r border-slate-200 px-2 py-1 text-xs transition last:border-r-0 ${
+                        realtimeLabelMode === mode
+                          ? 'bg-blue-600 text-white'
+                          : 'text-slate-600 hover:bg-slate-50'
+                      }`}
+                      onClick={() => setRealtimeLabelMode(mode)}
                     >
-                      切换标签
-                    </Button>
+                      {realtimeLabelModeLabels[mode]}
+                    </button>
+                  ))}
+                </div>
+                {analogSimulationMode === 'realtime' && (
+                  <>
                     <Button
                       size="small"
                       type={realtimeShowScopePanels ? 'primary' : 'default'}

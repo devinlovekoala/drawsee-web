@@ -500,24 +500,12 @@ Object.assign(SVGComponents, {
 
 // 使用React.memo包裹电路节点组件，避免不必要的重渲染
 export const CircuitNode = memo(({ data, selected, id }: NodeProps<CircuitNodeData>) => {
-  const [rotation, setRotation] = useState<number>(0);
   const [hovered, setHovered] = useState<boolean>(false);
   const [lastValues, setLastValues] = useState({
     label: data.label || "",
     value: data.value || ""
   });
-  
-  // 使用useCallback减少函数重新创建
-  const handleRotateClick = useCallback(() => {
-    const newRotation = (rotation + 90) % 360;
-    setRotation(newRotation);
-    
-    // 分发自定义事件，通知流程图组件更新连接线
-    const rotationEvent = new CustomEvent('circuit-node-rotated', { 
-      detail: { nodeId: id, rotation: newRotation }
-    });
-    document.dispatchEvent(rotationEvent);
-  }, [id, rotation]);
+  const rotation = Number(data.element?.rotation || 0);
   
   // 获取元件中的初始值，使用useMemo避免重复计算
   useEffect(() => {
@@ -531,11 +519,6 @@ export const CircuitNode = memo(({ data, selected, id }: NodeProps<CircuitNodeDa
         label: data.label || "",
         value: data.value || ""
       });
-      
-      // 设置初始旋转值
-      if (data.element.rotation !== undefined) {
-        setRotation(data.element.rotation);
-      }
     }
   }, [data.element, data.label, data.value, lastValues]);
   

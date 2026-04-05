@@ -286,28 +286,53 @@ export class NodeLabelRenderer {
       const labelY = cardY + (compact ? 8 : 11);
       const voltageText = `V ${formatValue(result.voltage, 'V')}`;
       const currentText = `I ${formatValue(result.current, 'A')}`;
+      const currentColor = result.current < -1e-10 ? '#0f766e' : result.current > 1e-10 ? '#1d4ed8' : '#64748b';
 
       ctx.save();
-      ctx.strokeStyle = isSelected ? 'rgba(37, 99, 235, 0.32)' : 'rgba(148, 163, 184, 0.30)';
+      ctx.strokeStyle = isSelected ? 'rgba(37, 99, 235, 0.24)' : 'rgba(148, 163, 184, 0.20)';
       ctx.lineWidth = 1;
+      ctx.setLineDash([3, 3]);
       ctx.beginPath();
       ctx.moveTo(tetherStartX, tetherStartY);
       ctx.lineTo(tetherEndX, tetherEndY);
       ctx.stroke();
+      ctx.setLineDash([]);
 
-      ctx.shadowColor = 'rgba(15, 23, 42, 0.11)';
-      ctx.shadowBlur = compact ? 10 : 14;
-      ctx.fillStyle = isSelected
-        ? `rgba(239, 246, 255, ${0.96 * opacity})`
-        : `rgba(255, 255, 255, ${0.92 * opacity})`;
-      drawRoundedRect(ctx, cardX, cardY, cardWidth, cardHeight, compact ? 9 : 11);
+      const fillGradient = ctx.createLinearGradient(cardX, cardY, cardX, cardY + cardHeight);
+      if (isSelected) {
+        fillGradient.addColorStop(0, `rgba(239, 246, 255, ${0.98 * opacity})`);
+        fillGradient.addColorStop(1, `rgba(219, 234, 254, ${0.88 * opacity})`);
+      } else {
+        fillGradient.addColorStop(0, `rgba(255, 255, 255, ${0.95 * opacity})`);
+        fillGradient.addColorStop(1, `rgba(241, 245, 249, ${0.86 * opacity})`);
+      }
+
+      ctx.shadowColor = 'rgba(15, 23, 42, 0.16)';
+      ctx.shadowBlur = compact ? 10 : 16;
+      ctx.fillStyle = fillGradient;
+      drawRoundedRect(ctx, cardX, cardY, cardWidth, cardHeight, compact ? 12 : 14);
       ctx.fill();
 
       ctx.shadowBlur = 0;
-      ctx.strokeStyle = isSelected ? 'rgba(147, 197, 253, 0.95)' : 'rgba(203, 213, 225, 0.88)';
+      const borderGradient = ctx.createLinearGradient(cardX, cardY, cardX + cardWidth, cardY + cardHeight);
+      borderGradient.addColorStop(0, isSelected ? 'rgba(96, 165, 250, 0.85)' : 'rgba(148, 163, 184, 0.42)');
+      borderGradient.addColorStop(1, isSelected ? 'rgba(147, 197, 253, 0.42)' : 'rgba(148, 163, 184, 0.18)');
+      ctx.strokeStyle = borderGradient;
+      ctx.lineWidth = 1;
       ctx.stroke();
 
-      ctx.fillStyle = accent;
+      const dotGradient = ctx.createRadialGradient(
+        cardX + 12,
+        cardY + (compact ? 10 : 11),
+        0.3,
+        cardX + 12,
+        cardY + (compact ? 10 : 11),
+        compact ? 3.8 : 4.4,
+      );
+      dotGradient.addColorStop(0, 'rgba(255, 255, 255, 0.96)');
+      dotGradient.addColorStop(0.38, accent);
+      dotGradient.addColorStop(1, isSelected ? 'rgba(59, 130, 246, 0.2)' : 'rgba(245, 158, 11, 0.16)');
+      ctx.fillStyle = dotGradient;
       ctx.beginPath();
       ctx.arc(cardX + 12, cardY + (compact ? 10 : 11), compact ? 3 : 3.5, 0, Math.PI * 2);
       ctx.fill();
@@ -316,13 +341,23 @@ export class NodeLabelRenderer {
       ctx.fillStyle = '#0f172a';
       ctx.fillText(result.label, labelX, labelY);
 
-      ctx.fillStyle = '#475569';
+      const dividerY = cardY + Math.round(cardHeight * (compact ? 0.52 : 0.48));
+      ctx.strokeStyle = 'rgba(148, 163, 184, 0.2)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(cardX + 9, dividerY);
+      ctx.lineTo(cardX + cardWidth - 9, dividerY);
+      ctx.stroke();
+
       ctx.font = `${valueFontSize}px ui-monospace, SFMono-Regular, Menlo, monospace`;
       if (compact || cardWidth < 154) {
         const combined = `${voltageText}   ${currentText}`;
+        ctx.fillStyle = '#1e40af';
         ctx.fillText(combined, cardX + 10, cardY + cardHeight - 7);
       } else {
+        ctx.fillStyle = '#1e40af';
         ctx.fillText(voltageText, cardX + 10, cardY + cardHeight - 8);
+        ctx.fillStyle = currentColor;
         ctx.fillText(currentText, cardX + (cardWidth / 2) + 4, cardY + cardHeight - 8);
       }
       ctx.restore();

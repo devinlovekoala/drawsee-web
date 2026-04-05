@@ -4,10 +4,11 @@ import { SimFrameResult } from '@/simulation/types/simResult';
 import { NodeLabelRenderer, RealtimeLabelDensity } from '@/simulation/renderer/NodeLabelRenderer';
 import { ScopeRenderer } from '@/simulation/renderer/ScopeRenderer';
 
+export type RealtimeLabelMode = 'hidden' | 'focused' | 'adaptive';
+
 export interface RealtimeOverlayOptions {
-  showLabels?: boolean;
   showScopePanels?: boolean;
-  labelDensity?: RealtimeLabelDensity;
+  labelMode?: RealtimeLabelMode;
 }
 
 interface CanvasOverlayProps {
@@ -55,9 +56,10 @@ export const CanvasOverlay: React.FC<CanvasOverlayProps> = ({
 
     hudContext.clearRect(0, 0, hudCanvas.width, hudCanvas.height);
 
-    if (options?.showLabels ?? true) {
+    const labelMode = options?.labelMode ?? 'adaptive';
+    if (labelMode !== 'hidden') {
       nodeLabelRenderer.render(hudContext, nodes, frameResult.elementResults, {
-        density: options?.labelDensity ?? 'adaptive',
+        density: labelMode as RealtimeLabelDensity,
         selectedNodeId,
         zoom: viewport.zoom,
         canvasWidth: bounds.width,
@@ -73,7 +75,7 @@ export const CanvasOverlay: React.FC<CanvasOverlayProps> = ({
     bounds.width,
     frameResult,
     nodes,
-    options?.labelDensity,
+    options?.labelMode,
     options?.showScopePanels,
     selectedNodeId,
     viewport.zoom,

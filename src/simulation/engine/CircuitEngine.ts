@@ -259,6 +259,7 @@ export class CircuitEngine {
     }
 
     if (this.hasNonlinearElements) {
+      const nonlinearElements = this.elements.filter((element) => element.hasNonlinearBehavior);
       let solved = false;
       for (let iteration = 0; iteration < this.maxIterations; iteration += 1) {
         const ok = this.solver.factor(matrix.cloneData(), matrix.size);
@@ -267,14 +268,15 @@ export class CircuitEngine {
           return;
         }
         const nextSolution = this.solver.solve(matrix.cloneRHS());
-        converged = this.elements
-          .filter((element) => element.hasNonlinearBehavior)
+        converged = nonlinearElements
           .every((element) => element.isConverged(nextSolution, this.convergenceTolerance));
         this.solution = nextSolution;
         if (converged) {
           solved = true;
           break;
         }
+        // Feed the latest nonlinear estimate back into the device model before restamping.
+        nonlinearElements.forEach((element) => element.updateFromSolution(this.solution));
         matrix = this.buildStepMatrix();
         const nonlinearContext = {
           time: this.time,
