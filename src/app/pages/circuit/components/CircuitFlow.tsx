@@ -3927,7 +3927,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
         )}
       
         {/* 流程图区域 */}
-        <div className="flex-1 relative overflow-hidden bg-[radial-gradient(circle_at_top,#f8fbff_0%,#f4f7fb_38%,#eef3f9_100%)]">
+        <div className="flex-1 relative overflow-hidden bg-white">
           <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -3979,7 +3979,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
             className="circuit-flow-canvas"
             proOptions={{ hideAttribution: true }}
           >
-            <Background gap={20} size={1.15} color="#c9d4e5" />
+            <Background gap={20} size={1} color="#e5e7eb" />
             <Controls className="circuit-flow-controls" />
           </ReactFlow>
           {workspaceMode !== 'digital' && analogSimulationMode === 'realtime' && (
