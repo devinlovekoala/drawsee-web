@@ -57,6 +57,7 @@ import {
 } from '@ant-design/icons';
 import ImageUploader from '@/app/components/ImageUploader';
 import { nanoid } from 'nanoid';
+import { CanvasOverlay, useSimLoop } from '@/simulation';
 
 // 唯一节点ID生成
 let nodeIdCounter = 1;
@@ -1384,6 +1385,8 @@ const powerSourceElementTypes = new Set<CircuitElementType>([
   CircuitElementType.SINE_SOURCE,
 ]);
 
+const realtimeUnsupportedElementTypes = new Set<CircuitElementType>([]);
+
 const measurementTypeLabels: Partial<Record<CircuitElementType, string>> = {
   [CircuitElementType.AMMETER]: '电流表',
   [CircuitElementType.VOLTMETER]: '电压表',
@@ -1490,6 +1493,11 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
   const [edges, setEdges] = useState<Edge[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isSimulating, setIsSimulating] = useState(false);
+  const [analogSimulationMode, setAnalogSimulationMode] = useState<'realtime' | 'precision'>('realtime');
+  const [realtimeRunning, setRealtimeRunning] = useState(false);
+  const [realtimeResetToken, setRealtimeResetToken] = useState(0);
+  const [realtimeViewport, setRealtimeViewport] = useState({ x: 0, y: 0, zoom: 1 });
+  const [realtimeCircuitDesign, setRealtimeCircuitDesign] = useState<CircuitDesign | null>(null);
   const [simulationResults, setSimulationResults] = useState<Record<string, SimulationMeasurementResult>>({});
   const [simulationStale, setSimulationStale] = useState(false);
   const [measurementModalVisible, setMeasurementModalVisible] = useState(false);
@@ -2452,6 +2460,22 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
   }, [nodes, edges, convertToCircuitDesign]);
 
   useEffect(() => {
+    if (workspaceMode === 'digital') {
+      setRealtimeCircuitDesign(null);
+      return;
+    }
+    setRealtimeCircuitDesign(convertToCircuitDesign());
+  }, [convertToCircuitDesign, realtimeResetToken, workspaceMode]);
+
+  const { frameResult: realtimeFrameResult } = useSimLoop({
+    enabled: workspaceMode !== 'digital' && analogSimulationMode === 'realtime' && realtimeRunning,
+    design: realtimeCircuitDesign,
+    flowNodes: nodes,
+    flowEdges: edges,
+    rebuildKey: realtimeResetToken,
+  });
+
+  useEffect(() => {
     return () => {
       if (autoSaveTimerRef.current) {
         window.clearTimeout(autoSaveTimerRef.current);
@@ -2779,6 +2803,28 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
       message.error('电路缺少电源器件，请添加电压源或电流源后再运行仿真');
       return;
     }
+    if (analogSimulationMode === 'realtime') {
+      const unsupportedElements = circuitDesign.elements.filter((element) =>
+        realtimeUnsupportedElementTypes.has(element.type as CircuitElementType),
+      );
+      if (unsupportedElements.length > 0) {
+        const labels = unsupportedElements.map((element) => element.label || element.id).join('、');
+        message.warning(`实时仿真暂不支持以下器件，已建议切换精确仿真：${labels}`);
+        setAnalogSimulationMode('precision');
+        return;
+      }
+      const nextRunning = !realtimeRunning;
+      setRealtimeRunning(nextRunning);
+      setSimulationStale(false);
+      if (nextRunning) {
+        setMeasurementModalVisible(false);
+        setActiveMeasurementResult(null);
+        message.success('实时仿真已启动，画布将持续反馈电压、电流和波形');
+      } else {
+        message.info('实时仿真已暂停');
+      }
+      return;
+    }
     const measurementNodes = nodes.filter(node => 
       measurementElementTypes.has(node.data.type as CircuitElementType)
     );
@@ -2839,7 +2885,14 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
     } finally {
       setIsSimulating(false);
     }
-  }, [convertToCircuitDesign, nodes, edges, isSimulating, workspaceMode, computeSimSignature]);
+  }, [analogSimulationMode, convertToCircuitDesign, nodes, edges, isSimulating, realtimeRunning, workspaceMode, computeSimSignature]);
+
+  const handleResetRealtimeSimulation = useCallback(() => {
+    setRealtimeRunning(false);
+    setRealtimeResetToken((value) => value + 1);
+    setSimulationStale(false);
+    message.info('实时仿真已重置');
+  }, []);
 
   const handleDownloadDigitalVcd = useCallback(() => {
     if (!digitalSimResult?.rawVcd) {
@@ -3369,6 +3422,12 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
     }
   }, [isJunctionModeActive, isReadOnly, isWireModeActive]);
 
+  useEffect(() => {
+    if (workspaceMode === 'digital' || analogSimulationMode === 'precision') {
+      setRealtimeRunning(false);
+    }
+  }, [analogSimulationMode, workspaceMode]);
+
   // 将未保存状态检查暴露到全局，以便侧栏可以进行同步阻塞检查
   useEffect(() => {
     (window as any).drawsee_hasUnsavedCircuitChanges = () => !!hasUnsavedChangesRef.current;
@@ -3802,7 +3861,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
               onToggleSidebar={toggleSideBar}
               isSidebarOpen={openSideBar}
               isAnalyzing={isAnalyzing}
-              isSimulating={isSimulating}
+              isSimulating={isSimulating || realtimeRunning}
               selectedModel={currentModel}
               onModelChange={(model) => {
                 setCurrentModel(model);
@@ -3834,7 +3893,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
         )}
       
         {/* 流程图区域 */}
-        <div className="flex-1">
+        <div className="flex-1 relative overflow-hidden bg-[radial-gradient(circle_at_top,#f8fbff_0%,#f4f7fb_38%,#eef3f9_100%)]">
           <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -3881,13 +3940,21 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
             zoomOnScroll={true}
             panOnScroll={false}
             zoomOnDoubleClick={false}
+            onMove={(_, viewport) => setRealtimeViewport(viewport)}
             disableKeyboardA11y={true}
             className="circuit-flow-canvas"
             proOptions={{ hideAttribution: true }}
           >
-            <Background />
-            <Controls />
+            <Background gap={20} size={1.15} color="#c9d4e5" />
+            <Controls className="circuit-flow-controls" />
           </ReactFlow>
+          {workspaceMode !== 'digital' && analogSimulationMode === 'realtime' && (
+            <CanvasOverlay
+              frameResult={realtimeFrameResult}
+              nodes={nodes}
+              viewport={realtimeViewport}
+            />
+          )}
         </div>
         
         {/* 状态信息栏 */}
@@ -3901,7 +3968,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
           )}
           
           <div className="flex items-center gap-3">
-            {simulationStale && (
+            {analogSimulationMode === 'precision' && simulationStale && (
               <span className="text-amber-600">仿真结果已失效，请重新运行</span>
             )}
             {isWireModeActive && (
@@ -3918,6 +3985,46 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
             >
               {showElementLibrary ? '隐藏元件库' : '显示元件库'}
             </button>
+            {workspaceMode !== 'digital' && (
+              <>
+                <span className="text-slate-500">
+                  模式: {analogSimulationMode === 'realtime' ? '实时仿真' : '精确仿真'}
+                </span>
+                <Button
+                  size="small"
+                  type={analogSimulationMode === 'realtime' ? 'primary' : 'default'}
+                  onClick={() => setAnalogSimulationMode('realtime')}
+                >
+                  实时
+                </Button>
+                <Button
+                  size="small"
+                  type={analogSimulationMode === 'precision' ? 'primary' : 'default'}
+                  onClick={() => setAnalogSimulationMode('precision')}
+                >
+                  精确
+                </Button>
+                {analogSimulationMode === 'realtime' && (
+                  <>
+                    <span className="text-slate-500">
+                      t={realtimeFrameResult.time.toFixed(6)}s
+                    </span>
+                    <span className={realtimeFrameResult.converged ? 'text-emerald-600' : 'text-amber-600'}>
+                      {realtimeFrameResult.converged ? '收敛' : '迭代中'}
+                    </span>
+                    <span className="text-slate-500">
+                      {Math.round(realtimeFrameResult.fpsHint)} FPS
+                    </span>
+                    <Button size="small" onClick={() => setRealtimeRunning((running) => !running)}>
+                      {realtimeRunning ? '暂停' : '启动'}
+                    </Button>
+                    <Button size="small" onClick={handleResetRealtimeSimulation}>
+                      重置
+                    </Button>
+                  </>
+                )}
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -4161,6 +4268,43 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
           <Spin size="large" spinning={true} />
         </div>
       )}
+      <style jsx global>{`
+        .circuit-flow-canvas .react-flow__renderer {
+          background:
+            radial-gradient(circle at 20% 0%, rgba(255,255,255,0.88) 0, rgba(255,255,255,0) 34%),
+            linear-gradient(180deg, rgba(255,255,255,0.16) 0%, rgba(226,232,240,0.18) 100%);
+        }
+
+        .circuit-flow-canvas .react-flow__controls {
+          box-shadow: 0 12px 28px rgba(15, 23, 42, 0.10);
+          border: 1px solid rgba(203, 213, 225, 0.8);
+          border-radius: 14px;
+          overflow: hidden;
+          background: rgba(255, 255, 255, 0.88);
+          backdrop-filter: blur(10px);
+        }
+
+        .circuit-flow-canvas .react-flow__controls-button {
+          width: 30px;
+          height: 30px;
+          border-bottom: 1px solid rgba(226, 232, 240, 0.9);
+          background: transparent;
+          color: #334155;
+        }
+
+        .circuit-flow-canvas .react-flow__controls-button:hover {
+          background: rgba(239, 246, 255, 0.95);
+          color: #0f172a;
+        }
+
+        .circuit-flow-canvas .react-flow__attribution {
+          background: rgba(255, 255, 255, 0.72);
+          border: 1px solid rgba(226, 232, 240, 0.85);
+          border-radius: 999px;
+          padding: 2px 8px;
+          backdrop-filter: blur(8px);
+        }
+      `}</style>
     </div>
   );
 };

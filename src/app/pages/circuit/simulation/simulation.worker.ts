@@ -31,6 +31,8 @@ const buildSimulationError = (error: any, fallback?: string) => {
   simError.rawMessage = info.rawMessage;
   simError.details = info;
   return simError;
+};
+
 const extractErrorDetails = (error: any): SimulationErrorDetails | undefined => {
   if (!error) return undefined;
   if (error.details) return error.details as SimulationErrorDetails;
@@ -42,8 +44,6 @@ const extractErrorDetails = (error: any): SimulationErrorDetails | undefined => 
     };
   }
   return undefined;
-};
-
 };
 
 const ensureNgSpice = () => {

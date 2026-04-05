@@ -1,7 +1,6 @@
-import { CircuitDesign, CircuitElementType } from '@/api/types/circuit.types';
+import { CircuitDesign } from '@/api/types/circuit.types';
 import { buildNetlist } from './netlist';
 import {
-  MeasurementBinding,
   SimulationMeasurementResult,
   SimulationRequest,
   SimulationResponse,

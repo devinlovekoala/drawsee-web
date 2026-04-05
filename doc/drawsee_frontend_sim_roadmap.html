@@ -1,0 +1,383 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font-sans, sans-serif); color: var(--color-text-primary); background: transparent; }
+
+.tabs { display: flex; gap: 4px; padding: 16px 16px 0; border-bottom: 1px solid var(--color-border-tertiary); }
+.tab { padding: 8px 14px; border-radius: 6px 6px 0 0; font-size: 13px; cursor: pointer; color: var(--color-text-secondary); border: 1px solid transparent; border-bottom: none; transition: all .15s; }
+.tab.active { color: var(--color-text-primary); border-color: var(--color-border-secondary); background: var(--color-background-secondary); font-weight: 500; }
+.tab:hover:not(.active) { color: var(--color-text-primary); }
+
+.panel { display: none; padding: 20px; }
+.panel.active { display: block; }
+
+.section-title { font-size: 11px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase; color: var(--color-text-tertiary); margin: 0 0 10px; }
+
+/* Layer cards */
+.layer { border: 1px solid var(--color-border-tertiary); border-radius: 10px; margin-bottom: 12px; overflow: hidden; }
+.layer-header { display: flex; align-items: center; gap: 10px; padding: 12px 14px; background: var(--color-background-secondary); }
+.layer-badge { font-size: 10px; font-weight: 500; padding: 2px 8px; border-radius: 20px; white-space: nowrap; }
+.badge-teal { background: #9FE1CB; color: #085041; }
+.badge-purple { background: #CECBF6; color: #26215C; }
+.badge-amber { background: #FAC775; color: #412402; }
+.badge-coral { background: #F5C4B3; color: #4A1B0C; }
+.badge-blue { background: #B5D4F4; color: #042C53; }
+.layer-title { font-size: 14px; font-weight: 500; flex: 1; }
+.layer-subtitle { font-size: 12px; color: var(--color-text-secondary); }
+.layer-body { padding: 12px 14px; }
+
+/* Code blocks */
+.code-block { background: var(--color-background-tertiary); border: 1px solid var(--color-border-tertiary); border-radius: 6px; padding: 10px 12px; font-family: var(--font-mono, monospace); font-size: 12px; color: var(--color-text-secondary); line-height: 1.6; margin: 8px 0; white-space: pre; overflow-x: auto; }
+
+/* Step list */
+.steps { list-style: none; }
+.steps li { display: flex; gap: 10px; padding: 6px 0; font-size: 13px; color: var(--color-text-secondary); border-bottom: 1px solid var(--color-border-tertiary); align-items: flex-start; }
+.steps li:last-child { border-bottom: none; }
+.step-num { min-width: 20px; height: 20px; border-radius: 50%; background: var(--color-background-tertiary); font-size: 11px; font-weight: 500; display: flex; align-items: center; justify-content: center; color: var(--color-text-primary); margin-top: 1px; }
+.step-text strong { color: var(--color-text-primary); font-weight: 500; }
+
+/* Warning / tip boxes */
+.tip { background: var(--color-background-info); border: 1px solid var(--color-border-info); border-radius: 8px; padding: 10px 12px; font-size: 13px; color: var(--color-text-info); margin: 10px 0; }
+.warn { background: var(--color-background-warning); border: 1px solid var(--color-border-warning); border-radius: 8px; padding: 10px 12px; font-size: 13px; color: var(--color-text-warning); margin: 10px 0; }
+
+/* Comparison table */
+.comp-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.comp-table th { background: var(--color-background-secondary); padding: 8px 10px; text-align: left; font-weight: 500; font-size: 12px; border-bottom: 1px solid var(--color-border-secondary); }
+.comp-table td { padding: 8px 10px; border-bottom: 1px solid var(--color-border-tertiary); color: var(--color-text-secondary); vertical-align: top; }
+.comp-table td:first-child { color: var(--color-text-primary); font-weight: 500; white-space: nowrap; }
+.yes { color: #0F6E56; }
+.no { color: #993C1D; }
+.partial { color: #854F0B; }
+
+/* Timeline */
+.phase { display: flex; gap: 14px; margin-bottom: 16px; }
+.phase-dot-col { display: flex; flex-direction: column; align-items: center; }
+.phase-dot { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 500; font-size: 13px; flex-shrink: 0; }
+.phase-line { width: 2px; flex: 1; min-height: 20px; background: var(--color-border-tertiary); margin: 4px 0; }
+.phase-content { flex: 1; padding-bottom: 4px; }
+.phase-title { font-size: 14px; font-weight: 500; margin-bottom: 4px; }
+.phase-desc { font-size: 13px; color: var(--color-text-secondary); line-height: 1.6; }
+.phase-tag { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 20px; margin-left: 6px; }
+
+.p1 .phase-dot { background: #9FE1CB; color: #085041; }
+.p2 .phase-dot { background: #CECBF6; color: #26215C; }
+.p3 .phase-dot { background: #FAC775; color: #412402; }
+.p4 .phase-dot { background: #B5D4F4; color: #042C53; }
+</style>
+</head>
+<body>
+
+<div class="tabs">
+  <div class="tab active" onclick="show('arch')">整体架构</div>
+  <div class="tab" onclick="show('mna')">MNA 仿真核心</div>
+  <div class="tab" onclick="show('visual')">实时可视化</div>
+  <div class="tab" onclick="show('plan')">实施路线</div>
+</div>
+
+<!-- ===== TAB 1: ARCH ===== -->
+<div class="panel active" id="panel-arch">
+  <p class="section-title">四层分工模型</p>
+
+  <div class="layer">
+    <div class="layer-header">
+      <span class="layer-badge badge-teal">Layer 1</span>
+      <div>
+        <div class="layer-title">React Flow 画布层（你已有）</div>
+        <div class="layer-subtitle">负责拖拽、连线、元件显示 — 不参与计算</div>
+      </div>
+    </div>
+    <div class="layer-body">
+      <ul class="steps">
+        <li><span class="step-num">→</span><span class="step-text">从 React Flow 的 <strong>nodes + edges</strong> 中提取网表（Netlist）</span></li>
+        <li><span class="step-num">→</span><span class="step-text">每次图变化时，触发 <strong>analyzeCircuit()</strong> 重新构建仿真矩阵</span></li>
+        <li><span class="step-num">→</span><span class="step-text">仿真结果反写回 node 的 <strong>data 字段</strong>，驱动自定义渲染</span></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="layer">
+    <div class="layer-header">
+      <span class="layer-badge badge-purple">Layer 2</span>
+      <div>
+        <div class="layer-title">MNA 仿真引擎（需自建 or 移植）</div>
+        <div class="layer-subtitle">纯 JS 类，运行在主线程或 Web Worker</div>
+      </div>
+    </div>
+    <div class="layer-body">
+      <div class="code-block">// 核心数据结构（对标 CircuitJS CirSim.java）
+class CircuitEngine {
+  nodes: Map&lt;string, number&gt;  // nodeId → 矩阵行号
+  elements: CircuitElement[]  // 所有元件实例
+  matrix: number[][]          // MNA G矩阵
+  rhs: number[]               // 右侧向量 B
+  solution: number[]          // 求解结果：各节点电压
+
+  analyzeCircuit()  // 构建节点编号映射
+  stampCircuit()    // 每个元件写入矩阵
+  runCircuit()      // 每帧：LU分解 → 求解 → doStep()
+}</div>
+      <div class="tip">关键洞察：CircuitJS 的秘密在于 <strong>线性电路只做一次 LU 分解</strong>（stampCircuit），之后每帧只更新右侧向量（O(n²) 而非 O(n³)），这就是为什么它能每帧运行。</div>
+    </div>
+  </div>
+
+  <div class="layer">
+    <div class="layer-header">
+      <span class="layer-badge badge-amber">Layer 3</span>
+      <div>
+        <div class="layer-title">requestAnimationFrame 驱动循环</div>
+        <div class="layer-subtitle">仿真时钟，每帧推进物理时间</div>
+      </div>
+    </div>
+    <div class="layer-body">
+      <div class="code-block">// 仿真主循环（对标 CirSim 的 updateCircuit()）
+function simLoop(timestamp) {
+  const stepsPerFrame = 20  // 每帧跑 20 个小时间步
+  for (let i = 0; i &lt; stepsPerFrame; i++) {
+    engine.runCircuit()     // 推进 dt = 5e-6 秒
+  }
+  renderFrame()             // 把仿真结果写入 React state
+  requestAnimationFrame(simLoop)
+}</div>
+      <div class="warn">为什么每帧跑 20 步？电路时间步需要很小（微秒级）才稳定，但 RAF 是 16ms 一帧，所以需要在一帧内跑多个小时步，然后只渲染最后一个结果。</div>
+    </div>
+  </div>
+
+  <div class="layer">
+    <div class="layer-header">
+      <span class="layer-badge badge-coral">Layer 4</span>
+      <div>
+        <div class="layer-title">Canvas / SVG 覆盖层</div>
+        <div class="layer-subtitle">实时绘制电压色彩 + 电流流动动画点</div>
+      </div>
+    </div>
+    <div class="layer-body">
+      <ul class="steps">
+        <li><span class="step-num">→</span><span class="step-text">在 React Flow 画布上叠加一个 <strong>绝对定位的 Canvas</strong>，与 Flow 坐标系同步</span></li>
+        <li><span class="step-num">→</span><span class="step-text">导线颜色：<strong>绿色=正压、红色=负压、灰色=地</strong>，厚度 ∝ 电流大小</span></li>
+        <li><span class="step-num">→</span><span class="step-text">移动黄点：<strong>offset += current × speed</strong>，用 stroke-dashoffset 动画实现</span></li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ===== TAB 2: MNA ===== -->
+<div class="panel" id="panel-mna">
+  <p class="section-title">MNA 矩阵"盖印"机制（CircuitJS 原理直译）</p>
+
+  <div class="tip">CircuitJS 开源了其内部原理文档 INTERNALS.md，以下是核心数学映射到代码的方式。</div>
+
+  <div style="margin: 14px 0;">
+    <div class="layer-header" style="border-radius:8px; border:1px solid var(--color-border-tertiary);">
+      <span class="layer-badge badge-purple">电阻 stamp</span>
+      <div class="layer-subtitle">Vb/R - Va/R = I，向矩阵写入 4 个点</div>
+    </div>
+    <div class="code-block" style="margin-top:4px">// 节点 a=行1，节点 b=行2，R=1000Ω
+stampResistor(a, b, R) {
+  const g = 1 / R          // 电导
+  matrix[a][a] += g        // G矩阵对角线
+  matrix[b][b] += g
+  matrix[a][b] -= g        // 非对角（负电导）
+  matrix[b][a] -= g
+}</div>
+
+    <div class="layer-header" style="border-radius:8px; border:1px solid var(--color-border-tertiary); margin-top:12px;">
+      <span class="layer-badge badge-teal">电压源 stamp</span>
+      <div class="layer-subtitle">需要额外行/列来求解电流（MNA 扩展）</div>
+    </div>
+    <div class="code-block" style="margin-top:4px">// 电压源：Va - Vb = Vs，新增一行 vsIndex
+stampVoltageSource(a, b, vsIndex, voltage) {
+  stampVCVS(a, b, vsIndex, 1)  // 添加约束方程
+  rhs[vsIndex] = voltage        // 设置电压值
+}
+// 求解后 solution[vsIndex] 即为电源电流</div>
+
+    <div class="layer-header" style="border-radius:8px; border:1px solid var(--color-border-tertiary); margin-top:12px;">
+      <span class="layer-badge badge-amber">电容 stamp（时域）</span>
+      <div class="layer-subtitle">用伴随电路模型，等效为电导 + 电流源</div>
+    </div>
+    <div class="code-block" style="margin-top:4px">// 电容用后向欧拉离散化：等效 Geq = C/dt
+doStep(C, dt) {
+  const geq = C / dt
+  const ieq = geq * (volts[0] - volts[1])  // 上一步电压
+  stampResistor(a, b, 1/geq)
+  stampCurrentSource(a, b, ieq)   // 历史电流源
+}</div>
+  </div>
+
+  <div style="margin-top:16px;">
+    <p class="section-title">元件覆盖范围（分阶段实现建议）</p>
+    <table class="comp-table">
+      <tr><th>元件</th><th>实现难度</th><th>stamp 类型</th><th>建议阶段</th></tr>
+      <tr><td>电阻 R</td><td class="yes">★☆☆</td><td>stampResistor</td><td>Phase 1</td></tr>
+      <tr><td>电压源 V</td><td class="yes">★☆☆</td><td>stampVoltageSource</td><td>Phase 1</td></tr>
+      <tr><td>电流源 I</td><td class="yes">★☆☆</td><td>stampCurrentSource</td><td>Phase 1</td></tr>
+      <tr><td>电容 C</td><td class="partial">★★☆</td><td>后向欧拉等效</td><td>Phase 1</td></tr>
+      <tr><td>电感 L</td><td class="partial">★★☆</td><td>后向欧拉等效</td><td>Phase 1</td></tr>
+      <tr><td>二极管</td><td class="partial">★★☆</td><td>非线性迭代（NR法）</td><td>Phase 2</td></tr>
+      <tr><td>BJT/MOSFET</td><td class="no">★★★</td><td>小信号模型迭代</td><td>Phase 2</td></tr>
+      <tr><td>运放 OpAmp</td><td class="partial">★★☆</td><td>VCVS stamp</td><td>Phase 2</td></tr>
+      <tr><td>数字逻辑门</td><td class="yes">★☆☆</td><td>不走MNA，独立逻辑求解</td><td>Phase 1</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- ===== TAB 3: VISUAL ===== -->
+<div class="panel" id="panel-visual">
+  <p class="section-title">CircuitJS 可视化效果的精确复现方案</p>
+
+  <div class="layer">
+    <div class="layer-header">
+      <span class="layer-badge badge-teal">效果 1</span>
+      <div>
+        <div class="layer-title">导线颜色编码（电压热图）</div>
+        <div class="layer-subtitle">绿=高压 / 灰=零 / 红=负压</div>
+      </div>
+    </div>
+    <div class="layer-body">
+      <div class="code-block">// 每帧渲染：根据节点电压给导线上色
+function getWireColor(voltage, maxV) {
+  const v = Math.max(-1, Math.min(1, voltage / maxV))
+  if (v &gt; 0) return `rgb(0, ${Math.round(v*200)}, 0)`  // 绿
+  if (v &lt; 0) return `rgb(${Math.round(-v*200)}, 0, 0)` // 红
+  return '#888'  // 灰（地）
+}
+// 在叠加 Canvas 上沿 edge 路径绘制彩色线段</div>
+    </div>
+  </div>
+
+  <div class="layer">
+    <div class="layer-header">
+      <span class="layer-badge badge-purple">效果 2</span>
+      <div>
+        <div class="layer-title">流动黄点（电流动画）</div>
+        <div class="layer-subtitle">CircuitJS 最标志性的视觉效果</div>
+      </div>
+    </div>
+    <div class="layer-body">
+      <div class="code-block">// 每帧：累积 offset，让虚线沿导线方向流动
+class WireRenderer {
+  offset = 0
+
+  draw(ctx, path, current, dt) {
+    this.offset += current * CURRENT_SPEED * dt
+    this.offset %= DOT_SPACING  // 循环
+
+    ctx.setLineDash([3, DOT_SPACING - 3])
+    ctx.lineDashOffset = -this.offset  // 负号=正向流动
+    ctx.strokeStyle = '#FFD700'
+    ctx.lineWidth = 2
+    ctx.stroke()
+  }
+}</div>
+      <div class="tip">这个效果本质上是 CSS/Canvas 的 <strong>stroke-dashoffset 动画</strong>，不需要真的绘制每个点，非常高效。</div>
+    </div>
+  </div>
+
+  <div class="layer">
+    <div class="layer-header">
+      <span class="layer-badge badge-amber">效果 3</span>
+      <div>
+        <div class="layer-title">元件上的实时数值标注</div>
+        <div class="layer-subtitle">悬浮/常驻显示电压、电流、功率</div>
+      </div>
+    </div>
+    <div class="layer-body">
+      <ul class="steps">
+        <li><span class="step-num">→</span><span class="step-text">把仿真结果写回 React Flow 的 <strong>node.data.simResult</strong></span></li>
+        <li><span class="step-num">→</span><span class="step-text">自定义 <strong>NodeComponent</strong> 读取 simResult 渲染覆盖标签</span></li>
+        <li><span class="step-num">→</span><span class="step-text">Hover 时用 Tooltip 显示完整参数（V/I/P/频率）</span></li>
+      </ul>
+      <div class="code-block">// 自定义 React Flow 节点组件
+const ResistorNode = ({ data }) =&gt; (
+  &lt;div className="resistor-node"&gt;
+    &lt;ResistorSymbol /&gt;
+    {data.simResult &amp;&amp; (
+      &lt;div className="sim-overlay"&gt;
+        {formatValue(data.simResult.voltage)}V
+        {formatValue(data.simResult.current)}A
+      &lt;/div&gt;
+    )}
+  &lt;/div&gt;
+)</div>
+    </div>
+  </div>
+
+  <div class="layer">
+    <div class="layer-header">
+      <span class="layer-badge badge-blue">效果 4</span>
+      <div>
+        <div class="layer-title">画布内示波器（Scope）</div>
+        <div class="layer-subtitle">点击导线/节点，弹出实时波形</div>
+      </div>
+    </div>
+    <div class="layer-body">
+      <ul class="steps">
+        <li><span class="step-num">→</span><span class="step-text">仿真引擎维护每个被探测节点的 <strong>ringBuffer</strong>（环形缓冲区，存 1000 个历史点）</span></li>
+        <li><span class="step-num">→</span><span class="step-text">用 Canvas 2D 绘制波形，每帧增量绘制新数据（而非重绘全部）</span></li>
+        <li><span class="step-num">→</span><span class="step-text">支持多通道（多个节点同时探测，不同颜色区分）</span></li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ===== TAB 4: PLAN ===== -->
+<div class="panel" id="panel-plan">
+  <p class="section-title">推荐实施顺序（最小可验证路径）</p>
+
+  <div class="phase p1">
+    <div class="phase-dot-col"><div class="phase-dot">1</div><div class="phase-line"></div></div>
+    <div class="phase-content">
+      <div class="phase-title">搭建 MNA 引擎骨架 <span class="phase-tag" style="background:#9FE1CB;color:#085041">1~2周</span></div>
+      <div class="phase-desc">仅支持 R、V源、I源。目标：一个 RC 串联电路能跑起来，能在控制台输出节点电压。不做任何可视化。先验证数学是对的。<br><strong>参考：</strong>直接读 CircuitJS 的 INTERNALS.md，或参考 npm 包 <code>circuit-simulator</code> 的 MNA 实现。</div>
+    </div>
+  </div>
+
+  <div class="phase p2">
+    <div class="phase-dot-col"><div class="phase-dot">2</div><div class="phase-line"></div></div>
+    <div class="phase-content">
+      <div class="phase-title">接入 RAF 主循环 + 基础可视化 <span class="phase-tag" style="background:#CECBF6;color:#26215C">1周</span></div>
+      <div class="phase-desc">把 MNA 引擎接入 requestAnimationFrame。在 React Flow 画布上叠加 Canvas，实现导线颜色编码和流动点动画。此时用户已经能感受到"活的电路"了。</div>
+    </div>
+  </div>
+
+  <div class="phase p3">
+    <div class="phase-dot-col"><div class="phase-dot">3</div><div class="phase-line"></div></div>
+    <div class="phase-content">
+      <div class="phase-title">扩展元件 + Web Worker 卸载 <span class="phase-tag" style="background:#FAC775;color:#412402">2周</span></div>
+      <div class="phase-desc">加入 C、L（时域离散），二极管（Newton-Raphson迭代）。把仿真引擎移入 Web Worker，通过 SharedArrayBuffer 或 postMessage 传递结果，保证主线程（UI）不卡。</div>
+    </div>
+  </div>
+
+  <div class="phase p4">
+    <div class="phase-dot-col"><div class="phase-dot">4</div></div>
+    <div class="phase-content">
+      <div class="phase-title">示波器 + 交互体验打磨 <span class="phase-tag" style="background:#B5D4F4;color:#042C53">1~2周</span></div>
+      <div class="phase-desc">实现 Scope 组件（环形缓冲区+Canvas绘图）。滚轮调参数、拖动滑块实时看电路响应。Ngspice 后端保留作为"高精度验证"模式，两者共存。</div>
+    </div>
+  </div>
+
+  <div class="warn" style="margin-top:16px;">
+    <strong>最需要避开的坑：</strong>不要一开始就尝试复制 CircuitJS 的全部元件库。先把 <strong>R-L-C + 电压源 + 二极管</strong> 这 5 种做扎实，覆盖了 80% 的经典模拟电路，然后再扩展。数学不对的引擎加再多元件也没用。
+  </div>
+
+  <div class="tip" style="margin-top:8px;">
+    <strong>可以直接复用的开源 JS MNA 实现：</strong><br>
+    • <code>jsCircuit</code> — 轻量，适合理解原理后移植关键部分<br>
+    • CircuitJS1 源码的 Java → 人工翻译为 JS（GWT 编译产物可读性差，建议手翻核心 stamp 方法）<br>
+    • <code>analog-circuit-simulator</code> npm 包 — 有 MNA + LU 分解现成实现
+  </div>
+</div>
+
+<script>
+function show(id) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'))
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'))
+  document.getElementById('panel-' + id).classList.add('active')
+  event.target.classList.add('active')
+}
+</script>
+</body>
+</html>
