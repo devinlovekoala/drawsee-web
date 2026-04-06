@@ -1,4 +1,5 @@
 import { CircuitDesign } from '@/api/types/circuit.types';
+import { NGSPICE_SIM_API_URL } from '@/api';
 import { buildNetlist } from './netlist';
 import {
   SimulationMeasurementResult,
@@ -13,8 +14,8 @@ class SimulationClient {
   private worker: WorkerInstance = null;
   private pending: ((res: SimulationResponse) => void) | null = null;
   private pendingReject: ((err: Error) => void) | null = null;
-  private fallbackEndpoint = import.meta.env.VITE_NGSPICE_API_URL || 'http://localhost:3001/simulate';
-  private preferBackend = Boolean(import.meta.env.VITE_NGSPICE_API_URL);
+  private fallbackEndpoint = NGSPICE_SIM_API_URL;
+  private preferBackend = import.meta.env.PROD || Boolean(import.meta.env.VITE_NGSPICE_API_URL);
 
 
 

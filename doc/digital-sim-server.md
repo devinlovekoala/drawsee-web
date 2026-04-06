@@ -85,7 +85,18 @@ npm run verilog:serve
 VITE_DIGITAL_SIM_API_URL=http://localhost:3002/simulate/digital
 ```
 
-若未设置，则默认访问 `http://localhost:3002/simulate/digital`。
+也可以统一配置主 API 地址，再让前端自动推导仿真服务地址：
+
+```
+VITE_API_BASE_URL=http://42.193.107.127:6868
+```
+
+地址解析规则：
+
+- 开发环境：未显式配置时默认访问 `http://localhost:3002/simulate/digital`
+- 生产环境：优先使用 `VITE_DIGITAL_SIM_API_URL`
+- 生产环境若未设置数字仿真地址，则按 `VITE_API_BASE_URL` 或当前页面主机名自动推导为 `http://<当前主机>:3002/simulate/digital`
+- 生产环境若误配置为 `localhost/127.0.0.1`，前端会自动忽略该值，避免打包后仍请求本机回环地址
 
 ## 前端使用说明
 

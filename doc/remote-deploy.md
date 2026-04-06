@@ -20,6 +20,15 @@ REMOTE_QDRANT_DATA=/opt/qdrant_data \
 ./scripts/deploy-remote-containers.sh
 ```
 
+前端生产构建建议同时配置以下变量，避免把本地 `localhost` 打进产物：
+
+```bash
+VITE_API_BASE_URL=http://<你的服务器>:6868
+# 如需显式覆盖，也可单独指定
+VITE_NGSPICE_API_URL=http://<你的服务器>:3001/simulate
+VITE_DIGITAL_SIM_API_URL=http://<你的服务器>:3002/simulate/digital
+```
+
 ## 主要参数
 - `DEPLOY_HOST`：ngspice/verilog 远程服务器 IP/域名（必填）
 - `DEPLOY_USER`：SSH 用户，默认 `ubuntu`，脚本默认会在该用户上执行 `sudo su - root -c` 来调用 Docker

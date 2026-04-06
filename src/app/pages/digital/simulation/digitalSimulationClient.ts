@@ -1,17 +1,8 @@
 import { CircuitDesign } from '@/api/types/circuit.types';
-import { BASE_URL } from '@/api';
+import { DIGITAL_SIM_API_URL } from '@/api';
 import { buildDigitalSimulationPlan } from './digitalNetlist';
 import { parseVcdToWaveforms } from './vcd';
 import { DigitalSimulationResult, DigitalWaveformTrace } from './types';
-
-const DEFAULT_ENDPOINT = (() => {
-  try {
-    const apiUrl = new URL(BASE_URL);
-    return `${apiUrl.protocol}//${apiUrl.hostname}:3002/simulate/digital`;
-  } catch {
-    return 'http://localhost:3002/simulate/digital';
-  }
-})();
 
 const buildBackendErrorMessage = async (response: Response, endpoint: string) => {
   let payload: any = null;
@@ -56,7 +47,7 @@ export const runDigitalSimulation = async (design: CircuitDesign): Promise<Digit
     },
   });
 
-  const endpoint = import.meta.env.VITE_DIGITAL_SIM_API_URL || DEFAULT_ENDPOINT;
+  const endpoint = DIGITAL_SIM_API_URL;
   const response = await fetch(endpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
