@@ -43,6 +43,12 @@ import SaveCircuitModal from './SaveCircuitModal';
 import { Line } from '@ant-design/charts';
 import { simulationClient } from '../simulation/simulationClient';
 import { SimulationMeasurementResult } from '../simulation/types';
+import {
+  classifyAnalogSimulationError,
+  classifyDigitalSimulationError,
+  diagnoseAnalogSimulationDesign,
+  SimulationAlert,
+} from '../simulation/simulationDiagnostics';
 import { runDigitalSimulation } from '@/app/pages/digital/simulation/digitalSimulationClient';
 import { DigitalSimulationResult, DigitalWaveformTrace } from '@/app/pages/digital/simulation/types';
 import {
@@ -1673,6 +1679,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
   const paletteCategories = useMemo(() => getElementCategories(workspaceMode), [workspaceMode]);
   const elementMenuItems = useMemo(() => getElementMenuItems(workspaceMode), [workspaceMode]);
   const lastSimSignatureRef = useRef<string | null>(null);
+  const lastRealtimeErrorRef = useRef<string | null>(null);
   const [isWireModeActive, setIsWireModeActive] = useState(false);
   const [wireAnchor, setWireAnchor] = useState<WireAnchor | null>(null);
   const [isJunctionModeActive, setIsJunctionModeActive] = useState(false);
@@ -2516,6 +2523,53 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
     rebuildKey: realtimeResetToken,
   });
 
+  const showSimulationAlertModal = useCallback((alert: SimulationAlert) => {
+    Modal.error({
+      title: alert.title,
+      width: 640,
+      content: (
+        <div className="space-y-3 text-sm text-slate-700">
+          <p>{alert.summary}</p>
+          {alert.suggestions.length > 0 && (
+            <div>
+              <div className="mb-1 font-medium text-slate-900">建议检查</div>
+              <ul className="list-disc space-y-1 pl-5">
+                {alert.suggestions.map((item, index) => (
+                  <li key={`${alert.title}-${index}`}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {alert.technicalDetails && (
+            <div>
+              <div className="mb-1 font-medium text-slate-900">技术细节</div>
+              <div className="max-h-28 overflow-y-auto rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500">
+                {alert.technicalDetails}
+              </div>
+            </div>
+          )}
+        </div>
+      ),
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!realtimeRunning || !realtimeFrameResult.lastError) {
+      if (!realtimeFrameResult.lastError) {
+        lastRealtimeErrorRef.current = null;
+      }
+      return;
+    }
+    if (lastRealtimeErrorRef.current === realtimeFrameResult.lastError) {
+      return;
+    }
+    lastRealtimeErrorRef.current = realtimeFrameResult.lastError;
+    message.destroy('circuit-sim');
+    setRealtimeRunning(false);
+    setRealtimeResetToken((value) => value + 1);
+    showSimulationAlertModal(classifyAnalogSimulationError(realtimeFrameResult.lastError, 'realtime'));
+  }, [realtimeFrameResult.lastError, realtimeRunning, showSimulationAlertModal]);
+
   useEffect(() => {
     return () => {
       if (autoSaveTimerRef.current) {
@@ -2826,7 +2880,8 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
         }
       } catch (err: any) {
         console.error('数字仿真失败', err);
-        message.error({ content: `数字仿真失败: ${err?.message || '未知错误'}`, key: 'circuit-sim' });
+        message.destroy('circuit-sim');
+        showSimulationAlertModal(classifyDigitalSimulationError(err));
       } finally {
         setIsSimulating(false);
       }
@@ -2854,6 +2909,14 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
         return;
       }
       const nextRunning = !realtimeRunning;
+      if (nextRunning) {
+        const diagnostic = diagnoseAnalogSimulationDesign(circuitDesign, 'realtime');
+        if (diagnostic) {
+          showSimulationAlertModal(diagnostic);
+          return;
+        }
+        lastRealtimeErrorRef.current = null;
+      }
       setRealtimeRunning(nextRunning);
       setSimulationStale(false);
       if (nextRunning) {
@@ -2863,6 +2926,11 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
       } else {
         message.info('实时仿真已暂停');
       }
+      return;
+    }
+    const analogDiagnostic = diagnoseAnalogSimulationDesign(circuitDesign, 'precision');
+    if (analogDiagnostic) {
+      showSimulationAlertModal(analogDiagnostic);
       return;
     }
     const measurementNodes = nodes.filter(node => 
@@ -2921,13 +2989,15 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
       message.success({ content: '仿真完成，双击仪表查看数据/波形', key: 'circuit-sim' });
     } catch (err: any) {
       console.error('仿真失败', err);
-      message.error({ content: `仿真失败: ${err?.message || '未知错误'}`, key: 'circuit-sim' });
+      message.destroy('circuit-sim');
+      showSimulationAlertModal(classifyAnalogSimulationError(err, 'precision'));
     } finally {
       setIsSimulating(false);
     }
-  }, [analogSimulationMode, convertToCircuitDesign, nodes, edges, isSimulating, realtimeRunning, workspaceMode, computeSimSignature]);
+  }, [analogSimulationMode, convertToCircuitDesign, nodes, edges, isSimulating, realtimeRunning, workspaceMode, computeSimSignature, showSimulationAlertModal]);
 
   const handleResetRealtimeSimulation = useCallback(() => {
+    lastRealtimeErrorRef.current = null;
     setRealtimeRunning(false);
     setRealtimeResetToken((value) => value + 1);
     setSimulationStale(false);

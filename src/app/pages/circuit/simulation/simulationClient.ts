@@ -102,10 +102,24 @@ class SimulationClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(request),
     });
+    let data: SimulationResponse | null = null;
+    try {
+      data = await response.json();
+    } catch {
+      data = null;
+    }
     if (!response.ok) {
+      if (data?.error || data?.errorDetails) {
+        throw this.buildError(
+          data.error || `后端仿真请求失败: ${response.status}`,
+          data.errorDetails,
+        );
+      }
       throw new Error(`后端仿真请求失败: ${response.status}`);
     }
-    const data: SimulationResponse = await response.json();
+    if (!data) {
+      throw new Error('后端仿真未返回有效结果');
+    }
     if (data.error) {
       throw this.buildError(data.error, data.errorDetails);
     }

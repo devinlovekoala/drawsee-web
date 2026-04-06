@@ -46,6 +46,7 @@ export interface EdgeSimResult {
 export interface SimFrameResult {
   time: number;
   converged: boolean;
+  lastError: string | null;
   nodeVoltages: Record<string, number>;
   elementResults: Record<string, ElementSimResult>;
   edgeResults: EdgeSimResult[];

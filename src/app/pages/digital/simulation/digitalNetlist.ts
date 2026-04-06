@@ -114,6 +114,15 @@ type DigitalInputMeta = {
   lastValue: number;
 };
 
+type NetDriver = {
+  root: string;
+  netName: string;
+  elementId: string;
+  elementType: CircuitElementType;
+  elementLabel: string;
+  portId: string;
+};
+
 const getEndpointKey = (elementId: string, portId: string) => `${elementId}:${portId}`;
 
 class UnionFind {
@@ -163,6 +172,22 @@ const getPorts = (element: { ports?: Port[] }) => element.ports || [];
 const elementLabel = (elementId: string, label?: string) =>
   sanitizeIdentifier(label || elementId, elementId);
 
+const isDriverPort = (elementType: CircuitElementType, port: Port) => {
+  if (elementType === CircuitElementType.DIGITAL_OUTPUT) return false;
+  if (elementType === CircuitElementType.DIGITAL_INPUT || elementType === CircuitElementType.DIGITAL_CLOCK) {
+    return port.id === 'out';
+  }
+  if (
+    elementType === CircuitElementType.DIGITAL_DFF ||
+    elementType === CircuitElementType.DIGITAL_JKFF ||
+    elementType === CircuitElementType.DIGITAL_TFF ||
+    elementType === CircuitElementType.DIGITAL_SRFF
+  ) {
+    return port.id === 'q' || port.id === 'qn';
+  }
+  return port.type === 'output' || port.type === 'bidirectional';
+};
+
 export const buildDigitalSimulationPlan = (design: CircuitDesign): DigitalSimulationPlan => {
   if (!design.elements?.length) {
     throw new Error('当前设计为空，无法生成数字仿真网表');
@@ -202,12 +227,27 @@ export const buildDigitalSimulationPlan = (design: CircuitDesign): DigitalSimula
   const assignUnique = uniqueNameFactory();
   const endpointSignalMap: Record<string, string> = {};
   const netNameByRoot = new Map<string, string>();
+  const netDrivers = new Map<string, NetDriver[]>();
 
   const registerPortName = (root: string, preferred: string) => {
     if (!netNameByRoot.has(root)) {
       netNameByRoot.set(root, assignUnique(preferred));
     }
     return netNameByRoot.get(root)!;
+  };
+
+  const registerDriver = (root: string, preferredNetName: string, element: CircuitDesign['elements'][number], port: Port) => {
+    const driver: NetDriver = {
+      root,
+      netName: registerPortName(root, preferredNetName),
+      elementId: element.id,
+      elementType: element.type as CircuitElementType,
+      elementLabel: elementLabel(element.id, element.label),
+      portId: port.id,
+    };
+    const current = netDrivers.get(root) || [];
+    current.push(driver);
+    netDrivers.set(root, current);
   };
 
   const inputs: Array<{ name: string; width?: number; default?: number }> = [];
@@ -223,6 +263,43 @@ export const buildDigitalSimulationPlan = (design: CircuitDesign): DigitalSimula
 
   const inputStepNs = DEFAULT_INPUT_STEP_NS;
   let suggestedDuration = 200;
+
+  design.elements.forEach((element) => {
+    const elementType = element.type as CircuitElementType;
+    getPorts(element).forEach((port) => {
+      if (!isDriverPort(elementType, port)) return;
+      const root = uf.getOrCreateRoot(getEndpointKey(element.id, port.id));
+      registerDriver(root, elementLabel(element.id, element.label || 'net'), element, port);
+    });
+  });
+
+  netDrivers.forEach((drivers) => {
+    if (drivers.length <= 1) return;
+    const sourceDrivers = drivers.filter((driver) =>
+      driver.elementType === CircuitElementType.DIGITAL_INPUT ||
+      driver.elementType === CircuitElementType.DIGITAL_CLOCK
+    );
+    const nonTriDrivers = drivers.filter((driver) => driver.elementType !== CircuitElementType.DIGITAL_TRI);
+
+    if (sourceDrivers.length > 1) {
+      const driverList = sourceDrivers.map((driver) => `${driver.elementLabel}(${driver.portId})`).join('、');
+      throw new Error(`数字网络 ${drivers[0].netName} 同时连接了多个输入源/时钟源：${driverList}。请检查图片识别后的连线，避免将多个源端直接短接。`);
+    }
+
+    if (sourceDrivers.length === 1 && drivers.length > 1) {
+      const source = sourceDrivers[0];
+      const others = drivers
+        .filter((driver) => driver !== source)
+        .map((driver) => `${driver.elementLabel}(${driver.portId})`)
+        .join('、');
+      throw new Error(`数字网络 ${source.netName} 同时被输入源 ${source.elementLabel}(${source.portId}) 和 ${others} 驱动。该网络存在多驱动冲突，请检查自动识图后的错误连线。`);
+    }
+
+    if (sourceDrivers.length === 0 && nonTriDrivers.length > 1) {
+      const driverList = nonTriDrivers.map((driver) => `${driver.elementLabel}(${driver.portId})`).join('、');
+      throw new Error(`数字网络 ${drivers[0].netName} 上存在多个输出驱动：${driverList}。请避免把多个逻辑输出直接连在同一根线上。`);
+    }
+  });
 
   design.elements.forEach((element) => {
     const type = element.type as CircuitElementType;
@@ -293,7 +370,6 @@ export const buildDigitalSimulationPlan = (design: CircuitDesign): DigitalSimula
       const root = uf.getOrCreateRoot(key);
       const portName = registerPortName(root, elementLabel(element.id, element.label || 'dout'));
       endpointSignalMap[key] = portName;
-      outputs.push({ name: portName });
       probes.push({
         elementId: element.id,
         label: elementLabel(element.id, element.label),
@@ -622,6 +698,8 @@ export const buildDigitalSimulationPlan = (design: CircuitDesign): DigitalSimula
   ];
 
   const verilogLines: string[] = [];
+  verilogLines.push('`timescale 1ns/1ps');
+  verilogLines.push('');
   verilogLines.push(`module digital_top(`);
   verilogLines.push(`  ${headerPorts.join(',\n  ')}`);
   verilogLines.push(`);`);

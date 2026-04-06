@@ -19,6 +19,7 @@ export interface SimLoopOptions {
 const emptyFrameResult: SimFrameResult = {
   time: 0,
   converged: true,
+  lastError: null,
   nodeVoltages: {},
   elementResults: {},
   edgeResults: [],
@@ -123,6 +124,7 @@ export const useSimLoop = ({
       setFrameResult({
         time: engine.time,
         converged: engine.converged,
+        lastError: engine.lastError,
         nodeVoltages,
         elementResults: Object.fromEntries(
           Object.entries(elementResults).map(([elementId, result]) => [

@@ -18,6 +18,16 @@ const app = express();
 app.use(express.json({ limit: MAX_BODY_SIZE }));
 app.use(cors());
 
+app.get('/health', (_req, res) => {
+  res.json({
+    ok: true,
+    service: 'verilog-sim-server',
+    port: Number(PORT),
+    iverilog: IVERILOG_BIN,
+    vvp: VVP_BIN,
+  });
+});
+
 const execFileAsync = (command, args, options = {}) =>
   new Promise((resolve, reject) => {
     execFile(
