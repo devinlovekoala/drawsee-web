@@ -63,7 +63,7 @@ import {
 } from '@ant-design/icons';
 import ImageUploader from '@/app/components/ImageUploader';
 import { nanoid } from 'nanoid';
-import { CanvasOverlay, RealtimeLabelMode, useSimLoop } from '@/simulation';
+import { CanvasOverlay, OscilloscopeWorkspace, RealtimeLabelMode, useSimLoop } from '@/simulation';
 
 // 定义节点类型
 const nodeTypes = {
@@ -2208,6 +2208,16 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
     
     const nodeType = node.data.type as CircuitElementType;
     if (measurementElementTypes.has(nodeType)) {
+      if (
+        nodeType === CircuitElementType.OSCILLOSCOPE &&
+        workspaceMode !== 'digital' &&
+        analogSimulationMode === 'realtime'
+      ) {
+        setRealtimeShowScopePanels(true);
+        setSelectedNodeId(nodeId);
+        message.info('实时示波器面板已激活，可直接拖拽、冻结、切换时基和通道');
+        return;
+      }
       const measurement = simulationResults[nodeId];
       if (measurement) {
         setActiveMeasurementResult(measurement);
@@ -2241,7 +2251,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
     
     setSelectedElement(nodeData);
     setConfigVisible(true);
-  }, [nodes, simulationResults]);
+  }, [analogSimulationMode, nodes, simulationResults, workspaceMode]);
 
   // 创建新节点
   const addNewNode = useCallback(
@@ -4213,16 +4223,24 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
             <Controls className="circuit-flow-controls" />
           </ReactFlow>
           {workspaceMode !== 'digital' && analogSimulationMode === 'realtime' && (
-            <CanvasOverlay
-              frameResult={realtimeFrameResult}
-              nodes={nodes}
-              selectedNodeId={selectedNodeId}
-              options={{
-                labelMode: realtimeLabelMode,
-                showScopePanels: realtimeShowScopePanels,
-              }}
-              viewport={realtimeViewport}
-            />
+            <>
+              <CanvasOverlay
+                frameResult={realtimeFrameResult}
+                nodes={nodes}
+                selectedNodeId={selectedNodeId}
+                options={{
+                  labelMode: realtimeLabelMode,
+                  showScopePanels: realtimeShowScopePanels,
+                }}
+                viewport={realtimeViewport}
+              />
+              <OscilloscopeWorkspace
+                panels={realtimeFrameResult.scopePanels}
+                visible={realtimeShowScopePanels}
+                selectedElementId={selectedNodeId}
+                onVisibilityChange={setRealtimeShowScopePanels}
+              />
+            </>
           )}
         </div>
         
@@ -4301,7 +4319,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
                       type={realtimeShowScopePanels ? 'primary' : 'default'}
                       onClick={() => setRealtimeShowScopePanels((value) => !value)}
                     >
-                      示波面板
+                      示波器
                     </Button>
                     <span className="text-slate-500">
                       t={realtimeFrameResult.time.toFixed(6)}s

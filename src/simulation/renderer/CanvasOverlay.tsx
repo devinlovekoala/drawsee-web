@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useRef } from 'react';
 import { Node } from 'reactflow';
 import { SimFrameResult } from '@/simulation/types/simResult';
 import { NodeLabelRenderer, RealtimeLabelDensity } from '@/simulation/renderer/NodeLabelRenderer';
-import { ScopeRenderer } from '@/simulation/renderer/ScopeRenderer';
 
 export type RealtimeLabelMode = 'hidden' | 'focused' | 'adaptive';
 
@@ -24,8 +23,6 @@ interface CanvasOverlayProps {
 }
 
 const nodeLabelRenderer = new NodeLabelRenderer();
-const scopeRenderer = new ScopeRenderer();
-
 export const CanvasOverlay: React.FC<CanvasOverlayProps> = ({
   frameResult,
   nodes,
@@ -66,17 +63,12 @@ export const CanvasOverlay: React.FC<CanvasOverlayProps> = ({
         canvasHeight: bounds.height,
       });
     }
-    const shouldShowScopePanels = (options?.showScopePanels ?? true) && viewport.zoom >= 0.85;
-    if (shouldShowScopePanels) {
-      scopeRenderer.render(hudContext, frameResult.scopePanels);
-    }
   }, [
     bounds.height,
     bounds.width,
     frameResult,
     nodes,
     options?.labelMode,
-    options?.showScopePanels,
     selectedNodeId,
     viewport.zoom,
   ]);
