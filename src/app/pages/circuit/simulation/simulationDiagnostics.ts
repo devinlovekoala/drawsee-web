@@ -44,6 +44,22 @@ const analogIgnoredTypes = new Set<CircuitElementType>([
   CircuitElementType.GROUND,
 ]);
 
+const analogTwoTerminalTypes = new Set<CircuitElementType>([
+  CircuitElementType.RESISTOR,
+  CircuitElementType.CAPACITOR,
+  CircuitElementType.INDUCTOR,
+  CircuitElementType.DIODE,
+  CircuitElementType.DIODE_ZENER,
+  CircuitElementType.DIODE_LED,
+  CircuitElementType.DIODE_SCHOTTKY,
+  CircuitElementType.VOLTAGE_SOURCE,
+  CircuitElementType.CURRENT_SOURCE,
+  CircuitElementType.AC_SOURCE,
+  CircuitElementType.PULSE_SOURCE,
+  CircuitElementType.PWM_SOURCE,
+  CircuitElementType.SINE_SOURCE,
+]);
+
 const digitalTypes = new Set<CircuitElementType>([
   CircuitElementType.DIGITAL_INPUT,
   CircuitElementType.DIGITAL_OUTPUT,
@@ -112,6 +128,22 @@ const buildElementAdjacency = (design: CircuitDesign) => {
   return adjacency;
 };
 
+const buildEndpointDegreeMap = (design: CircuitDesign) => {
+  const endpointDegree = new Map<string, number>();
+  design.elements.forEach((element) => {
+    element.ports.forEach((port) => {
+      endpointDegree.set(`${element.id}:${port.id}`, 0);
+    });
+  });
+  design.connections.forEach((connection) => {
+    const sourceKey = `${connection.source.elementId}:${connection.source.portId}`;
+    const targetKey = `${connection.target.elementId}:${connection.target.portId}`;
+    endpointDegree.set(sourceKey, (endpointDegree.get(sourceKey) || 0) + 1);
+    endpointDegree.set(targetKey, (endpointDegree.get(targetKey) || 0) + 1);
+  });
+  return endpointDegree;
+};
+
 const collectReachableElements = (roots: string[], adjacency: Map<string, Set<string>>) => {
   const visited = new Set<string>();
   const queue = [...roots];
@@ -146,6 +178,7 @@ export const diagnoseAnalogSimulationDesign = (
   }
 
   const degreeMap = buildElementDegreeMap(design);
+  const endpointDegreeMap = buildEndpointDegreeMap(design);
   const grounds = elements.filter((element) => element.type === CircuitElementType.GROUND);
   const connectedGrounds = grounds.filter((element) => (degreeMap.get(element.id) || 0) > 0);
   if (connectedGrounds.length === 0) {
@@ -185,6 +218,23 @@ export const diagnoseAnalogSimulationDesign = (
       suggestions: [
         '补全这些元件与主回路的连接。',
         '如果它们只是临时放置，请删除后再运行仿真。',
+      ],
+    };
+  }
+
+  const danglingTwoTerminalElements = elements.filter((element) => {
+    if (!analogTwoTerminalTypes.has(element.type as CircuitElementType)) return false;
+    const connectedPorts = element.ports.filter((port) => (endpointDegreeMap.get(`${element.id}:${port.id}`) || 0) > 0);
+    return connectedPorts.length < 2;
+  });
+  if (danglingTwoTerminalElements.length > 0) {
+    const labels = danglingTwoTerminalElements.map(labelOf).join('、');
+    return {
+      title: '检测到断路或悬空支路',
+      summary: `以下双端元件至少有一个端口未接入回路：${labels}。这类断路在实时引擎中可能会产生数学上的虚假电压数值。`,
+      suggestions: [
+        '检查这些元件的两个端口是否都已接线。',
+        '确认导线只是经过该元件附近，而不是视觉上贴近但实际上未连接。',
       ],
     };
   }

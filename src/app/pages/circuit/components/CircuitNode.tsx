@@ -57,16 +57,16 @@ const defaultPorts: Record<string, Port[]> = {
     { id: 'port2', name: '右端口', type: 'bidirectional', position: { side: 'right', x: 100, y: 50 } }
   ],
   [CircuitElementType.VOLTAGE_SOURCE]: [
-    { id: 'positive', name: '正极', type: 'output', position: { side: 'left', x: 0, y: 50 } },
-    { id: 'negative', name: '负极', type: 'input', position: { side: 'right', x: 120, y: 50 } }
+    { id: 'positive', name: '正极', type: 'bidirectional', position: { side: 'left', x: 0, y: 50 } },
+    { id: 'negative', name: '负极', type: 'bidirectional', position: { side: 'right', x: 120, y: 50 } }
   ],
   [CircuitElementType.CURRENT_SOURCE]: [
-    { id: 'positive', name: '正极', type: 'output', position: { side: 'left', x: 0, y: 50 } },
-    { id: 'negative', name: '负极', type: 'input', position: { side: 'right', x: 120, y: 50 } }
+    { id: 'positive', name: '正极', type: 'bidirectional', position: { side: 'left', x: 0, y: 50 } },
+    { id: 'negative', name: '负极', type: 'bidirectional', position: { side: 'right', x: 120, y: 50 } }
   ],
   [CircuitElementType.AC_SOURCE]: [
-    { id: 'positive', name: '正极', type: 'output', position: { side: 'left', x: 0, y: 50 } },
-    { id: 'negative', name: '负极', type: 'input', position: { side: 'right', x: 120, y: 50 } }
+    { id: 'positive', name: '正极', type: 'bidirectional', position: { side: 'left', x: 0, y: 50 } },
+    { id: 'negative', name: '负极', type: 'bidirectional', position: { side: 'right', x: 120, y: 50 } }
   ],
   [CircuitElementType.DIODE]: [
     { id: 'anode', name: '阳极', type: 'input', position: { side: 'left', x: 0, y: 50 } },
@@ -83,7 +83,7 @@ const defaultPorts: Record<string, Port[]> = {
     { id: 'collector', name: '集电极', type: 'output', position: { side: 'right', x: 100, y: 100 } }
   ],
   [CircuitElementType.GROUND]: [
-    { id: 'ground', name: '接地点', type: 'input', position: { side: 'top', x: 50, y: 10 } }
+    { id: 'ground', name: '接地点', type: 'bidirectional', position: { side: 'top', x: 50, y: 10 } }
   ],
   [CircuitElementType.OPAMP]: [
     { id: 'input1', name: '输入1', type: 'input', position: { side: 'left', x: 0, y: 40 } },

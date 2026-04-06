@@ -65,10 +65,6 @@ import ImageUploader from '@/app/components/ImageUploader';
 import { nanoid } from 'nanoid';
 import { CanvasOverlay, RealtimeLabelMode, useSimLoop } from '@/simulation';
 
-// 唯一节点ID生成
-let nodeIdCounter = 1;
-const getNewNodeId = () => `node-${nodeIdCounter++}`;
-
 // 定义节点类型
 const nodeTypes = {
   circuitNode: CircuitNode,
@@ -343,16 +339,16 @@ const defaultPorts = {
     { id: 'port2', name: '端口2', type: 'bidirectional' as const, position: { side: 'right' as const, x: 100, y: 50, align: 'center' as const } }
   ],
   [CircuitElementType.VOLTAGE_SOURCE]: [
-    { id: 'positive', name: '正极', type: 'output' as const, position: { side: 'right' as const, x: 100, y: 50, align: 'center' as const } },
-    { id: 'negative', name: '负极', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 50, align: 'center' as const } }
+    { id: 'positive', name: '正极', type: 'bidirectional' as const, position: { side: 'right' as const, x: 100, y: 50, align: 'center' as const } },
+    { id: 'negative', name: '负极', type: 'bidirectional' as const, position: { side: 'left' as const, x: 0, y: 50, align: 'center' as const } }
   ],
   [CircuitElementType.CURRENT_SOURCE]: [
-    { id: 'positive', name: '正极', type: 'output' as const, position: { side: 'right' as const, x: 100, y: 50, align: 'center' as const } },
-    { id: 'negative', name: '负极', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 50, align: 'center' as const } }
+    { id: 'positive', name: '正极', type: 'bidirectional' as const, position: { side: 'right' as const, x: 100, y: 50, align: 'center' as const } },
+    { id: 'negative', name: '负极', type: 'bidirectional' as const, position: { side: 'left' as const, x: 0, y: 50, align: 'center' as const } }
   ],
   [CircuitElementType.AC_SOURCE]: [
-    { id: 'positive', name: '正极', type: 'output' as const, position: { side: 'right' as const, x: 100, y: 50, align: 'center' as const } },
-    { id: 'negative', name: '负极', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 50, align: 'center' as const } }
+    { id: 'positive', name: '正极', type: 'bidirectional' as const, position: { side: 'right' as const, x: 100, y: 50, align: 'center' as const } },
+    { id: 'negative', name: '负极', type: 'bidirectional' as const, position: { side: 'left' as const, x: 0, y: 50, align: 'center' as const } }
   ],
   [CircuitElementType.DIODE]: [
     { id: 'anode', name: '阳极', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 50, align: 'center' as const } },
@@ -369,7 +365,7 @@ const defaultPorts = {
     { id: 'emitter', name: '发射极', type: 'input' as const, position: { side: 'right' as const, x: 100, y: 85, align: 'center' as const } }
   ],
   [CircuitElementType.GROUND]: [
-    { id: 'ground', name: '接地点', type: 'input' as const, position: { side: 'top' as const, x: 50, y: 0, align: 'center' as const } }
+    { id: 'ground', name: '接地点', type: 'bidirectional' as const, position: { side: 'top' as const, x: 50, y: 0, align: 'center' as const } }
   ],
   [CircuitElementType.OPAMP]: [
     { id: 'input1', name: '输入1', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 30, align: 'center' as const } },
@@ -465,16 +461,16 @@ const createFourInputGatePorts = () => ([
 
 Object.assign(defaultPorts, {
   [CircuitElementType.PULSE_SOURCE]: [
-    { id: 'positive', name: '正极', type: 'output' as const, position: { side: 'right' as const, x: 100, y: 50, align: 'center' as const } },
-    { id: 'negative', name: '负极', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 50, align: 'center' as const } },
+    { id: 'positive', name: '正极', type: 'bidirectional' as const, position: { side: 'right' as const, x: 100, y: 50, align: 'center' as const } },
+    { id: 'negative', name: '负极', type: 'bidirectional' as const, position: { side: 'left' as const, x: 0, y: 50, align: 'center' as const } },
   ],
   [CircuitElementType.PWM_SOURCE]: [
-    { id: 'positive', name: '正极', type: 'output' as const, position: { side: 'right' as const, x: 100, y: 50, align: 'center' as const } },
-    { id: 'negative', name: '负极', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 50, align: 'center' as const } },
+    { id: 'positive', name: '正极', type: 'bidirectional' as const, position: { side: 'right' as const, x: 100, y: 50, align: 'center' as const } },
+    { id: 'negative', name: '负极', type: 'bidirectional' as const, position: { side: 'left' as const, x: 0, y: 50, align: 'center' as const } },
   ],
   [CircuitElementType.SINE_SOURCE]: [
-    { id: 'positive', name: '正极', type: 'output' as const, position: { side: 'right' as const, x: 100, y: 50, align: 'center' as const } },
-    { id: 'negative', name: '负极', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 50, align: 'center' as const } },
+    { id: 'positive', name: '正极', type: 'bidirectional' as const, position: { side: 'right' as const, x: 100, y: 50, align: 'center' as const } },
+    { id: 'negative', name: '负极', type: 'bidirectional' as const, position: { side: 'left' as const, x: 0, y: 50, align: 'center' as const } },
   ],
   [CircuitElementType.DIODE_ZENER]: [
     { id: 'anode', name: '阳极', type: 'input' as const, position: { side: 'left' as const, x: 0, y: 50, align: 'center' as const } },
@@ -1149,7 +1145,15 @@ const normalizeElementPorts = (element: CircuitElement): Port[] => {
     });
   })();
 
-  if (positionMissing || overlapping || existing.length !== defaults.length) {
+  const typeMismatch = (() => {
+    if (existing.length !== defaults.length) {
+      return true;
+    }
+    const defaultTypeById = new Map(defaults.map((port) => [port.id, port.type]));
+    return existing.some((port) => defaultTypeById.get(port.id) !== port.type);
+  })();
+
+  if (positionMissing || overlapping || typeMismatch) {
     return clonePorts(defaults);
   }
 
@@ -1487,6 +1491,17 @@ const formatMeasurementValue = (value: number, unit?: string) => {
   return `${scaled.toFixed(precision)}${suffix ? ` ${suffix}` : ''}`;
 };
 
+const isEditableTarget = (target: EventTarget | null): boolean => {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+  const tagName = target.tagName.toLowerCase();
+  if (tagName === 'input' || tagName === 'textarea' || tagName === 'select') {
+    return true;
+  }
+  return target.isContentEditable || Boolean(target.closest('[contenteditable="true"]'));
+};
+
 // 在文件顶部添加接口定义
 const determineWorkspaceMode = (types?: CircuitElementType[]): CircuitWorkspaceMode => {
   if (!types || types.length === 0) return 'analog';
@@ -1632,6 +1647,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
   const [isImportModalVisible, setIsImportModalVisible] = useState(false);
   const [hasUploadedImage, setHasUploadedImage] = useState(false);
   const imageUploaderRef = useRef<{ triggerRecognition: () => void; hasImage: () => boolean }>(null);
+  const clipboardNodeRef = useRef<Node | null>(null);
 
   const elementTypesForDetection = useMemo(() => {
     if (nodes.length > 0) {
@@ -1680,6 +1696,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
   const elementMenuItems = useMemo(() => getElementMenuItems(workspaceMode), [workspaceMode]);
   const lastSimSignatureRef = useRef<string | null>(null);
   const lastRealtimeErrorRef = useRef<string | null>(null);
+  const lastRealtimeValidationRef = useRef<string | null>(null);
   const [isWireModeActive, setIsWireModeActive] = useState(false);
   const [wireAnchor, setWireAnchor] = useState<WireAnchor | null>(null);
   const [isJunctionModeActive, setIsJunctionModeActive] = useState(false);
@@ -2099,8 +2116,43 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
   const handleConnection = useCallback(
     (connection: Connection) => {
       // 检查连接是否有效
-      if (!connection.source || !connection.target || !connection.sourceHandle || !connection.targetHandle) {
+      if (!connection.source || !connection.target) {
         message.warning('无效的连接，请确保正确连接两个端口');
+        return;
+      }
+
+      const sourceNode = reactFlowInstance.getNode(connection.source);
+      const targetNode = reactFlowInstance.getNode(connection.target);
+      const sourceType = sourceNode?.data?.type as CircuitElementType | undefined;
+      const targetType = targetNode?.data?.type as CircuitElementType | undefined;
+      const sourcePorts = (sourceNode?.data?.ports as Port[] | undefined) || [];
+      const targetPorts = (targetNode?.data?.ports as Port[] | undefined) || [];
+
+      const pickFallbackPort = (ports: Port[], preferredId?: string) => {
+        if (preferredId && ports.some((port) => port.id === preferredId)) {
+          return preferredId;
+        }
+        return ports[0]?.id;
+      };
+
+      let resolvedSourceHandle = connection.sourceHandle || pickFallbackPort(sourcePorts);
+      let resolvedTargetHandle = connection.targetHandle || pickFallbackPort(targetPorts);
+
+      // 对接地连接进行极性归一：电源接GND时统一使用negative端
+      const sourceIsGround = sourceType === CircuitElementType.GROUND;
+      const targetIsGround = targetType === CircuitElementType.GROUND;
+      const sourceIsPower = !!sourceType && powerSourceElementTypes.has(sourceType);
+      const targetIsPower = !!targetType && powerSourceElementTypes.has(targetType);
+      if (sourceIsPower && targetIsGround) {
+        resolvedSourceHandle = 'negative';
+        resolvedTargetHandle = 'ground';
+      } else if (targetIsPower && sourceIsGround) {
+        resolvedSourceHandle = 'ground';
+        resolvedTargetHandle = 'negative';
+      }
+
+      if (!resolvedSourceHandle || !resolvedTargetHandle) {
+        message.warning('无法识别连线端口，请尽量从元件端口圆点开始拖拽');
         return;
       }
 
@@ -2111,9 +2163,9 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
       const connectionExists = edges.some(
         edge => 
           edge.source === connection.source && 
-          edge.sourceHandle === connection.sourceHandle && 
+          edge.sourceHandle === resolvedSourceHandle && 
           edge.target === connection.target && 
-          edge.targetHandle === connection.targetHandle
+          edge.targetHandle === resolvedTargetHandle
       );
 
       if (connectionExists) {
@@ -2130,7 +2182,9 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
       // 创建新的边对象
       const newEdge = {
         ...connection,
-        id: `edge-${connection.source}-${connection.sourceHandle}-${connection.target}-${connection.targetHandle}`,
+        sourceHandle: resolvedSourceHandle,
+        targetHandle: resolvedTargetHandle,
+        id: `edge-${connection.source}-${resolvedSourceHandle}-${connection.target}-${resolvedTargetHandle}`,
         type: 'default',
         animated: false,
         style: { stroke: '#3B82F6', strokeWidth: 2 },
@@ -2140,7 +2194,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
       setEdges((eds) => addEdge(newEdge, eds));
       message.success('连接成功', 0.5);
     },
-    [edges]
+    [edges, reactFlowInstance]
   );
 
   // 添加一个函数来处理元件双击事件
@@ -2198,8 +2252,8 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
         y: Math.random() * 400 + 50,
       });
 
-      // 生成唯一ID
-      const nodeId = getNewNodeId();
+      // 生成唯一ID，避免编辑已有电路时与历史节点ID冲突导致节点被替换
+      const nodeId = `node-${nanoid(10)}`;
       
       // 节点标签 - 使用元件类型专属前缀
       const elementLabel = getNextElementLabel(type);
@@ -2571,6 +2625,29 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
   }, [realtimeFrameResult.lastError, realtimeRunning, showSimulationAlertModal]);
 
   useEffect(() => {
+    if (!realtimeRunning || analogSimulationMode !== 'realtime' || workspaceMode === 'digital' || !realtimeCircuitDesign) {
+      if (!realtimeRunning || !realtimeCircuitDesign) {
+        lastRealtimeValidationRef.current = null;
+      }
+      return;
+    }
+    const diagnostic = diagnoseAnalogSimulationDesign(realtimeCircuitDesign, 'realtime');
+    if (!diagnostic) {
+      lastRealtimeValidationRef.current = null;
+      return;
+    }
+    const issueKey = `${diagnostic.title}:${diagnostic.summary}`;
+    if (lastRealtimeValidationRef.current === issueKey) {
+      return;
+    }
+    lastRealtimeValidationRef.current = issueKey;
+    message.destroy('circuit-sim');
+    setRealtimeRunning(false);
+    setRealtimeResetToken((value) => value + 1);
+    showSimulationAlertModal(diagnostic);
+  }, [analogSimulationMode, realtimeCircuitDesign, realtimeRunning, showSimulationAlertModal, workspaceMode]);
+
+  useEffect(() => {
     return () => {
       if (autoSaveTimerRef.current) {
         window.clearTimeout(autoSaveTimerRef.current);
@@ -2916,6 +2993,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
           return;
         }
         lastRealtimeErrorRef.current = null;
+        lastRealtimeValidationRef.current = null;
       }
       setRealtimeRunning(nextRunning);
       setSimulationStale(false);
@@ -2998,6 +3076,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
 
   const handleResetRealtimeSimulation = useCallback(() => {
     lastRealtimeErrorRef.current = null;
+    lastRealtimeValidationRef.current = null;
     setRealtimeRunning(false);
     setRealtimeResetToken((value) => value + 1);
     setSimulationStale(false);
@@ -3214,6 +3293,34 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
     setSelectedEdgeId(null);
     message.success('连线已删除');
   }, [selectedEdgeId]);
+
+  const copySelectedNode = useCallback(() => {
+    if (isReadOnly) return;
+    if (!selectedNodeId) {
+      message.info('请先选择需要复制的元件');
+      return;
+    }
+    const selectedNode = nodes.find((node) => node.id === selectedNodeId);
+    if (!selectedNode) {
+      message.warning('未找到选中的元件');
+      return;
+    }
+    clipboardNodeRef.current = JSON.parse(JSON.stringify(selectedNode)) as Node;
+    message.success('元件已复制');
+  }, [isReadOnly, nodes, selectedNodeId]);
+
+  const cutSelectedNode = useCallback(() => {
+    if (isReadOnly) return;
+    if (!selectedNodeId) {
+      message.info('请先选择需要剪切的元件');
+      return;
+    }
+    const selectedNode = nodes.find((node) => node.id === selectedNodeId);
+    if (selectedNode) {
+      clipboardNodeRef.current = JSON.parse(JSON.stringify(selectedNode)) as Node;
+    }
+    deleteSelectedNode();
+  }, [deleteSelectedNode, isReadOnly, nodes, selectedNodeId]);
   
   // 处理边点击
   const onEdgeClick = useCallback((e: React.MouseEvent, edge: Edge) => {
@@ -3450,6 +3557,49 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
     });
   }, []);
 
+  useEffect(() => {
+    setNodes((currentNodes) => {
+      let changed = false;
+      const nextNodes = currentNodes.map((node) => {
+        const nodeType = node.data?.type as CircuitElementType | undefined;
+        if (!nodeType) {
+          return node;
+        }
+        const element = node.data?.element as CircuitElement | undefined;
+        if (!element) {
+          return node;
+        }
+        const normalizedPorts = normalizeElementPorts({
+          ...element,
+          type: nodeType,
+        });
+        const existingPorts = (node.data?.ports as Port[] | undefined) || [];
+        const sameShape =
+          existingPorts.length === normalizedPorts.length &&
+          existingPorts.every((port, index) => {
+            const target = normalizedPorts[index];
+            return port.id === target.id && port.type === target.type;
+          });
+        if (sameShape) {
+          return node;
+        }
+        changed = true;
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            ports: normalizedPorts,
+            element: {
+              ...element,
+              ports: normalizedPorts,
+            },
+          },
+        };
+      });
+      return changed ? nextNodes : currentNodes;
+    });
+  }, []);
+
   const handleEdgeDoubleClick = useCallback((event: React.MouseEvent, edge: Edge) => {
     event.preventDefault();
     event.stopPropagation();
@@ -3508,6 +3658,22 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
     event.preventDefault();
     handleRotate();
   }, [handleRotate]);
+
+  useHotkeys('ctrl+c, meta+c', (event) => {
+    if (isEditableTarget(event.target)) {
+      return;
+    }
+    event.preventDefault();
+    copySelectedNode();
+  }, [copySelectedNode]);
+
+  useHotkeys('ctrl+x, meta+x', (event) => {
+    if (isEditableTarget(event.target)) {
+      return;
+    }
+    event.preventDefault();
+    cutSelectedNode();
+  }, [cutSelectedNode]);
   
   useHotkeys('ctrl+d, delete', (event) => {
     event.preventDefault();
@@ -3946,13 +4112,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
               onSaveAs={hasPersistedDesign ? handleSaveAsCircuit : undefined}
               onUndo={handleUndo}
               onRedo={handleRedo}
-              onCopy={() => {
-                // 复制选中节点
-                if (selectedNodeId) {
-                  // TODO: 实现复制功能
-                  message.info('复制功能开发中');
-                }
-              }}
+              onCopy={copySelectedNode}
               onDelete={deleteSelectedNode}
               onRotate={handleRotate}
               onZoomIn={() => reactFlowInstance.zoomIn()}
@@ -4017,7 +4177,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
             // @ts-ignore
             connectionMode="loose"
             defaultMarkerColor="#3B82F6"
-            connectOnClick={!isReadOnly && !isWireModeActive && !isJunctionModeActive}
+            connectOnClick={false}
             connectionRadius={20}
             isValidConnection={() => !isReadOnly}
             onNodeClick={isReadOnly ? undefined : handleNodeClick}
