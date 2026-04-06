@@ -2,7 +2,10 @@ import { createAlova } from 'alova';
 import adapterFetch from 'alova/fetch';
 import ReactHook from 'alova/react';
 import {TOKEN_KEY} from "@/common/constant/storage-key.constant.ts";
-import { BASE_URL } from './runtimeConfig';
+
+export const BASE_URL = 'http://42.193.107.127:6868';
+export const NGSPICE_SIM_API_URL = 'http://42.193.107.127:3001/simulate';
+export const DIGITAL_SIM_API_URL = 'http://42.193.107.127:3002/simulate/digital';
 
 // 导出所有API方法
 export * from './methods/auth.methods';
@@ -11,7 +14,6 @@ export * from './methods/knowledge.methods';
 export * from './methods/tool.methods';
 export * from './methods/course.methods';
 export * from './methods/circuit.methods';
-export * from './runtimeConfig';
 
 const alova = createAlova({
   requestAdapter: adapterFetch(),

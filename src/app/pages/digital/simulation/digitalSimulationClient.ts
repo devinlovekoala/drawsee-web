@@ -4,27 +4,6 @@ import { buildDigitalSimulationPlan } from './digitalNetlist';
 import { parseVcdToWaveforms } from './vcd';
 import { DigitalSimulationResult, DigitalWaveformTrace } from './types';
 
-const buildBackendErrorMessage = async (response: Response, endpoint: string) => {
-  let payload: any = null;
-  try {
-    payload = await response.json();
-  } catch {
-    // Ignore non-JSON bodies and fall through to generic message.
-  }
-
-  const details = [
-    payload?.error,
-    payload?.stderr,
-    payload?.stdout,
-  ].filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
-
-  if (details.length > 0) {
-    return `数字仿真后端异常(${response.status}) [${endpoint}]：${details.join(' | ')}`;
-  }
-
-  return `数字仿真后端请求失败：${response.status} [${endpoint}]`;
-};
-
 const matchSignalName = (vcdName: string, target: string) => {
   if (vcdName === target) return true;
   if (vcdName.endsWith(`.${target}`)) return true;
@@ -47,20 +26,19 @@ export const runDigitalSimulation = async (design: CircuitDesign): Promise<Digit
     },
   });
 
-  const endpoint = DIGITAL_SIM_API_URL;
-  const response = await fetch(endpoint, {
+  const response = await fetch(DIGITAL_SIM_API_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: requestBody,
   });
 
   if (!response.ok) {
-    throw new Error(await buildBackendErrorMessage(response, endpoint));
+    throw new Error(`数字仿真后端请求失败：${response.status}`);
   }
 
   const payload = await response.json();
   if (!payload.success) {
-    throw new Error(payload.error || `数字仿真失败 [${endpoint}]`);
+    throw new Error(payload.error || '数字仿真失败');
   }
 
   const parsed = payload.vcd ? parseVcdToWaveforms(payload.vcd, { onlySignals: plan.probes.map((probe) => probe.signal) }) : [];
