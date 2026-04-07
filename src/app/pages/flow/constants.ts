@@ -11,6 +11,6 @@ export const COMPACT_NODE_WIDTH = 380;
 export const COMPACT_NODE_HEIGHT = 180;
 
 // 布局间距设置 - 控制节点水平、垂直间隔
-export const FLOW_HORIZONTAL_SPACING = 70;
-export const FLOW_VERTICAL_SPACING = 70;
-export const FLOW_SIBLING_SPACING = 80;
+export const FLOW_HORIZONTAL_SPACING = 110;
+export const FLOW_VERTICAL_SPACING = 80;
+export const FLOW_SIBLING_SPACING = 90;

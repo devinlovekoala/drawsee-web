@@ -361,18 +361,19 @@ export function entitreeFlexLayout(nodes: Node[], edges: Edge[], shouldUpdateSer
     });
     
     // 调整布局设置 - 保持稳定的间距配置
+    const LAYOUT_MARGIN = 48;
     const settings = {
       clone: false,
       enableFlex: true,
-      // 紧凑模式下的节点间距
+      // 紧凑模式下的节点间距，保持节点间隔一致但不显拥挤
       firstDegreeSpacing: FLOW_SIBLING_SPACING,
-      nextAfterSpacing: 12,
-      nextBeforeSpacing: 12,
+      nextAfterSpacing: 14,
+      nextBeforeSpacing: 14,
       nodeHeight: COMPACT_NODE_HEIGHT,
       nodeWidth: COMPACT_NODE_WIDTH,
       orientation: "horizontal",
-      rootX: 0,
-      rootY: 0,
+      rootX: LAYOUT_MARGIN,
+      rootY: LAYOUT_MARGIN,
       secondDegreeSpacing: FLOW_VERTICAL_SPACING,
       sourcesAccessor: "parents",
       sourceTargetSpacing: FLOW_HORIZONTAL_SPACING,
@@ -382,14 +383,39 @@ export function entitreeFlexLayout(nodes: Node[], edges: Edge[], shouldUpdateSer
     const {map: layoutedTreeMap} = layoutFromMap(rootId, flatTree, settings);
     
     // 应用布局结果到节点
-    const layoutedNodes = Object.entries(layoutedTreeMap).map(([id, node]) => {
+    const layoutedNodesData = Object.entries(layoutedTreeMap).map(([id, node]) => {
       const originalNode = nodes.find(n => n.id === id);
       if (!originalNode) return null;
-      
-      // 检查位置是否发生变化
-      const positionChanged = 
-        originalNode.position.x !== node.x || 
-        originalNode.position.y !== node.y;
+      return {
+        id,
+        originalNode,
+        layoutNode: node
+      };
+    }).filter((item): item is { id: string; originalNode: Node; layoutNode: { x: number; y: number; width: number; height: number } } => item !== null);
+
+    if (layoutedNodesData.length === 0) {
+      return { nodes, edges };
+    }
+
+    const minX = Math.min(...layoutedNodesData.map(item => item.layoutNode.x));
+    const minY = Math.min(...layoutedNodesData.map(item => item.layoutNode.y));
+    const maxX = Math.max(...layoutedNodesData.map(item => item.layoutNode.x + item.layoutNode.width));
+    const maxY = Math.max(...layoutedNodesData.map(item => item.layoutNode.y + item.layoutNode.height));
+    const boundingWidth = maxX - minX;
+    const boundingHeight = maxY - minY;
+    const centerOffsetX = typeof window !== 'undefined' && window.innerWidth > boundingWidth + LAYOUT_MARGIN * 2
+      ? Math.floor((window.innerWidth - boundingWidth) / 2) - LAYOUT_MARGIN
+      : 0;
+    const centerOffsetY = typeof window !== 'undefined' && window.innerHeight > boundingHeight + LAYOUT_MARGIN * 2
+      ? Math.floor((window.innerHeight - boundingHeight) / 2) - LAYOUT_MARGIN
+      : 0;
+    const shiftX = LAYOUT_MARGIN - minX + centerOffsetX;
+    const shiftY = LAYOUT_MARGIN - minY + centerOffsetY;
+
+    const layoutedNodes = layoutedNodesData.map(({ id, originalNode, layoutNode }) => {
+      const nodeX = Math.round(layoutNode.x + shiftX);
+      const nodeY = Math.round(layoutNode.y + shiftY);
+      const positionChanged = originalNode.position.x !== nodeX || originalNode.position.y !== nodeY;
       
       if (shouldUpdateServer && positionChanged) {
         // 查找节点是否已在更新列表中
@@ -397,7 +423,7 @@ export function entitreeFlexLayout(nodes: Node[], edges: Edge[], shouldUpdateSer
         
         if (existingNodeIndex !== -1) {
           // 更新已有节点的位置信息
-          nodesToUpdate[existingNodeIndex].position = { x: node.x, y: node.y };
+          nodesToUpdate[existingNodeIndex].position = { x: nodeX, y: nodeY };
         } else {
           // 添加新的需要更新的节点
           // 确保height不为null
@@ -408,7 +434,7 @@ export function entitreeFlexLayout(nodes: Node[], edges: Edge[], shouldUpdateSer
           if (!id.startsWith(TEMP_QUERY_NODE_ID_PREFIX)) {
             nodesToUpdate.push({
               id: parseInt(id),
-              position: { x: node.x, y: node.y },
+              position: { x: nodeX, y: nodeY },
               height: nodeHeight
             });
           }
@@ -418,16 +444,16 @@ export function entitreeFlexLayout(nodes: Node[], edges: Edge[], shouldUpdateSer
       // 返回布局后的节点
       return {
         ...originalNode,
-        position: { x: node.x, y: node.y }
+        position: { x: nodeX, y: nodeY }
       } as Node;
-    }).filter((node: Node | null): node is Node => node !== null);
+    });
     
     // 更新服务器 - 仅当要求且有节点需要更新时才执行
     if (shouldUpdateServer && nodesToUpdate.length > 0) {
       console.log(`更新服务器节点数: ${nodesToUpdate.length}`);
       // 仅当位置或高度确实发生变化时才发送更新，防止无谓写库
       const changedOnly = nodesToUpdate.filter((nu) => {
-        const original = nodes.find(n => n.id === nu.id);
+        const original = nodes.find(n => parseInt(n.id) === nu.id);
         if (!original) return true;
         const posChanged = original.position?.x !== nu.position?.x || original.position?.y !== nu.position?.y;
         const hChanged = (original.data as any)?.height !== nu.height;
