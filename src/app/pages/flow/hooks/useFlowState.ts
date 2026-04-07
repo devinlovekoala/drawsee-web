@@ -74,9 +74,25 @@ function useFlowState(convId: number | null, selectedNode?: Node | null, setSele
   const pollAttempts = useRef<number>(0);
   const lastNodeCount = useRef<number>(0);
 
+  const hasMeaningfulFlowProgress = useCallback((nodesFromApi: NodeVO[]) => {
+    return nodesFromApi.some((node) => {
+      if (!node || String(node.type).toUpperCase() === 'ROOT') {
+        return false;
+      }
+
+      const data = node.data as Record<string, unknown> | undefined;
+      const text = typeof data?.text === 'string' ? data.text.trim() : '';
+      const process = typeof data?.process === 'string' ? data.process : '';
+      const isGenerated = data?.isGenerated === true;
+      const followUps = Array.isArray(data?.followUps) ? data.followUps : [];
+
+      return text.length > 0 || process === 'completed' || isGenerated || followUps.length > 0;
+    });
+  }, []);
+
   // 主动拉取最新节点（用于处理无nodeId的DATA进度消息）
   const refreshNodesFromServer = useCallback(async () => {
-    if (!convId) return;
+    if (!convId) return [] as NodeVO[];
     try {
       // 加入时间戳避免alova命中缓存
       const nodesFromApi = await getNodesByConvId(convId, { _ts: Date.now() });
@@ -120,8 +136,10 @@ function useFlowState(convId: number | null, selectedNode?: Node | null, setSele
         }
         return { nodes: layoutedNodes, edges: flowEdges };
       });
+      return nodesFromApi;
     } catch (e) {
       console.error('刷新节点失败', e);
+      return [] as NodeVO[];
     }
   }, [convId, executeLayout, setElements]);
 
@@ -642,6 +660,8 @@ function useFlowState(convId: number | null, selectedNode?: Node | null, setSele
     );
     
     let hasReceivedMessage = false;
+    let hasCompleted = false;
+    let isClosingIntentionally = false;
     let idleTimeout: number | null = null;
 
     const clearIdleTimeout = () => {
@@ -653,19 +673,29 @@ function useFlowState(convId: number | null, selectedNode?: Node | null, setSele
 
     const resetIdleTimeout = () => {
       clearIdleTimeout();
-      idleTimeout = window.setTimeout(() => {
+      idleTimeout = window.setTimeout(async () => {
+        isClosingIntentionally = true;
+        const latestNodes = await refreshNodesFromServer();
+        const hasServerProgress = hasMeaningfulFlowProgress(latestNodes);
+        const hasEnoughNodes = latestNodes.length >= 3;
+
         console.warn(
           hasReceivedMessage
             ? 'SSE连接长时间空闲（45秒），强制关闭'
             : 'SSE连接首包等待超时（90秒），强制关闭'
         );
         source.close();
-        void refreshNodesFromServer();
-        toast.error(
-          hasReceivedMessage
-            ? '分析连接已中断，已停止等待新内容，请重试或刷新当前会话'
-            : '分析任务长时间没有返回内容，可能后端执行异常或仍在排队，请稍后重试'
-        );
+
+        if (!hasServerProgress && !hasEnoughNodes) {
+          toast.error(
+            hasReceivedMessage
+              ? '分析连接已中断，已停止等待新内容，请重试或刷新当前会话'
+              : '分析任务长时间没有返回内容，可能后端执行异常或仍在排队，请稍后重试'
+          );
+        } else {
+          console.log('SSE空闲超时，但服务端节点已同步完成，忽略中断提示');
+        }
+
         setIsChatting(false);
         if (pollTimer.current) {
           window.clearInterval(pollTimer.current);
@@ -687,6 +717,8 @@ function useFlowState(convId: number | null, selectedNode?: Node | null, setSele
         
         // 如果接收到done消息，确保SSE连接关闭
         if (task.type === 'done') {
+          hasCompleted = true;
+          isClosingIntentionally = true;
           setTimeout(() => {
             source.close();
           }, 500);
@@ -701,17 +733,23 @@ function useFlowState(convId: number | null, selectedNode?: Node | null, setSele
     
     // 处理错误情况
     source.addEventListener("error", (event: MessageEvent<string>) => {
+      const eventData = typeof event.data === 'string' ? event.data.trim() : '';
+
       if (event.data === "waiting") {
         // 1秒后重试
 				// TODO 多次重试后直接失败处理
         setTimeout(() => {
           chat(taskId);
         }, 1000);
+      } else if (hasCompleted || isClosingIntentionally) {
+        console.log('忽略SSE关闭阶段的尾部错误事件', event);
+      } else if (hasReceivedMessage && !eventData) {
+        console.log('忽略已收到内容后的空SSE错误事件', event);
       } else {
         // 错误处理
         console.error('SSE连接错误:', event);
         clearIdleTimeout();
-        toast.error(`请求出错了：${event.data || '连接异常'}`);
+        toast.error(`请求出错了：${eventData || '连接异常'}`);
         // 设置聊天状态为false
         setIsChatting(false);
       }
@@ -730,7 +768,7 @@ function useFlowState(convId: number | null, selectedNode?: Node | null, setSele
         }
       }, 200);
     });
-  }, [addChatTask, convId, isChatting, refreshNodesFromServer]);
+  }, [addChatTask, convId, hasMeaningfulFlowProgress, isChatting, refreshNodesFromServer]);
 
   return {
     // 状态
