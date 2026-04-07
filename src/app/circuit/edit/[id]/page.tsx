@@ -41,9 +41,14 @@ export default function CircuitEditPage() {
       try {
         setLoading(true);
         const design = await getCircuitDesignById(id);
-        setCircuitDesign(design);
+        // 后端详情接口在部分场景不会返回 id，这里兜底回填路由 id，避免编辑态被误判为新建态。
+        const normalizedDesign: CircuitDesign = {
+          ...design,
+          id: design.id || id,
+        };
+        setCircuitDesign(normalizedDesign);
         // 保存原始设计，用于比较是否有未保存的更改
-        originalDesignRef.current = JSON.parse(JSON.stringify(design));
+        originalDesignRef.current = JSON.parse(JSON.stringify(normalizedDesign));
         setError(null);
       } catch (error) {
         console.error('获取电路设计失败:', error);

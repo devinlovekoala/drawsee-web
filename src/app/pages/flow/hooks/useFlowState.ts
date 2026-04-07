@@ -641,9 +641,46 @@ function useFlowState(convId: number | null, selectedNode?: Node | null, setSele
       }
     );
     
+    let hasReceivedMessage = false;
+    let idleTimeout: number | null = null;
+
+    const clearIdleTimeout = () => {
+      if (idleTimeout !== null) {
+        window.clearTimeout(idleTimeout);
+        idleTimeout = null;
+      }
+    };
+
+    const resetIdleTimeout = () => {
+      clearIdleTimeout();
+      idleTimeout = window.setTimeout(() => {
+        console.warn(
+          hasReceivedMessage
+            ? 'SSE连接长时间空闲（45秒），强制关闭'
+            : 'SSE连接首包等待超时（90秒），强制关闭'
+        );
+        source.close();
+        void refreshNodesFromServer();
+        toast.error(
+          hasReceivedMessage
+            ? '分析连接已中断，已停止等待新内容，请重试或刷新当前会话'
+            : '分析任务长时间没有返回内容，可能后端执行异常或仍在排队，请稍后重试'
+        );
+        setIsChatting(false);
+        if (pollTimer.current) {
+          window.clearInterval(pollTimer.current);
+          pollTimer.current = null;
+        }
+      }, hasReceivedMessage ? 45000 : 90000);
+    };
+
+    resetIdleTimeout();
+
     // 流式获取响应
     source.addEventListener("message", async (event: MessageEvent<string>) => {
       try {
+        hasReceivedMessage = true;
+        resetIdleTimeout();
         const task = JSON.parse(event.data) as ChatTask;
         // 添加消息到队列
         addChatTask(task);
@@ -656,6 +693,7 @@ function useFlowState(convId: number | null, selectedNode?: Node | null, setSele
         }
       } catch (error) {
         console.error('处理SSE消息出错:', error, event.data);
+        clearIdleTimeout();
         toast.error('处理响应数据时出错');
         setIsChatting(false);
       }
@@ -672,6 +710,7 @@ function useFlowState(convId: number | null, selectedNode?: Node | null, setSele
       } else {
         // 错误处理
         console.error('SSE连接错误:', event);
+        clearIdleTimeout();
         toast.error(`请求出错了：${event.data || '连接异常'}`);
         // 设置聊天状态为false
         setIsChatting(false);
@@ -681,6 +720,7 @@ function useFlowState(convId: number | null, selectedNode?: Node | null, setSele
     // 添加连接关闭事件处理
     source.addEventListener("close", () => {
       console.log('SSE连接已关闭');
+      clearIdleTimeout();
       // 确保isChatting被设置为false
       setTimeout(() => {
         setIsChatting(false);
@@ -690,19 +730,7 @@ function useFlowState(convId: number | null, selectedNode?: Node | null, setSele
         }
       }, 200);
     });
-    
-    // 添加安全超时，防止连接长时间未响应
-    const safetyTimeout = setTimeout(() => {
-      console.warn('SSE连接超时（20秒），强制关闭');
-      source.close();
-      setIsChatting(false);
-    }, 20000);
-    
-    // 在消息处理后清除安全超时
-    source.addEventListener("message", () => {
-      clearTimeout(safetyTimeout);
-    });
-  }, [addChatTask, isChatting]);
+  }, [addChatTask, convId, isChatting, refreshNodesFromServer]);
 
   return {
     // 状态

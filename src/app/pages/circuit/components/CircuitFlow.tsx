@@ -49,6 +49,7 @@ import {
   diagnoseAnalogSimulationDesign,
   SimulationAlert,
 } from '../simulation/simulationDiagnostics';
+import { buildCircuitAnalysisPromptPayload } from '../simulation/circuitAnalysisPayload';
 import { runDigitalSimulation } from '@/app/pages/digital/simulation/digitalSimulationClient';
 import { DigitalSimulationResult, DigitalWaveformTrace } from '@/app/pages/digital/simulation/types';
 import {
@@ -1512,6 +1513,24 @@ const determineWorkspaceMode = (types?: CircuitElementType[]): CircuitWorkspaceM
   return 'analog';
 };
 
+const normalizeCircuitDesignInput = (design?: CircuitDesign | null): CircuitDesign | undefined => {
+  if (!design) return undefined;
+
+  const fallbackTimestamp = new Date().toISOString();
+
+  return {
+    ...design,
+    elements: Array.isArray(design.elements) ? design.elements : [],
+    connections: Array.isArray(design.connections) ? design.connections : [],
+    metadata: {
+      title: design.metadata?.title || '电路设计',
+      description: design.metadata?.description || '使用DrawSee创建的电路',
+      createdAt: design.metadata?.createdAt || fallbackTimestamp,
+      updatedAt: design.metadata?.updatedAt || fallbackTimestamp,
+    },
+  };
+};
+
 interface CircuitFlowProps {
   onCircuitDesignChange?: (design: CircuitDesign) => void;
   selectedModel?: string;
@@ -1524,13 +1543,17 @@ interface CircuitFlowProps {
 }
 
 export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3', initialCircuitDesign, isReadOnly = false, classId = null, onModelChange, workspaceMode: workspaceModeProp = 'auto', onUnsavedChange }: CircuitFlowProps) => {
+  const normalizedInitialCircuitDesign = useMemo(
+    () => normalizeCircuitDesignInput(initialCircuitDesign),
+    [initialCircuitDesign]
+  );
   const initialWorkspaceMode = useMemo(() => {
     if (workspaceModeProp && workspaceModeProp !== 'auto') {
       return workspaceModeProp;
     }
-    const initialTypes = initialCircuitDesign?.elements?.map((el) => el.type as CircuitElementType);
+    const initialTypes = normalizedInitialCircuitDesign?.elements.map((el) => el.type as CircuitElementType);
     return determineWorkspaceMode(initialTypes);
-  }, [initialCircuitDesign, workspaceModeProp]);
+  }, [normalizedInitialCircuitDesign, workspaceModeProp]);
   const [workspaceMode, setWorkspaceMode] = useState<CircuitWorkspaceMode>(initialWorkspaceMode);
   const [workspaceModeOverride, setWorkspaceModeOverride] = useState<CircuitWorkspaceMode | null>(null);
   const [nodes, setNodes] = useState<Node[]>([]);
@@ -1581,17 +1604,17 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
   const [currentCircuitDesign, setCurrentCircuitDesign] = useState<CircuitDesign | null>(null);
   const elementNameCountersRef = useRef<Record<string, number>>({});
   const initialDesignMetadata = React.useMemo(() => ({
-    title: initialCircuitDesign?.metadata?.title || '电路设计',
-    description: initialCircuitDesign?.metadata?.description || '使用DrawSee创建的电路',
-    createdAt: initialCircuitDesign?.metadata?.createdAt || new Date().toISOString(),
-    updatedAt: initialCircuitDesign?.metadata?.updatedAt || new Date().toISOString(),
-  }), [initialCircuitDesign]);
+    title: normalizedInitialCircuitDesign?.metadata?.title || '电路设计',
+    description: normalizedInitialCircuitDesign?.metadata?.description || '使用DrawSee创建的电路',
+    createdAt: normalizedInitialCircuitDesign?.metadata?.createdAt || new Date().toISOString(),
+    updatedAt: normalizedInitialCircuitDesign?.metadata?.updatedAt || new Date().toISOString(),
+  }), [normalizedInitialCircuitDesign]);
   const [designMetadata, setDesignMetadata] = useState(initialDesignMetadata);
   const designMetadataRef = useRef(designMetadata);
   useEffect(() => {
     designMetadataRef.current = designMetadata;
   }, [designMetadata]);
-  const [persistedDesignId, setPersistedDesignId] = useState<string | null>(initialCircuitDesign?.id ?? null);
+  const [persistedDesignId, setPersistedDesignId] = useState<string | null>(normalizedInitialCircuitDesign?.id ?? null);
   const designIdRef = useRef<string | null>(persistedDesignId);
   useEffect(() => {
     designIdRef.current = persistedDesignId;
@@ -1604,9 +1627,9 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
   });
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const hasUnsavedChangesRef = useRef(false);
-  const currentDesignRef = useRef<CircuitDesign>(initialCircuitDesign ?? getEmptyDesignSnapshot());
+  const currentDesignRef = useRef<CircuitDesign>(normalizedInitialCircuitDesign ?? getEmptyDesignSnapshot());
   const lastSavedDesignHashRef = useRef<string>(serializeCircuitDesignSnapshot(currentDesignRef.current));
-  const suppressUnsavedTrackingRef = useRef<boolean>(!!initialCircuitDesign);
+  const suppressUnsavedTrackingRef = useRef<boolean>(!!normalizedInitialCircuitDesign);
   const updateUnsavedState = useCallback((dirty: boolean) => {
     const previouslyDirty = hasUnsavedChangesRef.current;
     if (previouslyDirty !== dirty) {
@@ -1655,11 +1678,11 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
         .map((node) => node.data?.type as CircuitElementType)
         .filter(Boolean);
     }
-    if (initialCircuitDesign?.elements?.length) {
-      return initialCircuitDesign.elements.map((element) => element.type as CircuitElementType);
+    if (normalizedInitialCircuitDesign?.elements.length) {
+      return normalizedInitialCircuitDesign.elements.map((element) => element.type as CircuitElementType);
     }
     return [];
-  }, [nodes, initialCircuitDesign]);
+  }, [nodes, normalizedInitialCircuitDesign]);
 
   const detectedWorkspaceMode = useMemo(() => determineWorkspaceMode(elementTypesForDetection), [elementTypesForDetection]);
   const workspaceModeMismatch = workspaceMode !== detectedWorkspaceMode;
@@ -2041,12 +2064,12 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
   const initialLoadRef = useRef(false);
   
   useEffect(() => {
-    if (initialCircuitDesign && initialCircuitDesign.elements.length > 0 && !initialLoadRef.current) {
-      console.log('加载初始电路设计数据', initialCircuitDesign);
+    if (normalizedInitialCircuitDesign && normalizedInitialCircuitDesign.elements.length > 0 && !initialLoadRef.current) {
+      console.log('加载初始电路设计数据', normalizedInitialCircuitDesign);
       initialLoadRef.current = true;
-      loadCircuitDesign(initialCircuitDesign, { fitView: true, notifyChange: false });
+      loadCircuitDesign(normalizedInitialCircuitDesign, { fitView: true, notifyChange: false });
     }
-  }, [initialCircuitDesign, loadCircuitDesign]);
+  }, [normalizedInitialCircuitDesign, loadCircuitDesign]);
   
   // 监听节点旋转事件，更新连线
   useEffect(() => {
@@ -2666,6 +2689,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
   }, []);
 
   const quickSaveExistingCircuit = useCallback(async (reason: 'manual' | 'auto' = 'manual', snapshot?: CircuitDesign) => {
+    if (isReadOnly) return false;
     if (!designIdRef.current) return false;
     const baseDesign = snapshot || convertToCircuitDesign();
     const now = new Date().toISOString();
@@ -2702,9 +2726,10 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
       }
       return false;
     }
-  }, [convertToCircuitDesign, markCurrentDesignAsSaved]);
+  }, [convertToCircuitDesign, isReadOnly, markCurrentDesignAsSaved]);
 
   const scheduleAutoSave = useCallback(() => {
+    if (isReadOnly) return;
     if (!designIdRef.current) {
       if (!autoSaveInfoShownRef.current) {
         message.info('请先保存电路以启用自动保存');
@@ -2719,7 +2744,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
       quickSaveExistingCircuit('auto');
       autoSaveTimerRef.current = null;
     }, 600);
-  }, [quickSaveExistingCircuit]);
+  }, [isReadOnly, quickSaveExistingCircuit]);
 
   useEffect(() => {
     scheduleAutoSaveRef.current = scheduleAutoSave;
@@ -2845,11 +2870,18 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
         duration: 0 // 不自动关闭
       });
       
-      // 按照文档规范构造电路分析任务数据
+      const promptPayload = buildCircuitAnalysisPromptPayload({
+        design: processedCircuitDesign,
+        workspaceMode,
+        analogSimulationMode,
+        simulationResults,
+        digitalSimResult,
+        realtimeFrameResult,
+      });
+
       const createAiTaskDTO: CreateAiTaskDTO = {
         type: 'CIRCUIT_ANALYSIS',
-        // 按照文档规范，prompt需要是具有特定格式的对象
-        prompt: JSON.stringify(processedCircuitDesign),
+        prompt: JSON.stringify(promptPayload),
         promptParams: {},
         convId: null,
         parentId: null,
@@ -2935,7 +2967,19 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
       }
       setIsAnalyzing(false);
     }
-  }, [convertToCircuitDesign, currentModel, handleBlankQuery, handleAiTaskCountPlus, classId, persistedDesignId]);
+  }, [
+    convertToCircuitDesign,
+    currentModel,
+    handleBlankQuery,
+    handleAiTaskCountPlus,
+    classId,
+    persistedDesignId,
+    workspaceMode,
+    analogSimulationMode,
+    simulationResults,
+    digitalSimResult,
+    realtimeFrameResult,
+  ]);
   
   // 运行模拟仿真
   const handleRunSimulation = useCallback(async () => {

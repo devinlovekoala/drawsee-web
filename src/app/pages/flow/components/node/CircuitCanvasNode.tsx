@@ -24,7 +24,21 @@ function CircuitCanvasNode({ data, ...props }: ExtendedNodeProps<'circuit-canvas
   
   // 电路设计数据
   const circuitDesign = useMemo(() => {
-    return nodeData.circuitDesign || null;
+    if (!nodeData.circuitDesign) {
+      return null;
+    }
+
+    return {
+      ...nodeData.circuitDesign,
+      elements: Array.isArray(nodeData.circuitDesign.elements) ? nodeData.circuitDesign.elements : [],
+      connections: Array.isArray(nodeData.circuitDesign.connections) ? nodeData.circuitDesign.connections : [],
+      metadata: {
+        title: nodeData.circuitDesign.metadata?.title || '电路设计',
+        description: nodeData.circuitDesign.metadata?.description || '使用DrawSee创建的电路',
+        createdAt: nodeData.circuitDesign.metadata?.createdAt || new Date().toISOString(),
+        updatedAt: nodeData.circuitDesign.metadata?.updatedAt || new Date().toISOString(),
+      },
+    };
   }, [nodeData.circuitDesign]);
   
   const circuitContent = useMemo(() => {
