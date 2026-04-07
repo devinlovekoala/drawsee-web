@@ -24,6 +24,7 @@ import {
 } from '@ant-design/icons';
 import { AppstoreOutlined } from '@ant-design/icons';
 import { ModelType } from '@/app/pages/flow/components/input/FlowInputPanel';
+import { ModelSelector } from '@/app/pages/blank/components/ModelSelector';
 
 type CircuitWorkspaceMode = 'analog' | 'digital' | 'hybrid';
 
@@ -90,6 +91,8 @@ export const CircuitToolbar: FC<CircuitToolbarProps> = ({
   hasSelectedEdge = false,
   hasContent = false,
   isSimulating = false,
+  selectedModel,
+  onModelChange,
   canSaveAs = false,
   onImageImport,
   isImportingImage = false,
@@ -107,19 +110,6 @@ export const CircuitToolbar: FC<CircuitToolbarProps> = ({
   detectedWorkspaceMode,
   onWorkspaceModeToggle,
 }) => {
-
-  // 只在开发环境下输出日志
-  if (process.env.NODE_ENV === 'development') {
-    // 限制日志频率，使用requestAnimationFrame来降低日志输出频率
-    const debug = () => {
-      if (Math.random() < 0.01) { // 只有1%的概率输出日志
-        console.log('CircuitToolbar 渲染 - hasSelectedNode:', hasSelectedNode, 'canUndo:', canUndo, 'canRedo:', canRedo, 'hasContent:', hasContent);
-      }
-    };
-    
-    // 使用requestAnimationFrame来避免在同一帧内重复输出日志
-    requestAnimationFrame(debug);
-  }
 
   // 根据按钮是否禁用返回对应的CSS类
   const getButtonClass = (isDisabled: boolean) => {
@@ -317,6 +307,14 @@ export const CircuitToolbar: FC<CircuitToolbarProps> = ({
           loading={isSimulating}
         />
       </Tooltip>
+
+      {/* 模型选择器 */}
+      <div className="flex items-center">
+        <ModelSelector
+          selectedModel={selectedModel || 'deepseekV3'}
+          onModelChange={onModelChange || (() => {})}
+        />
+      </div>
 
       <Tooltip title="分析电路">
         <Button

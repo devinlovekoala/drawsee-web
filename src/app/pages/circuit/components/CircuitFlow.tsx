@@ -2922,6 +2922,13 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
         duration: 1 // 显示1秒
       });
       
+      // 设置预确认标志，允许从电路分析跳转而不触发未保存提示
+      try {
+        (window as any).drawsee_preConfirmedNavigation = true;
+      } catch (err) {
+        console.warn('Failed to set preConfirmed flag:', err);
+      }
+      
       // 立即触发跳转
       handleBlankQuery(response);
       
