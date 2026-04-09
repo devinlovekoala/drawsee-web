@@ -102,12 +102,12 @@ const HeroSection: React.FC = () => {
                 思维的画布
               </span>
               <span className="block text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600">
-                知识的星图
+                知识与仿真的星图
               </span>
             </h1>
             
             <p className="text-xl md:text-2xl text-gray-700 mb-8 max-w-lg">
-              打破线性对话的局限，让AI交流如同在<span className="text-blue-600 font-medium">思维画布</span>上绘制<span className="text-indigo-600 font-medium">知识星图</span>，并将教师知识库、学生答疑与电路实践连接成一条连续链路。
+              打破线性对话的局限，让AI交流如同在<span className="text-blue-600 font-medium">思维画布</span>上绘制<span className="text-indigo-600 font-medium">知识星图</span>，并将教师知识库、学生答疑、实验任务解析与模拟/数字电路实时仿真连接成一条连续链路。
             </p>
             
             <div className="flex flex-wrap gap-4">

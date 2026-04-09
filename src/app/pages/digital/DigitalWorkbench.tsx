@@ -1,10 +1,23 @@
+import { useEffect, useState } from 'react';
 import { Button } from 'antd';
 import { ArrowLeft, Cpu } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { CircuitFlowWithProvider } from '../circuit/components/CircuitFlow';
+import { CircuitDesign } from '@/api/types/circuit.types';
+import { consumeCircuitPrefill } from '../circuit/utils/circuitPrefill';
 
 const DigitalWorkbench = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const classId = location.state?.classId as string || null;
+  const [circuitDesign, setCircuitDesign] = useState<CircuitDesign | null>(null);
+
+  useEffect(() => {
+    const prefillDesign = consumeCircuitPrefill();
+    if (prefillDesign) {
+      setCircuitDesign(prefillDesign);
+    }
+  }, []);
 
   return (
     <div className="flex h-full flex-col bg-slate-50">
@@ -30,7 +43,11 @@ const DigitalWorkbench = () => {
       </header>
 
       <main className="flex flex-1 overflow-hidden">
-        <CircuitFlowWithProvider workspaceMode="digital" />
+        <CircuitFlowWithProvider
+          workspaceMode="digital"
+          initialCircuitDesign={circuitDesign || undefined}
+          classId={classId}
+        />
       </main>
     </div>
   );

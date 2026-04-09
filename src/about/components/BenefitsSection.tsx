@@ -60,7 +60,7 @@ const BenefitsSection: React.FC = () => {
             </span>
           </h2>
           <p className="text-xl text-gray-600">
-            聚焦教学答疑与工程实践的真实收益
+            聚焦教学答疑、仿真验证与工程实践的真实收益
           </p>
           
           {/* 装饰线 */}
@@ -106,7 +106,7 @@ const BenefitsSection: React.FC = () => {
             <div className="text-4xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600 mb-4">
               实验
             </div>
-            <p className="text-gray-600">任务文档解析与电路分析可连续追问</p>
+            <p className="text-gray-600">任务文档解析、实时仿真与电路分析可连续追问</p>
           </div>
         </div>
       </div>

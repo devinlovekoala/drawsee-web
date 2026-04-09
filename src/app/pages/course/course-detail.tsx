@@ -18,6 +18,10 @@ import {
 import { getCourseDetail, getCourseResources } from '@/api/methods/course.methods';
 import { recognizeCircuitDesignFromImage } from '@/api/methods/tool.methods';
 import { CourseResourceType, CourseResourceVO, CourseVO } from '@/api/types/course.types';
+import {
+  resolveWorkbenchRouteFromDesign,
+  writeCircuitPrefill,
+} from '@/app/pages/circuit/utils/circuitPrefill';
 import { toast } from 'sonner';
 
 const RESOURCE_TABS: { type: CourseResourceType; label: string; icon: React.ElementType }[] = [
@@ -25,8 +29,6 @@ const RESOURCE_TABS: { type: CourseResourceType; label: string; icon: React.Elem
   { type: 'TASK', label: '任务布置', icon: ClipboardList },
   { type: 'CIRCUIT_REF', label: '参考电路图', icon: CircuitBoard }
 ];
-
-const CIRCUIT_PREFILL_STORAGE_KEY = 'flow_prefill_circuit_design';
 
 const formatDateTime = (value?: Date | string | number) => {
   if (!value) return '-';
@@ -148,18 +150,16 @@ function CourseDetail() {
       });
 
       const design = await recognizeCircuitDesignFromImage(imageFile);
-      sessionStorage.setItem(
-        CIRCUIT_PREFILL_STORAGE_KEY,
-        JSON.stringify({
+      writeCircuitPrefill({
           design,
           ts: Date.now(),
           source: 'course_resource',
           resourceId: resource.id,
           courseId: course.id
-        })
-      );
+      });
+      const targetRoute = resolveWorkbenchRouteFromDesign(design);
       toast.success('转换完成，已进入电路工作台');
-      navigate('/circuit', {
+      navigate(targetRoute, {
         state: {
           classId: course.id
         }

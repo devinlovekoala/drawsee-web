@@ -15,7 +15,7 @@ const IntelligentWorkflowSection: React.FC = () => {
             </span>
           </h2>
           <p className="text-xl text-gray-600">
-            从手动模式切换升级为系统自动编排，围绕真实教学与工程任务持续输出
+            从手动模式切换升级为系统自动编排，围绕真实教学、仿真与工程任务持续输出
           </p>
           <div className="w-24 h-1 bg-gradient-to-r from-blue-500 to-indigo-500 mx-auto mt-6"></div>
         </div>

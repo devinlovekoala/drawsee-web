@@ -55,6 +55,10 @@ export const landingFeatures: LandingFeatureItem[] = [
     description: '覆盖从实验任务理解到电路分析的完整流程，支持电路推导、电路细节展开与工程化实践问答。'
   },
   {
+    title: '在线电路仿真与波形观察',
+    description: '支持模拟与数字电路在线仿真，实时查看示波器波形、逻辑电平与信号变化，增强实验验证能力。'
+  },
+  {
     title: 'PDF 电路实验文档解析',
     description: '针对电子电路实验文档自动生成分析点并支持深度展开，帮助学生从任务文本快速进入实验思考。'
   },
@@ -105,6 +109,11 @@ export const landingCapabilities: LandingCapabilityItem[] = [
     tag: 'CIRCUIT'
   },
   {
+    title: '实时仿真与波形观察',
+    description: '支持模拟电路、数字逻辑与示波器波形可视化，帮助学生验证电路行为与设计思路。',
+    tag: 'SIMULATION'
+  },
+  {
     title: 'PDF 实验任务解析',
     description: '对电路实验文档进行任务拆解、分析点提取与逐点深入解释。',
     tag: 'PDF_CIRCUIT'
@@ -126,8 +135,8 @@ export const landingBenefits: LandingBenefitItem[] = [
     description: '教师配置班级知识库后，学生提问能够直接继承课程语境，提升答疑一致性与教学落地效果。'
   },
   {
-    title: '答疑与电路实践一体化',
-    description: '把理论问答、文档解析与电路分析串成连续学习流程，减少从学习到实践的切换成本。'
+    title: '答疑与仿真一体化',
+    description: '把理论问答、文档解析、仿真验证与电路分析串成连续学习流程，减少从学习到实践的切换成本。'
   }
 ];
 

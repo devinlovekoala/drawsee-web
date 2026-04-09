@@ -5,8 +5,7 @@ import { CircuitFlowWithProvider } from './components/CircuitFlow';
 import { ModelType } from '../flow/components/input/FlowInputPanel';
 import { Button, Tooltip, Modal } from 'antd';
 import { BrainCircuit, InfoIcon, Save, Cpu } from 'lucide-react';
-
-const CIRCUIT_PREFILL_STORAGE_KEY = 'flow_prefill_circuit_design';
+import { consumeCircuitPrefill } from './utils/circuitPrefill';
 
 interface NavigationEvent {
   path: string;
@@ -35,17 +34,9 @@ function Circuit() {
 
   // 从Flow预填电路设计（无ID时也能直接带入）
   useEffect(() => {
-    try {
-      const stored = sessionStorage.getItem(CIRCUIT_PREFILL_STORAGE_KEY);
-      if (!stored) return;
-      const parsed = JSON.parse(stored) as { design?: CircuitDesign; ts?: number };
-      if (parsed?.design) {
-        setCircuitDesign(parsed.design);
-      }
-    } catch (err) {
-      console.error('读取预填电路设计失败', err);
-    } finally {
-      try { sessionStorage.removeItem(CIRCUIT_PREFILL_STORAGE_KEY); } catch (err) {}
+    const prefillDesign = consumeCircuitPrefill();
+    if (prefillDesign) {
+      setCircuitDesign(prefillDesign);
     }
   }, []);
   

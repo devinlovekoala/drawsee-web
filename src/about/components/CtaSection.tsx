@@ -85,11 +85,11 @@ const CtaSection: React.FC = () => {
             {/* 内容区域 */}
             <div className="relative z-10 text-center">
               <h2 className="text-3xl md:text-5xl font-bold text-white mb-6 leading-tight">
-                让班级答疑与电路实践真正连起来
+                让班级答疑、实验任务与实时仿真真正连起来
               </h2>
               
               <p className="text-lg md:text-xl text-blue-100 mb-10 max-w-2xl mx-auto">
-                从教师配置知识库到学生日常提问，再到电路实验任务解析与推理复盘，
+                从教师配置知识库到学生日常提问，再到电路实验任务解析、实时仿真与推理复盘，
                 DrawSee 用一套智能交互方案贯穿完整学习链路
               </p>
               
