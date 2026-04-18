@@ -2,12 +2,7 @@ import { useMemo, useRef, useCallback, useState, useEffect } from "react";
 import { Node, Edge } from "@xyflow/react";
 import { AiTaskType, NodeType } from "@/api/types/flow.types";
 import useFlowTools from "./useFlowTools";
-import { TEMP_QUERY_NODE_ID_PREFIX } from "../constants";
-import { useAppContext } from "@/app/contexts/AppContext.tsx";
-import { nanoid } from "nanoid";
-import { createAiTask } from "@/api/methods/flow.methods.ts";
-import { NodeData } from "@/app/pages/flow/components/node/types/node.types";
-import toast from "react-hot-toast";
+import { COMPACT_NODE_HEIGHT, COMPACT_NODE_WIDTH, TEMP_QUERY_NODE_ID_PREFIX } from "../constants";
 
 // 定义临时节点任务数据类型
 export type TempQueryNodeTask = { 
@@ -20,7 +15,21 @@ export type TempQueryNodeTask = {
 };
 
 // 定义允许用户追问的节点类型
-const ALLOWED_PARENT_TYPES: NodeType[] = ['root', 'answer', 'knowledge-detail'];
+const ALLOWED_PARENT_TYPES: NodeType[] = [
+  'root', 
+  'query',
+  'knowledge-detail', 
+  'answer-detail', 
+  'ANSWER_DETAIL',
+  'circuit-detail',
+  'circuit-canvas',
+  'circuit-analyze',
+  'answer',
+  'PDF_ANALYSIS_POINT',
+  'PDF_ANALYSIS_DETAIL',
+  'pdf-circuit-point',
+  'pdf-circuit-detail'
+];
 
 // 防抖函数
 function debounce<F extends (...args: Parameters<F>) => ReturnType<F>>(func: F, wait: number): (...args: Parameters<F>) => void {
@@ -33,7 +42,7 @@ function debounce<F extends (...args: Parameters<F>) => ReturnType<F>>(func: F, 
 }
 
 function useTempQueryNode(
-	convId: number | undefined,
+	convId: number | null,
 	isChatting: boolean,
 	selectedNode: Node | null,
 	rootNodeId: string | null,
@@ -43,8 +52,8 @@ function useTempQueryNode(
     edges: Edge[];
   }>>
 ) {
+
 	const { executeFitView, executeLayout } = useFlowTools();
-	const { nodeWidth } = useAppContext();
 	// 临时查询节点ID
 	const tempQueryNodeId = useRef<string | null>(null);
 	// 没有临时查询节点的节点和边
@@ -57,59 +66,111 @@ function useTempQueryNode(
   const [canNotInputReason, setCanNotInputReason] = useState<string | null>(null);
   // 判断当前是否可以输入（根据选中节点类型和SSE处理状态）
   const canInput = useMemo(() => {
-    if (isChatting) {
-      return {can: false, reason: '请等待当前对话完成'};
-    }
     if (!convId) {
-      return {can: false, reason: '请先创建对话'};
+      setCanNotInputReason('登录后可追问');
+      return false;
     }
+    // 如果正在处理SSE消息，禁止输入
+    if (isChatting) {
+      setCanNotInputReason('正在chatting，无法追问');
+      return false;
+    }
+    // 没有选中节点，但有根节点时可以输入
     if (!selectedNode) {
-      return {can: false, reason: '请先选择一个节点'};
+      if (rootNodeId === null) setCanNotInputReason('没有选中节点，无法追问');
+      return rootNodeId !== null;
     }
-    // 检查selectedNode是否可以继续提问
-    if (selectedNode.type === 'answer' && selectedNode.data.subtype === 'solver') {
-      if (!selectedNode.data.isDone) {
-        return {can: false, reason: '解题过程还未完成，请等待完成后继续'};
-      }
+    
+    // 显式检查不允许追问的节点类型
+    const nodeType = selectedNode.type as NodeType;
+    const nodeSubtype = selectedNode.data?.subtype as string | undefined;
+    const allowFollowup = selectedNode.data?.allowFollowup as boolean | undefined;
+    
+    // 添加调试输出
+    console.log('当前选中节点信息:', {
+      id: selectedNode.id,
+      type: nodeType,
+      subtype: nodeSubtype,
+      allowFollowup,
+      data: selectedNode.data
+    });
+    
+    // 检查节点类型是否在允许列表中
+    const isTypeAllowed = ALLOWED_PARENT_TYPES.includes(nodeType);
+    // 检查节点子类型是否在允许列表中(针对subtype为circuit-detail的情况)
+    const isSubtypeAllowed = nodeSubtype && ALLOWED_PARENT_TYPES.includes(nodeSubtype as NodeType);
+    
+    console.log('节点追问权限检查:', {
+      typeAllowed: isTypeAllowed,
+      subtypeAllowed: isSubtypeAllowed,
+      explicitlyAllowed: allowFollowup === true,
+      ALLOWED_PARENT_TYPES
+    });
+    
+    // 如果节点明确允许追问，则直接返回true
+    if (allowFollowup === true) {
+      setCanNotInputReason(null);
+      return true;
     }
-
-    return {can: true, reason: ''};
-  }, [convId, isChatting, selectedNode]);
+    
+    // 明确拒绝的节点类型
+    if (
+      (nodeType === 'answer' && nodeSubtype !== 'circuit-analyze') || 
+      nodeType === 'knowledge-head' || 
+      nodeType === 'answer-point' || 
+      nodeType === 'ANSWER_POINT'
+    ) {
+      setCanNotInputReason('当前节点不允许追问');
+      return false;
+    }
+    
+    const isCircuitAnswer = nodeType === 'answer' && nodeSubtype === 'circuit-analyze';
+    
+    // 特殊处理circuit分析类型
+    if (nodeType === 'circuit-analyze' || nodeSubtype === 'circuit-analyze' || nodeType === 'circuit-detail' || nodeSubtype === 'circuit-detail' || isCircuitAnswer) {
+      setCanNotInputReason(null);
+      return true;
+    }
+    
+    // 选中节点是允许用户追问的节点类型
+    if (isTypeAllowed || isSubtypeAllowed) {
+      setCanNotInputReason(null);
+      return true;
+    }
+    
+    setCanNotInputReason('当前节点不允许追问');
+    return false;
+  }, [selectedNode, rootNodeId, isChatting]);
   // 获取临时查询节点的父节点ID
   const parentIdOfTempQueryNode = useMemo(() => {
-    if (!canInput.can) return null;
-
-    // 如果是根节点，直接返回根节点ID
-    if (selectedNode?.type === 'root') {
+    if (!selectedNode) return rootNodeId;
+    
+    const nodeType = selectedNode.type as NodeType;
+    const nodeSubtype = selectedNode.data?.subtype as string | undefined;
+    const allowFollowup = selectedNode.data?.allowFollowup as boolean | undefined;
+    
+    // 如果节点明确允许追问，则直接使用其ID
+    if (allowFollowup === true) {
       return selectedNode.id;
     }
-
-    // 如果是知识头部节点，直接返回知识头部节点ID
-    if (selectedNode?.type === 'knowledge-head') {
+    
+    // 检查类型或子类型是否在允许列表中
+    const isTypeAllowed = ALLOWED_PARENT_TYPES.includes(nodeType);
+    const isSubtypeAllowed = nodeSubtype && ALLOWED_PARENT_TYPES.includes(nodeSubtype as NodeType);
+    
+    const isCircuitAnswer = nodeType === 'answer' && nodeSubtype === 'circuit-analyze';
+    
+    // 特殊处理circuit分析类型
+    if (nodeType === 'circuit-analyze' || nodeSubtype === 'circuit-analyze' || nodeType === 'circuit-detail' || nodeSubtype === 'circuit-detail' || isCircuitAnswer) {
       return selectedNode.id;
     }
-
-    // 如果是答案节点，返回答案节点ID
-    if (selectedNode?.type === 'answer') {
+    
+    if (isTypeAllowed || isSubtypeAllowed) {
       return selectedNode.id;
     }
-
-    // 如果是查询节点，则返回上一级的答案节点ID（如果存在）
-    if (selectedNode?.type === 'query') {
-      const edges = elements.edges.filter(edge => edge.target === selectedNode.id);
-      if (edges.length > 0) {
-        const sourceNode = elements.nodes.find(node => node.id === edges[0].source);
-        if (sourceNode) {
-          return sourceNode.id;
-        }
-      }
-      // 如果没有上级节点或上级不是答案节点，就返回根节点ID
-      return rootNodeId;
-    }
-
-    // 默认返回根节点ID
+    
     return rootNodeId;
-  }, [canInput.can, elements.edges, elements.nodes, rootNodeId, selectedNode]);
+  }, [selectedNode, rootNodeId]);
   
   // 存储最新计算结果的ref
   const latestNodesAndEdgesWithTempQueryNode = useRef<{nodes: Node[], edges: Edge[]}>(elements);
@@ -122,7 +183,7 @@ function useTempQueryNode(
     parentId: string | null, 
     canInputValue: boolean, 
     elementsValue: {nodes: Node[], edges: Edge[]},
-    convIdValue: number | undefined,
+    convIdValue: number,
     executeLayoutFn: typeof executeLayout
   ) => void;
   
@@ -134,7 +195,12 @@ function useTempQueryNode(
     convIdValue,
     executeLayoutFn
   ) => {
-    if (!parentId || !canInputValue || !convIdValue) {
+    if (!convIdValue) {
+      latestNodesAndEdgesWithTempQueryNode.current = elementsValue;
+      setUpdateCounter(prev => prev + 1);
+      return;
+    }
+    if (!parentId || !canInputValue) {
       latestNodesAndEdgesWithTempQueryNode.current = elementsValue;
       setUpdateCounter(prev => prev + 1); // 触发重新渲染
       return;
@@ -153,6 +219,8 @@ function useTempQueryNode(
         convId: convIdValue,
         createdAt: Date.now(),
         updatedAt: Date.now(),
+        layoutWidth: COMPACT_NODE_WIDTH,
+        layoutHeight: COMPACT_NODE_HEIGHT
       },
       selectable: false
     };
@@ -182,12 +250,12 @@ function useTempQueryNode(
   useEffect(() => {
     debouncedUpdateNodesAndEdges(
       parentIdOfTempQueryNode, 
-      canInput.can, 
+      canInput, 
       elements,
       convId,
       executeLayout
     );
-  }, [parentIdOfTempQueryNode, canInput.can, elements, convId, executeLayout, debouncedUpdateNodesAndEdges]);
+  }, [parentIdOfTempQueryNode, canInput, elements, convId, executeLayout, debouncedUpdateNodesAndEdges]);
 
   // 有临时查询节点的节点和边 - 使用最新计算结果
   const nodesAndEdgesWithTempQueryNode = useMemo(() => {
@@ -207,7 +275,7 @@ function useTempQueryNode(
       if (!task) continue;
       switch (task.type) {
         case 'create': {
-          if (!canInput.can || !parentIdOfTempQueryNode) continue;
+          if (!canInput || !parentIdOfTempQueryNode) continue;
           
           setElements(({nodes, edges}) => {
             // 保存没有临时查询节点的节点和边
@@ -278,70 +346,19 @@ function useTempQueryNode(
     }
     // 释放锁
     isProcessingTempQueryNodeTask.current = false;
-  }, [canInput.can, parentIdOfTempQueryNode, setElements, nodesAndEdgesWithTempQueryNode, executeFitView]);
+  }, [canInput, parentIdOfTempQueryNode, setElements, nodesAndEdgesWithTempQueryNode, executeFitView]);
 
   /**
    * 添加临时查询节点任务
    */
-  const addTempQueryNodeTask = useCallback(async (prompt: string) => {
-    if (!canInput.can || !convId) {
-      toast.error(canInput.reason || '无法发送消息');
-      return;
-    }
-
-    try {
-      if (!parentIdOfTempQueryNode) {
-        toast.error('父节点ID不存在');
-        return;
-      }
-
-      // 分析消息类型
-      let mode: AiTaskType = 'general'; // 默认为general
-      
-      if (prompt.trim().toLowerCase().startsWith('/knowledge')) {
-        mode = 'knowledge';
-        prompt = prompt.replace(/^\/knowledge/i, '').trim();
-      }
-
-      // 添加临时节点任务，使用为参数创建任务
-      tempQueryNodeTaskQueue.current.push({
-        type: 'create',
-        text: prompt,
-        mode: mode
-      });
-      processTempQueryNodeTask();
-      const tempNodeId = tempQueryNodeId.current;
-
-      // 创建任务
-      const res = await createAiTask({
-        type: mode,
-        prompt: prompt,
-        promptParams: null,
-        convId: convId,
-        parentId: parseInt(parentIdOfTempQueryNode),
-        model: null
-      });
-
-      if (res.taskId) {
-        const taskId = res.taskId;
-        // 通知任务创建成功，并触发聊天
-        const chatEvent = new CustomEvent('chat-task-created', { detail: { taskId } });
-        window.dispatchEvent(chatEvent);
-      }
-    } catch (error) {
-      toast.error('发送消息失败');
-      console.error('发送消息失败', error);
-      
-      // 恢复原始节点和边
-      if (nodesAndEdgesNoneTempQueryNode.current) {
-        setElements(nodesAndEdgesNoneTempQueryNode.current);
-      }
-    }
-  }, [canInput, convId, parentIdOfTempQueryNode, processTempQueryNodeTask, setElements]);
+  const addTempQueryNodeTask = useCallback((task: TempQueryNodeTask) => {
+    tempQueryNodeTaskQueue.current.push(task);
+    processTempQueryNodeTask();
+  }, [processTempQueryNodeTask]);
 
 	return {
-		canInput: canInput.can,
-		canNotInputReason: canInput.reason,
+		canInput,
+		canNotInputReason,
 		parentIdOfTempQueryNode,
     nodesAndEdgesNoneTempQueryNode,
 		addTempQueryNodeTask,

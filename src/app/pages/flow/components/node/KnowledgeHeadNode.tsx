@@ -3,15 +3,41 @@ import { useFlowContext } from '@/app/contexts/FlowContext';
 import { CreateAiTaskDTO } from '@/api/types/flow.types';
 import { toast } from 'sonner';
 import { createAiTask } from '@/api/methods/flow.methods';
-import { useState } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useAppContext } from '@/app/contexts/AppContext';
+import { ModelType } from '../input/FlowInputPanel';
+import { ModelSelector } from '../../../blank/components/ModelSelector';
+import { useLocation } from 'react-router-dom';
 
 function KnowledgeHeadNode({ showSourceHandle, showTargetHandle, data, ...props }: ExtendedNodeProps<'knowledge-head'>) {
   
   const {chat, convId, isChatting, addChatTask} = useFlowContext();
   const {handleAiTaskCountPlus} = useAppContext();
+  
+  const location = useLocation();
+  const classId = location.state?.classId as string || null;
 
   const [isGenerated, setIsGenerated] = useState(data.isGenerated || false);
+  const initialModel = (data as { mode?: ModelType })?.mode;
+  const [selectedModel, setSelectedModel] = useState<ModelType>(initialModel || 'deepseekV3'); // 默认使用DeepSeekV3模型
+
+  // 处理模型变更
+  const handleModelChange = useCallback((model: ModelType) => {
+    setSelectedModel(model);
+    addChatTask({
+      type: 'data',
+      data: {
+        nodeId: parseInt(props.id),
+        mode: model
+      }
+    });
+  }, [addChatTask, props.id]);
+
+  useEffect(() => {
+    if (data.mode && data.mode !== selectedModel) {
+      setSelectedModel(data.mode as ModelType);
+    }
+  }, [data.mode, selectedModel]);
 
   const handleKnowledgeDetailChat = () => {
     if (isChatting) {
@@ -23,13 +49,16 @@ function KnowledgeHeadNode({ showSourceHandle, showTargetHandle, data, ...props 
       return;
     }
     setIsGenerated(true);
-    const createAiTaskDTO = {
-      type: "knowledge-detail",
-      prompt: null,
+    const createAiTaskDTO: CreateAiTaskDTO = {
+      type: "KNOWLEDGE_DETAIL",
+      prompt: "请详细解析该知识点",
       promptParams: null,
       convId: convId,
-      parentId: parseInt(props.id)
-    } as CreateAiTaskDTO;
+      parentId: parseInt(props.id),
+      model: selectedModel,
+      classId: classId
+    };
+    console.log('发送知识详情AI任务', createAiTaskDTO);
     createAiTask(createAiTaskDTO).then((response) => {
       toast.success("问题已发送");
       handleAiTaskCountPlus();
@@ -42,14 +71,41 @@ function KnowledgeHeadNode({ showSourceHandle, showTargetHandle, data, ...props 
       });
       setTimeout(() => {
         chat(response.taskId);
+        
+        // 在启动流式响应后，延迟一段时间自动切换到详情节点
+        setTimeout(() => {
+          // 通过全局事件通知需要自动选中对应的详情节点
+          window.dispatchEvent(new CustomEvent('auto-select-detail-node', {
+            detail: {
+              parentNodeId: props.id,
+              detailNodeType: 'knowledge-detail'
+            }
+          }));
+        }, 800); // 给一点时间让节点创建
       }, 200);
+    }).catch(error => {
+      console.error('知识详情AI任务失败', error);
+      setIsGenerated(false);
+      toast.error(error.message || "创建任务失败，请重试");
     });
   }
+
+  // 模型选择器内容
+  const modelSelector = (
+    <div className="mt-2 mb-3">
+      <div className="w-full">
+        <ModelSelector 
+          selectedModel={selectedModel} 
+          onModelChange={handleModelChange} 
+        />
+      </div>
+    </div>
+  );
 
   return (
     <BaseNode
       {...props}
-      data={data}
+      data={{...data, customContent: !isGenerated ? modelSelector : null}}
       showSourceHandle={showSourceHandle}
       showTargetHandle={showTargetHandle}
       footerContent={

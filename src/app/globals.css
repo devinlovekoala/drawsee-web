@@ -1,0 +1,48 @@
+:root {
+  /* 现有的CSS变量 */
+  
+  /* 节段节点样式变量 */
+  --blue-bg: rgba(59, 130, 246, 0.1);
+  --blue-border: rgba(59, 130, 246, 0.5);
+  
+  --green-bg: rgba(16, 185, 129, 0.1);
+  --green-border: rgba(16, 185, 129, 0.5);
+  
+  --amber-bg: rgba(245, 158, 11, 0.1);
+  --amber-border: rgba(245, 158, 11, 0.5);
+  
+  --purple-bg: rgba(139, 92, 246, 0.1);
+  --purple-border: rgba(139, 92, 246, 0.5);
+}
+
+.dark {
+  /* 现有的深色模式CSS变量 */
+  
+  /* 深色模式节段节点样式变量 */
+  --blue-bg: rgba(59, 130, 246, 0.2);
+  --blue-border: rgba(59, 130, 246, 0.6);
+  
+  --green-bg: rgba(16, 185, 129, 0.2);
+  --green-border: rgba(16, 185, 129, 0.6);
+  
+  --amber-bg: rgba(245, 158, 11, 0.2);
+  --amber-border: rgba(245, 158, 11, 0.6);
+  
+  --purple-bg: rgba(139, 92, 246, 0.2);
+  --purple-border: rgba(139, 92, 246, 0.6);
+}
+
+/* 为节点连接线添加样式 */
+.node-handle.sectioned {
+  width: 16px;
+  height: 16px;
+  background-color: rgba(59, 130, 246, 0.6);
+  border: 2px solid #fff;
+  box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);
+}
+
+.dark .node-handle.sectioned {
+  background-color: rgba(59, 130, 246, 0.8);
+  border: 2px solid #1f2937;
+  box-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
+} 

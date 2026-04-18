@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Logo from '../../assets/svg/昭析.svg';
+import { LOGIN_FLAG_KEY } from '@/common/constant/storage-key.constant.ts';
 
 const NavBar: React.FC = () => {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -18,7 +19,18 @@ const NavBar: React.FC = () => {
   }, []);
 
   const handleLogin = () => {
-    navigate('/blank', { state: { from: '/about' } });
+    // 检查用户是否已登出
+    const hasLoggedOut = localStorage.getItem('Auth:LoggedOut') === 'true';
+    const isLoggedIn = sessionStorage.getItem(LOGIN_FLAG_KEY) === 'true';
+    
+    // 如果已登出或未登录，则不跳转到应用页面，而是进入登录拦截模式
+    if (hasLoggedOut || !isLoggedIn) {
+      // 将状态设置为需要登录，App组件会检测并显示登录表单
+      navigate('/blank', { state: { requireLogin: true, loginRequestId: Date.now() } });
+    } else {
+      // 已登录用户直接跳转
+      navigate('/blank', { state: { from: '/about' } });
+    }
   };
 
   return (
@@ -45,10 +57,10 @@ const NavBar: React.FC = () => {
             可视化
           </a>
           <a href="#agents" className="text-gray-700 hover:text-blue-600 transition-colors duration-300">
-            智能助手
+            交互方案
           </a>
           <a href="#benefits" className="text-gray-700 hover:text-blue-600 transition-colors duration-300">
-            优势
+            价值
           </a>
         </nav>
 
@@ -90,8 +102,8 @@ const NavBar: React.FC = () => {
         <div className="container mx-auto px-6 flex flex-col space-y-4">
           <a href="#features" className="text-gray-700 py-2 hover:text-blue-600">功能</a>
           <a href="#visual" className="text-gray-700 py-2 hover:text-blue-600">可视化</a>
-          <a href="#agents" className="text-gray-700 py-2 hover:text-blue-600">智能助手</a>
-          <a href="#benefits" className="text-gray-700 py-2 hover:text-blue-600">优势</a>
+          <a href="#agents" className="text-gray-700 py-2 hover:text-blue-600">交互方案</a>
+          <a href="#benefits" className="text-gray-700 py-2 hover:text-blue-600">价值</a>
           <button
             onClick={handleLogin}
             className="px-6 py-2.5 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-medium"

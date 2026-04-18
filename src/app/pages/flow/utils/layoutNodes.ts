@@ -1,7 +1,7 @@
 import ELK from 'elkjs/lib/elk-api';
 import type { ElkNode, ElkExtendedEdge } from 'elkjs';
 import { Node, Edge } from '@xyflow/react';
-import { NODE_WIDTH, ROOT_NODE_SIZE, TEMP_QUERY_NODE_HEIGHT, TEMP_QUERY_NODE_ID_PREFIX } from '../constants';
+import { NODE_WIDTH, ROOT_NODE_SIZE, TEMP_QUERY_NODE_HEIGHT, TEMP_QUERY_NODE_ID_PREFIX, COMPACT_NODE_WIDTH, COMPACT_NODE_HEIGHT, FLOW_HORIZONTAL_SPACING, FLOW_VERTICAL_SPACING, FLOW_SIBLING_SPACING } from '../constants';
 import { calculateNodeHeight } from './calculateNodeHeight';
 import { NodeType } from '@/api/types/flow.types';
 import { NodeData } from '../components/node/types/node.types';
@@ -73,25 +73,20 @@ export async function mrtreeLayout(nodes: Node[], edges: Edge[], shouldUpdateSer
       sources: [edge.source],
       targets: [edge.target]
     })) as ElkExtendedEdge[];
-    // 准备ELK图
+    // 准备ELK图 - 解决重叠问题并极大压缩横向空间
     const graph = {
       id: "root",
       layoutOptions: {
         "elk.interactiveLayout": "true",
-        "elk.direction": "DOWN",
+        "elk.direction": "RIGHT", // 从DOWN改为RIGHT，实现横向布局
         "elk.algorithm": "mrtree",
-        //"elk.childAreaHeight": "140.0",
-        //"elk.padding": "[top=20.0,left=20.0,bottom=20.0,right=20.0]",
         "elk.nodeSize.constraints": "[]",
         "elk.interactive": "true",
-        //"elk.spacing.portsSurrounding": "[top=0.0,left=0.0,bottom=0.0,right=0.0]",
-        //"elk.childAreaWidth": "50.0",
-        "elk.spacing.nodeNode": "40.0",
-        //"elk.mrtree.weighting": "CONSTRAINT",
+        "elk.spacing.nodeNode": "40.0", // 同级节点间距（从15增加到40，防止重叠）
+        "elk.layered.spacing.nodeNodeBetweenLayers": "30.0", // 层级间距（从50进一步减少到30，极大压缩横向）
         "elk.mrtree.edgeRoutingMode": "AVOID_OVERLAP",
-        //"elk.resolvedAlgorithm": "Layout Algorithm: org.eclipse.elk.mrtree",
-        //"elk.hierarchyHandling": "SEPARATE_CHILDREN",
-        //"elk.nodeLabels.padding": "[top=5.0,left=5.0,bottom=5.0,right=5.0]"
+        "elk.spacing.portPort": "4.0", // 端口间距（从6减少到4）
+        "elk.margins": "8.0", // 图的边距（从10减少到8，进一步节省空间）
       },
       children: elkNodes,
       edges: elkEdges
@@ -161,7 +156,13 @@ export async function mrtreeLayout(nodes: Node[], edges: Edge[], shouldUpdateSer
 }
 
 const dagreGraph = new dagre.graphlib.Graph().setDefaultEdgeLabel(() => ({}));
-dagreGraph.setGraph({ rankdir: 'TB' });
+dagreGraph.setGraph({ 
+  rankdir: 'LR', // 从TB（Top-Bottom）改为LR（Left-Right）
+  nodesep: 40,   // 同一层级节点间的垂直间距（从15增加到40，防止重叠）
+  ranksep: 30,   // 不同层级间的水平间距（从50进一步减少到30，极大压缩横向）
+  marginx: 8,    // 图的左右边距（从10减少到8）
+  marginy: 8     // 图的上下边距（从10减少到8）
+});
 
 export function dagreLayout(nodes: Node[], edges: Edge[], shouldUpdateServer: boolean = false): { nodes: Node[], edges: Edge[] } {
   // 记录开始时间
@@ -267,14 +268,17 @@ export function dagreLayout(nodes: Node[], edges: Edge[], shouldUpdateServer: bo
   }
 }
 
-export function entitreeFlexLayout(nodes: Node[], edges: Edge[], nodeWidth: number, shouldUpdateServer: boolean = false, resetHeight: boolean = false): { nodes: Node[], edges: Edge[] } {
-  // 记录开始时间
-  //const startTime = performance.now();
-
+export function entitreeFlexLayout(nodes: Node[], edges: Edge[], shouldUpdateServer: boolean = false, resetHeight: boolean = false): { nodes: Node[], edges: Edge[] } {
   try {
     if (nodes.length === 0) {
       return { nodes, edges };
     }
+    
+    // 性能优化：添加时间戳用于性能监控
+    const startTime = performance.now();
+    
+    // 调试信息：输出布局参数
+    console.log(`entitreeFlexLayout 调用参数: shouldUpdateServer=${shouldUpdateServer}, resetHeight=${resetHeight}, 节点数=${nodes.length}`);
     
     const rootId = nodes.find(node => node.type === 'root')?.id || nodes[0].id;
     
@@ -294,41 +298,58 @@ export function entitreeFlexLayout(nodes: Node[], edges: Edge[], nodeWidth: numb
     // 构建扁平树结构
     const flatTree = {} as Record<string, { width: number, height: number, children: string[], parents: string[] }>;
     
-    // 性能统计
-    //let heightCalculationTime = 0;
-    //let cachedHeightCount = 0;
+    // 性能优化：全局高度缓存，避免重复计算相同类型节点的高度
+    const globalHeightCache = new Map<string, number>();
+    
+    // 性能优化：批量处理节点高度计算
+    let heightCalculationCount = 0;
+    let cacheHitCount = 0;
     
     nodes.forEach(node => {
-      const width = node.type !== 'root' ? nodeWidth : ROOT_NODE_SIZE;
+      const isRootNode = node.type === 'root';
+      const widthFromData = typeof node.data?.layoutWidth === 'number' ? node.data.layoutWidth : undefined;
+      const width = isRootNode ? ROOT_NODE_SIZE : (widthFromData || NODE_WIDTH);
+      const previousHeightValue = typeof node.data?.height === 'number' ? node.data.height as number : null;
+      const previousHeightWidth = (node.data as any)?.__heightCalcWidth;
       let height: number;
       
-      // 获得节点高度
-      if (node.id.startsWith(TEMP_QUERY_NODE_ID_PREFIX)) {
-        height = TEMP_QUERY_NODE_HEIGHT;
-      } else if (node.type === 'root') {
+      if (isRootNode) {
         height = ROOT_NODE_SIZE;
-      } else if (!resetHeight && node.data.height !== undefined) {
-        height = node.data.height as number;
-        //cachedHeightCount++;
+      } else if (node.id.startsWith(TEMP_QUERY_NODE_ID_PREFIX)) {
+        height = TEMP_QUERY_NODE_HEIGHT;
       } else {
-        // 如果没有缓存高度，则计算高度
-        //const calcStartTime = performance.now();
-        height = calculateNodeHeight(node as Node<NodeData<NodeType>>, nodeWidth);
-        //const calcEndTime = performance.now();
-        //heightCalculationTime += (calcEndTime - calcStartTime);
-        //console.log(`${node.type}节点进行calculateNodeHeight，结果：${height}，用时: ${calcEndTime - calcStartTime}毫秒`);
+        const textLength = (node.data.text && typeof node.data.text === 'string') ? node.data.text.length : 0;
+        const cacheKey = `${node.type}-${textLength}-${width}`;
         
-        // 将没有高度信息的节点添加到需要更新的列表中
-        if (!node.id.startsWith(TEMP_QUERY_NODE_ID_PREFIX)) {
-          nodesToUpdate.push({
-            id: parseInt(node.id),
-            position: node.position,
-            height
-          });
+        if (!resetHeight && previousHeightValue !== null && previousHeightWidth === width) {
+          height = previousHeightValue;
+          cacheHitCount++;
+        } else if (!resetHeight && globalHeightCache.has(cacheKey)) {
+          height = globalHeightCache.get(cacheKey)!;
+          cacheHitCount++;
+        } else {
+          height = calculateNodeHeight(node as Node<NodeData<NodeType>>, width);
+          heightCalculationCount++;
+          globalHeightCache.set(cacheKey, height);
         }
-        
-        // 更新节点的高度信息（用于后续渲染）
-        node.data.height = height;
+      }
+      
+      const heightChanged = previousHeightValue !== height || previousHeightWidth !== width;
+      
+      // 更新节点的高度信息（用于后续渲染）
+      node.data.height = height;
+      (node.data as any).__heightCalcWidth = width;
+      
+      if (
+        shouldUpdateServer && 
+        heightChanged &&
+        !node.id.startsWith(TEMP_QUERY_NODE_ID_PREFIX)
+      ) {
+        nodesToUpdate.push({
+          id: parseInt(node.id),
+          position: node.position,
+          height
+        });
       }
       
       flatTree[node.id] = {
@@ -339,43 +360,70 @@ export function entitreeFlexLayout(nodes: Node[], edges: Edge[], nodeWidth: numb
       };
     });
     
+    // 调整布局设置 - 保持稳定的间距配置
+    const LAYOUT_MARGIN = 48;
     const settings = {
-      clone: false, // 如果您的应用程序不允许编辑原始对象，则返回输入的副本
-      enableFlex: true, // 如果关闭，性能略好（不会读取node.width，node.height）
-      firstDegreeSpacing: 75, // 节点之间的间距（像素），属于同一源的节点，例如具有相同父节点的子节点
-      nextAfterAccessor: "spouses", // 用于在当前节点之后侧向移动的侧节点属性
-      nextAfterSpacing: 10, // 当前节点之后的"侧"节点的间距
-      nextBeforeAccessor: "siblings", // 用于在当前节点之前侧向移动的侧节点属性
-      nextBeforeSpacing: 10, // 当前节点之前的"侧"节点的间距
-      nodeHeight: 40, // 默认节点高度（像素）
-      nodeWidth: 40, // 默认节点宽度（像素）
-      orientation: "vertical", // "垂直"以查看顶部的父节点和底部的子节点，"水平"以查看左侧的父节点和
-      rootX: 0, // 如果不是0，设置根节点的位置
-      rootY: 0, // 如果不是0，设置根节点的位置
-      secondDegreeSpacing: 20, // 节点之间的间距（像素），不属于同一父节点的节点，例如"cousin"节点
-      sourcesAccessor: "parents", // 用作祖先ID数组的属性
-      sourceTargetSpacing: 120, // 在垂直方向上节点之间的间距（垂直方向），否则在水平方向
-      targetsAccessor: "children", // 用作子节点ID数组的属性
+      clone: false,
+      enableFlex: true,
+      // 紧凑模式下的节点间距，保持节点间隔一致但不显拥挤
+      firstDegreeSpacing: FLOW_SIBLING_SPACING,
+      nextAfterSpacing: 14,
+      nextBeforeSpacing: 14,
+      nodeHeight: COMPACT_NODE_HEIGHT,
+      nodeWidth: COMPACT_NODE_WIDTH,
+      orientation: "horizontal",
+      rootX: LAYOUT_MARGIN,
+      rootY: LAYOUT_MARGIN,
+      secondDegreeSpacing: FLOW_VERTICAL_SPACING,
+      sourcesAccessor: "parents",
+      sourceTargetSpacing: FLOW_HORIZONTAL_SPACING,
+      targetsAccessor: "children",
     } as Partial<Settings>;
     
     const {map: layoutedTreeMap} = layoutFromMap(rootId, flatTree, settings);
     
     // 应用布局结果到节点
-    const layoutedNodes = Object.entries(layoutedTreeMap).map(([id, node]) => {
+    const layoutedNodesData = Object.entries(layoutedTreeMap).map(([id, node]) => {
       const originalNode = nodes.find(n => n.id === id);
       if (!originalNode) return null;
+      return {
+        id,
+        originalNode,
+        layoutNode: node
+      };
+    }).filter((item): item is { id: string; originalNode: Node; layoutNode: { x: number; y: number; width: number; height: number } } => item !== null);
+
+    if (layoutedNodesData.length === 0) {
+      return { nodes, edges };
+    }
+
+    const minX = Math.min(...layoutedNodesData.map(item => item.layoutNode.x));
+    const minY = Math.min(...layoutedNodesData.map(item => item.layoutNode.y));
+    const maxX = Math.max(...layoutedNodesData.map(item => item.layoutNode.x + item.layoutNode.width));
+    const maxY = Math.max(...layoutedNodesData.map(item => item.layoutNode.y + item.layoutNode.height));
+    const boundingWidth = maxX - minX;
+    const boundingHeight = maxY - minY;
+    const centerOffsetX = typeof window !== 'undefined' && window.innerWidth > boundingWidth + LAYOUT_MARGIN * 2
+      ? Math.floor((window.innerWidth - boundingWidth) / 2) - LAYOUT_MARGIN
+      : 0;
+    const centerOffsetY = typeof window !== 'undefined' && window.innerHeight > boundingHeight + LAYOUT_MARGIN * 2
+      ? Math.floor((window.innerHeight - boundingHeight) / 2) - LAYOUT_MARGIN
+      : 0;
+    const shiftX = LAYOUT_MARGIN - minX + centerOffsetX;
+    const shiftY = LAYOUT_MARGIN - minY + centerOffsetY;
+
+    const layoutedNodes = layoutedNodesData.map(({ id, originalNode, layoutNode }) => {
+      const nodeX = Math.round(layoutNode.x + shiftX);
+      const nodeY = Math.round(layoutNode.y + shiftY);
+      const positionChanged = originalNode.position.x !== nodeX || originalNode.position.y !== nodeY;
       
-      // 检查位置是否发生变化
-      if (
-        shouldUpdateServer && 
-        (originalNode.position.x !== node.x || originalNode.position.y !== node.y)
-      ) {
+      if (shouldUpdateServer && positionChanged) {
         // 查找节点是否已在更新列表中
         const existingNodeIndex = nodesToUpdate.findIndex(n => n.id === parseInt(id));
         
         if (existingNodeIndex !== -1) {
           // 更新已有节点的位置信息
-          nodesToUpdate[existingNodeIndex].position = { x: node.x, y: node.y };
+          nodesToUpdate[existingNodeIndex].position = { x: nodeX, y: nodeY };
         } else {
           // 添加新的需要更新的节点
           // 确保height不为null
@@ -386,37 +434,55 @@ export function entitreeFlexLayout(nodes: Node[], edges: Edge[], nodeWidth: numb
           if (!id.startsWith(TEMP_QUERY_NODE_ID_PREFIX)) {
             nodesToUpdate.push({
               id: parseInt(id),
-              position: { x: node.x, y: node.y },
+              position: { x: nodeX, y: nodeY },
               height: nodeHeight
             });
           }
         }
       }
       
+      // 返回布局后的节点
       return {
         ...originalNode,
-        position: { x: node.x, y: node.y }
+        position: { x: nodeX, y: nodeY }
       } as Node;
-    }).filter((node: Node | null): node is Node => node !== null);
+    });
     
-    // 输出性能统计
-    //const endTime = performance.now();
-    //const totalTime = endTime - startTime;
-    //console.log(`布局计算总耗时: ${totalTime.toFixed(2)}ms`);
-    //console.log(`高度计算耗时: ${heightCalculationTime.toFixed(2)}ms (${(heightCalculationTime / totalTime * 100).toFixed(2)}%)`);
-    //console.log(`使用缓存高度的节点数: ${cachedHeightCount}/${nodes.length} (${(cachedHeightCount / nodes.length * 100).toFixed(2)}%)`);
-    
-    // 更新服务器
+    // 更新服务器 - 仅当要求且有节点需要更新时才执行
     if (shouldUpdateServer && nodesToUpdate.length > 0) {
       console.log(`更新服务器节点数: ${nodesToUpdate.length}`);
-      updateNodesPositionAndHeight(nodesToUpdate).send()
-        .then(() => {
-          console.log('节点位置和高度更新成功');
-        })
-        .catch(error => {
-          console.error('节点位置和高度更新失败', error);
-        });
+      // 仅当位置或高度确实发生变化时才发送更新，防止无谓写库
+      const changedOnly = nodesToUpdate.filter((nu) => {
+        const original = nodes.find(n => parseInt(n.id) === nu.id);
+        if (!original) return true;
+        const posChanged = original.position?.x !== nu.position?.x || original.position?.y !== nu.position?.y;
+        const hChanged = (original.data as any)?.height !== nu.height;
+        return posChanged || hChanged;
+      });
+      if (changedOnly.length > 0) {
+        updateNodesPositionAndHeight(changedOnly).send()
+          .then(() => {
+            console.log('节点位置和高度更新成功');
+          })
+          .catch(error => {
+            console.error('节点位置和高度更新失败', error);
+          });
+      } else {
+        console.log('节点位置和高度无变化，跳过更新服务器');
+      }
     }
+    
+    // 性能统计输出
+    const endTime = performance.now();
+    const totalTime = endTime - startTime;
+    console.log(`entitreeFlexLayout 性能统计:`);
+    console.log(`- 总耗时: ${totalTime.toFixed(2)}ms`);
+    console.log(`- 节点总数: ${nodes.length}`);
+    console.log(`- 高度计算次数: ${heightCalculationCount}`);
+    console.log(`- 缓存命中次数: ${cacheHitCount}`);
+    console.log(`- 缓存命中率: ${nodes.length > 0 ? ((cacheHitCount / nodes.length) * 100).toFixed(1) : 0}%`);
+    console.log(`- 参数: shouldUpdateServer=${shouldUpdateServer}, resetHeight=${resetHeight}`);
+    console.log(`- 需要更新服务器的节点数: ${nodesToUpdate.length}`);
     
     return { nodes: layoutedNodes, edges };
   } catch (error) {

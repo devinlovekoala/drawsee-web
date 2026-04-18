@@ -56,3 +56,168 @@
   background-size: 10px 10px;
   background-image: radial-gradient(#e5e7eb 1px, transparent 1px);
 } 
+
+/* 紧凑模式样式 */
+.compact-node-content {
+  background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
+  border: 1px solid #e5e7eb;
+}
+
+.compact-node-content:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  transform: translateY(-1px);
+  border-color: #d1d5db;
+}
+
+.compact-node-footer {
+  border-top: 1px solid #e9ecef;
+  padding-top: 8px;
+  margin-top: 8px;
+}
+
+.compact-footer-content button {
+  font-size: 0.75rem !important;
+  padding: 6px 12px !important;
+  border-radius: 6px !important;
+  font-weight: 500 !important;
+  transition: all 0.2s ease;
+  min-width: 80px;
+}
+
+.compact-footer-content button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.compact-footer-content button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* 紧凑模式下选中状态样式 */
+.base-node.simplified-view.node-selected .compact-node-content {
+  border: 2px solid #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* 紧凑模式下的模型选择器样式 */
+.compact-node-content .model-selector {
+  transform: scale(0.9);
+  margin: 4px 0;
+}
+
+.compact-node-content .model-selector select {
+  font-size: 0.75rem;
+  padding: 4px 8px;
+}
+
+/* 紧凑模式下的节点类型标识 */
+.node-type-indicator {
+  margin-top: 4px;
+}
+
+.node-type-indicator span {
+  font-size: 0.6rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+  color: #1e40af;
+}
+
+/* 优化紧凑模式下的文本显示 */
+.compact-node-content .node-title {
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 4px;
+  text-align: center;
+  word-break: break-word;
+}
+
+.compact-node-content .node-preview {
+  color: #6b7280;
+  text-align: center;
+  word-break: break-word;
+  line-height: 1.3;
+}
+
+/* 为不同节点类型添加左侧色条标识 */
+.base-node[data-type="root"] .compact-node-content::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: #fbbf24;
+  border-radius: 4px 0 0 4px;
+}
+
+.base-node[data-type="query"] .compact-node-content::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: #3b82f6;
+  border-radius: 4px 0 0 4px;
+}
+
+.base-node[data-type="answer"] .compact-node-content::before,
+.base-node[data-type="answer-point"] .compact-node-content::before,
+.base-node[data-type="answer-detail"] .compact-node-content::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: #10b981;
+  border-radius: 4px 0 0 4px;
+}
+
+.base-node[data-type="circuit-canvas"] .compact-node-content::before,
+.base-node[data-type="circuit-analyze"] .compact-node-content::before,
+.base-node[data-type="circuit-detail"] .compact-node-content::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: #f59e0b;
+  border-radius: 4px 0 0 4px;
+}
+
+.base-node[data-type="knowledge-head"] .compact-node-content::before,
+.base-node[data-type="knowledge-detail"] .compact-node-content::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: #8b5cf6;
+  border-radius: 4px 0 0 4px;
+}
+
+.base-node[data-type="resource"] .compact-node-content::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: #ec4899;
+  border-radius: 4px 0 0 4px;
+}
+
+/* 确保紧凑模式内容有相对定位以支持伪元素 */
+.compact-node-content {
+  position: relative;
+} 

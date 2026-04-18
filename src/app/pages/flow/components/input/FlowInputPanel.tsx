@@ -1,17 +1,17 @@
-import { useCallback, useState, useRef, useEffect, useMemo } from "react";
+import { useCallback, useState, useRef, useEffect, useMemo, forwardRef, useImperativeHandle } from "react";
 import { toast } from "sonner";
 import { XMarkIcon } from '@heroicons/react/24/outline';
-import { BookOpenIcon, CircuitBoardIcon, CodeXmlIcon, MessageCircleIcon, TargetIcon } from 'lucide-react';
 import { createAiTask } from "@/api/methods/flow.methods.ts";
 import type { AiTaskType, CreateAiTaskDTO } from '@/api/types/flow.types.ts';
 import { TempQueryNodeTask } from "../../hooks/useTempQueryNode";
 import { useFlowContext } from "@/app/contexts/FlowContext";
 import { useAppContext } from "@/app/contexts/AppContext";
+import type { CircuitDesign } from '@/api/types/circuit.types';
 import '@/app/components/text-selection/TextSelectionToolbar.css';
 import { Node as FlowNode } from "@xyflow/react";
-import { DeepSeek, Doubao } from "./ModelIcons";
+import { DeepSeek, Qwen } from "./ModelIcons";
 import { DropdownOption, SelectDropdown } from "./SelectDropdown";
-import CircuitAnalysisModal from "@/components/circuit/modal/CircuitAnalysisModal";
+import { useLocation } from 'react-router-dom';
 
 interface FlowInputPanelProps {
   prompt: string;
@@ -23,91 +23,53 @@ interface FlowInputPanelProps {
   selectedNode: FlowNode | null;
 }
 
-export type ModelType = 'deepseekV3' | 'doubao';
+export type ModelType = 'deepseekV3' | 'qwen';
 
-export function FlowInputPanel({
-  selectedNode,
+export interface FlowInputPanelHandle {
+  applySuggestion: (text: string) => void;
+}
+
+const stripMarkdownText = (input: string): string => {
+  return input
+    .replace(/\$\$[\s\S]*?\$\$/g, ' ')
+    .replace(/\$(.*?)\$/g, ' ')
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/#{1,6}\s+/g, '')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/[*_~`>#-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+};
+
+const extractCircuitWarmupIntro = (rawText: string): string => {
+  const normalized = rawText.replace(/\r\n/g, '\n');
+  const warmupMatch = normalized.match(/###\s*预热导语\s*\n([\s\S]*?)(?=\n\s*#{2,3}\s*|$)/);
+  if (warmupMatch?.[1]) {
+    return stripMarkdownText(warmupMatch[1]);
+  }
+  const splitByFollowup = normalized.split(/###\s*追问方向概览/);
+  return stripMarkdownText(splitByFollowup[0] || normalized);
+};
+
+export const FlowInputPanel = forwardRef<FlowInputPanelHandle, FlowInputPanelProps>(function FlowInputPanel(
+{
   prompt,
   setPrompt,
   canInput, 
   canNotInputReason,
   addTempQueryNodeTask,
-  parentIdOfTempQueryNode
-}: FlowInputPanelProps) {
-
-  const chatModes = useMemo(() => {
-    const defaultModes = [
-      {
-        name: '常规问答模式',
-        description: '最常规的 AI 生成模式，一问一答。',
-        icon: MessageCircleIcon,
-        type: 'general' satisfies AiTaskType
-      },
-      {
-        name: '知识问答模式',
-        description: '基于知识库的 AI 生成模式，能识别用户提问中的相关知识点。',
-        icon: BookOpenIcon,
-        type: 'knowledge' satisfies AiTaskType
-      },
-      {
-        name: '目标解析模式',
-        description: '基于目标解析引擎，能够对用户目标进行有效拆解。',
-        icon: TargetIcon,
-        type: 'planner' satisfies AiTaskType
-      },
-      {
-        name: '网页生成模式',
-        description: '基于网页生成引擎，能够基于用户提问生成可预览的html网页。',
-        icon: CodeXmlIcon,
-        type: 'html-maker' satisfies AiTaskType
-      },
-      {
-        name: '电路分析模式',
-        description: '基于电路分析引擎，能够基于用户输入的电路图，生成电路分析结果。',
-        icon: CircuitBoardIcon,
-        type: 'circuit-analyze' satisfies AiTaskType
-      }
-    ];
-    if (selectedNode?.data.subtype === 'planner-split') {
-      // 把planner模式排在第一位
-      const plannerMode = defaultModes.find(mode => mode.type === 'planner');
-      if (plannerMode) {
-        return [
-          plannerMode,
-          ...defaultModes.filter(mode => mode.type !== 'planner')
-        ];
-      }
-    }
-    if (selectedNode?.data.subtype === 'html-maker') {
-      // 把html-maker模式排在第一位
-      const htmlMakerMode = defaultModes.find(mode => mode.type === 'html-maker');
-      if (htmlMakerMode) {
-        return [
-          htmlMakerMode,
-          ...defaultModes.filter(mode => mode.type !== 'html-maker')
-        ];
-      }
-    }
-    if (selectedNode?.data.subtype === 'circuit-analyze') {
-      // 把circuit-analyze模式排在第一位
-      const circuitAnalyzeMode = defaultModes.find(mode => mode.type === 'circuit-analyze');
-      if (circuitAnalyzeMode) {
-        return [
-          circuitAnalyzeMode,
-          ...defaultModes.filter(mode => mode.type !== 'circuit-analyze')
-        ];
-      }
-    }
-    return defaultModes;
-  }, [selectedNode]);
+  parentIdOfTempQueryNode,
+  selectedNode
+}: FlowInputPanelProps,
+ref) {
 
   // 新增模型选项
   const modelOptions = useMemo<DropdownOption[]>(() => [
     {
-      name: '豆包',
-      description: '豆包大语言模型',
-      icon: Doubao.Color,
-      type: 'doubao' satisfies ModelType
+      name: 'Qwen',
+      description: 'Qwen 大语言模型',
+      icon: Qwen.Color,
+      type: 'qwen' satisfies ModelType
     },
     {
       name: 'DeepSeekV3',
@@ -119,33 +81,93 @@ export function FlowInputPanel({
 
   const [isExpanded, setIsExpanded] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
-  const [selectedType, setSelectedType] = useState<AiTaskType>(chatModes[0].type as AiTaskType);
-  const [selectedModel, setSelectedModel] = useState<ModelType>('doubao');
+  const [selectedModel, setSelectedModel] = useState<ModelType>('deepseekV3');
   const containerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const inputContainerRef = useRef<HTMLDivElement>(null);
-  
-  // 电路分析模态框状态
-  const [isCircuitModalOpen, setIsCircuitModalOpen] = useState(false);
 
   const {chat, convId} = useFlowContext();
+  
   const {handleNewChat, quoteText, setQuoteText, handleAiTaskCountPlus} = useAppContext();
   
-  const [isProcessing, setIsProcessing] = useState(false);
+  const location = useLocation();
+  const classId = location.state?.classId as string || null;
   
-  // 当selectedNode发生变化时，更新selectedType
-  useEffect(() => {
-    if (selectedNode?.data.subtype === 'planner-split') {
-      setSelectedType('planner');
-    } else if (selectedNode?.data.subtype === 'html-maker') {
-      setSelectedType('html-maker');
-    } else if (selectedNode?.data.subtype === 'circuit-analyze') {
-      setSelectedType('circuit-analyze');
-    } else {
-      setSelectedType('general');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [pendingSubmit, setPendingSubmit] = useState(false);
+  
+  const determineTaskType = useCallback((): AiTaskType => {
+    if (!selectedNode) return 'GENERAL';
+    const nodeType = selectedNode.type as string | undefined;
+    const nodeSubtype = (selectedNode.data as Record<string, unknown> | undefined)?.subtype as string | undefined;
+
+    const isCircuitNode = (nodeType === 'answer' && nodeSubtype === 'circuit-analyze') ||
+      nodeSubtype === 'circuit-canvas' ||
+      nodeSubtype === 'circuit-analyze' ||
+      nodeType === 'circuit-canvas' ||
+      nodeType === 'circuit-analyze';
+
+    if (isCircuitNode) {
+      return 'CIRCUIT_DETAIL';
     }
+
+    const isPdfNode = nodeType === 'PDF_ANALYSIS_POINT' ||
+      nodeType === 'PDF_ANALYSIS_DETAIL' ||
+      nodeType === 'pdf-circuit-point' ||
+      nodeType === 'pdf-circuit-detail' ||
+      nodeSubtype === 'PDF_ANALYSIS_POINT' ||
+      nodeSubtype === 'PDF_ANALYSIS_DETAIL' ||
+      nodeSubtype === 'pdf-circuit-point' ||
+      nodeSubtype === 'pdf-circuit-detail';
+
+    if (isPdfNode) {
+      return 'PDF_CIRCUIT_ANALYSIS_DETAIL';
+    }
+
+    return 'GENERAL';
   }, [selectedNode]);
 
+  const buildPromptWithNodeContext = useCallback((basePrompt: string): string => {
+    if (!selectedNode) return basePrompt;
+    const nodeType = selectedNode.type as string | undefined;
+    const nodeData = selectedNode.data as Record<string, unknown> | undefined;
+    const rawText = typeof nodeData?.text === 'string' ? nodeData.text.trim() : '';
+    const nodeTitle = typeof nodeData?.title === 'string' ? nodeData.title.trim() : '';
+    const rawSubtype = typeof nodeData?.subtype === 'string' ? nodeData.subtype : undefined;
+    const displayTitle = nodeTitle || (rawText ? rawText.slice(0, 30) : '');
+    const circuitDesign = nodeData?.circuitDesign as CircuitDesign | undefined;
+    const isCircuitCanvas = nodeType === 'circuit-canvas' || rawSubtype === 'circuit-canvas';
+    const isCircuitAnalyze = nodeType === 'circuit-analyze' || rawSubtype === 'circuit-analyze';
+    const isCircuitDetail = nodeType === 'circuit-detail' || rawSubtype === 'circuit-detail';
+
+    const isPdfPoint = nodeType === 'PDF_ANALYSIS_POINT' || nodeType === 'pdf-circuit-point' ||
+      rawSubtype === 'PDF_ANALYSIS_POINT' || rawSubtype === 'pdf-circuit-point';
+    const isPdfDetail = nodeType === 'PDF_ANALYSIS_DETAIL' || nodeType === 'pdf-circuit-detail' ||
+      rawSubtype === 'PDF_ANALYSIS_DETAIL' || rawSubtype === 'pdf-circuit-detail';
+
+    if (isCircuitCanvas && circuitDesign) {
+      const elementCount = circuitDesign.elements?.length ?? 0;
+      const connectionCount = circuitDesign.connections?.length ?? 0;
+      const metaTitle = circuitDesign.metadata?.title || displayTitle || '当前电路图';
+      return `请基于以下电路设计回答追问：\n电路名称：${metaTitle}\n元件/连线：${elementCount} / ${connectionCount}\n问题：${basePrompt}`;
+    }
+
+    if ((isCircuitAnalyze || isCircuitDetail) && rawText) {
+      const warmupSummary = extractCircuitWarmupIntro(rawText).slice(0, 260);
+      return [
+        '请围绕当前电路分析结果继续深入回答，不要重复已有预热导语。',
+        `当前追问：${basePrompt}`,
+        warmupSummary ? `已知分析摘要：${warmupSummary}` : '',
+      ].filter(Boolean).join('\n');
+    }
+
+    if ((isPdfPoint || isPdfDetail) && rawText) {
+      return `请基于以下PDF分析分点继续回答用户问题：\n分点标题：${displayTitle || '未命名分点'}\n分点内容：${rawText}\n\n用户追问：${basePrompt}`;
+    }
+
+    return basePrompt;
+  }, [selectedNode]);
+  
   // 处理输入变化
   const handlePromptChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newText = e.target.value;
@@ -156,11 +178,11 @@ export function FlowInputPanel({
       
       // 创建临时查询节点
       if (canInput) {
-        addTempQueryNodeTask({type: 'create', text: newText, mode: selectedType});
+        addTempQueryNodeTask({type: 'create', text: newText, mode: determineTaskType()});
       }
     } else if (newText.length > 0) {
       // 更新临时节点文本
-      addTempQueryNodeTask({type: 'update', text: newText});
+      addTempQueryNodeTask({type: 'update', text: newText, mode: determineTaskType()});
     } else if (newText.length === 0) {
       // 如果清空了输入，删除临时节点并重置输入框状态
       addTempQueryNodeTask({type: 'delete'});
@@ -185,49 +207,29 @@ export function FlowInputPanel({
     }
   }, [prompt]);
 
-  const handleSubmit = useCallback(() => {
-    if (isProcessing) return;
-    
-    if (!canInput) {
-      toast.error(`当前无法追问，${canNotInputReason as string}`);
-      return;
-    }
-    
-    // 如果是电路分析模式，打开电路分析模态框
-    if (selectedType === 'circuit-analyze') {
-      setIsCircuitModalOpen(true);
-      return;
-    }
-    
-    if (prompt.trim() === "") {
-      toast.error("请输入问题");
-      return;
-    }
-    if (!parentIdOfTempQueryNode) {
-      toast.error("无法确定追问的节点");
-      return;
-    }
-
+  const submitWithParentId = useCallback((parentId: string) => {
     setIsProcessing(true);
     
-    // 构建最终提交的问题文本，如果有引用则包含引用内容
+    // 构建最终提交的问题文本，如果有引用则包含引用内容，并叠加节点上下文
     let finalPrompt = prompt;
     if (quoteText) {
       finalPrompt = `对于之前内容中的：\n\n>${quoteText.replace(/\n/g, ' ')}\n\n我的问题是：${prompt}`;
     }
+    finalPrompt = buildPromptWithNodeContext(finalPrompt);
+    
+    const taskType: AiTaskType = determineTaskType();
+    
     // 最终选择的模型
-    let finalModel = null;
-    if (selectedType === 'general' || selectedType === 'knowledge') {
-      finalModel = selectedModel;
-    }
+    const finalModel = selectedModel; // 所有模式都使用选择的模型
 
     const createAiTaskDTO = {
-      type: selectedType,
+      type: taskType,
       prompt: finalPrompt,
-      promptParams: null,
+      promptParams: {},
       convId: convId,
-      parentId: parseInt(parentIdOfTempQueryNode),
-      model: finalModel // 使用选择的模型
+      parentId: parseInt(parentId, 10),
+      model: finalModel, // 使用选择的模型
+      classId: classId // 传递班级ID
     } as CreateAiTaskDTO;
     
     createAiTask(createAiTaskDTO).then((response) => {
@@ -251,19 +253,52 @@ export function FlowInputPanel({
       
       // 发送聊天请求
       setTimeout(() => {
-        if (convId) {
+        if (convId != null) {
           handleNewChat(convId);
-          chat(response.taskId);
-        } else {
-          toast.error('会话ID不存在');
         }
+        chat(response.taskId);
       }, 300);
     }).catch((error) => {
       toast.error(`请求失败, ${error.message}`);
     }).finally(() => {
       setIsProcessing(false);
     });
-  }, [canInput, prompt, parentIdOfTempQueryNode, selectedType, selectedModel, convId, canNotInputReason, quoteText, setQuoteText, setPrompt, handleNewChat, chat, isProcessing, isCircuitModalOpen]);
+  }, [
+    prompt, quoteText, selectedModel, convId, classId, buildPromptWithNodeContext,
+    determineTaskType, handleAiTaskCountPlus, setQuoteText, setPrompt, setIsExpanded,
+    setIsAnimating, handleNewChat, chat
+  ]);
+
+  const handleSubmit = useCallback(() => {
+    if (isProcessing) return;
+    
+    if (!canInput) {
+      toast.error(`当前无法追问，${canNotInputReason as string}`);
+      return;
+    }
+    if (prompt.trim() === "") {
+      toast.error("请输入问题");
+      return;
+    }
+    if (!parentIdOfTempQueryNode) {
+      // 新建会话后parentId可能稍后才可用，自动挂起后在可用时发送
+      setPendingSubmit(true);
+      addTempQueryNodeTask({type: 'create', text: prompt, mode: determineTaskType()});
+      return;
+    }
+    submitWithParentId(parentIdOfTempQueryNode);
+  }, [isProcessing, canInput, canNotInputReason, prompt, parentIdOfTempQueryNode, addTempQueryNodeTask, determineTaskType, submitWithParentId]);
+
+  useEffect(() => {
+    if (!pendingSubmit || isProcessing) return;
+    if (!canInput || prompt.trim() === '') {
+      setPendingSubmit(false);
+      return;
+    }
+    if (!parentIdOfTempQueryNode) return;
+    setPendingSubmit(false);
+    submitWithParentId(parentIdOfTempQueryNode);
+  }, [pendingSubmit, isProcessing, canInput, prompt, parentIdOfTempQueryNode, submitWithParentId]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -272,139 +307,126 @@ export function FlowInputPanel({
     }
   };
 
-  // 处理模式选择
-  const handleModeSelect = (option: DropdownOption) => {
-    setSelectedType(option.type as AiTaskType);
-  };
-
   // 处理模型选择
   const handleModelSelect = (option: DropdownOption) => {
     setSelectedModel(option.type as ModelType);
   };
-  
-  // 处理电路分析提交
-  const handleCircuitSubmit = useCallback((circuitId: string, circuitPrompt: string) => {
-    if (!canInput) {
-      toast.error(`当前无法追问，${canNotInputReason as string}`);
-      return;
-    }
-    if (!parentIdOfTempQueryNode) {
-      toast.error("无法确定追问的节点");
-      return;
-    }
 
-    setIsProcessing(true);
-    
-    const createAiTaskDTO = {
-      type: 'circuit-analyze',
-      prompt: circuitPrompt,
-      promptParams: {
-        circuit_id: circuitId
-      },
-      convId: convId,
-      parentId: parseInt(parentIdOfTempQueryNode),
-      model: null
-    } as CreateAiTaskDTO;
-    
-    createAiTask(createAiTaskDTO).then((response) => {
-      toast.success("电路分析请求已发送");
-      handleAiTaskCountPlus();
-      
-      // 发送聊天请求
-      setTimeout(() => {
-        if (convId) {
-          handleNewChat(convId);
-          chat(response.taskId);
-        } else {
-          toast.error('会话ID不存在');
-        }
-      }, 300);
-    }).catch((error) => {
-      toast.error(`请求失败, ${error.message}`);
-    }).finally(() => {
-      setIsProcessing(false);
-    });
-  }, [canInput, parentIdOfTempQueryNode, convId, canNotInputReason, handleNewChat, chat, handleAiTaskCountPlus]);
+  // 处理引用文本显示，超过15个字符显示省略号
+  const displayQuoteText = useCallback((text: string) => {
+    if (!text) return '';
+    return text.length <= 15 ? text : text.substring(0, 15) + '...';
+  }, []);
 
-  // 确定提交按钮文本
-  const getSubmitButtonText = () => {
-    if (isProcessing) return "处理中...";
-    if (selectedType === 'circuit-analyze') return "打开电路绘图工具";
-    return "发送";
-  };
+  // 清除引用文本
+  const clearQuoteText = useCallback(() => {
+    setQuoteText(null);
+  }, [setQuoteText]);
+
+  useImperativeHandle(ref, () => ({
+    applySuggestion: (text: string) => {
+      const trimmed = text.trim();
+      if (!trimmed) return;
+      const hadText = prompt.trim().length > 0;
+      setPrompt(trimmed);
+      setIsExpanded(true);
+      requestAnimationFrame(() => {
+        textareaRef.current?.focus();
+      });
+      if (!canInput) {
+        return;
+      }
+      const taskType = determineTaskType();
+      if (hadText) {
+        addTempQueryNodeTask({type: 'update', text: trimmed, mode: taskType});
+      } else {
+        addTempQueryNodeTask({type: 'create', text: trimmed, mode: taskType});
+      }
+    }
+  }), [addTempQueryNodeTask, canInput, determineTaskType, prompt, setPrompt]);
 
   return (
-    <>
-      <div ref={containerRef} className={`flow-input-panel ${isAnimating ? 'animating' : ''} ${isExpanded ? 'expanded' : ''}`}>
-        <div ref={inputContainerRef} className="px-4 py-3 relative bg-white/80 backdrop-blur-xl min-h-[60px] shadow-md rounded-2xl border border-neutral-300/60 overflow-visible">
-          <div className="flex items-start gap-3">
-            {/* 模式选择器下拉菜单 */}
-            <div className="mode-selector-wrapper">
-              <SelectDropdown 
-                options={chatModes}
-                selectedOption={chatModes.find(mode => mode.type === selectedType) || chatModes[0]}
-                onSelect={handleModeSelect}
-              />
-            </div>
+    <div ref={containerRef} className="input-panel-container"
+      style={quoteText ? {
+        transform: "translateY(15%) translateX(-50%)"
+      } : {}}
+    >
+      {/* 选择器按钮区域 */}
+      <div className={`selectors-container flex flex-row justify-center gap-2`}>
+        {/* 移除知识问答模式开关 */}
+        
+        {/* 模型选择器 */}
+        <SelectDropdown
+          options={modelOptions}
+          selectedType={selectedModel}
+          onSelect={handleModelSelect}
+          buttonLabel={modelOptions.find(model => model.type === selectedModel)?.name || '默认模型'}
+          dropdownTitle="选择使用模型"
+        />
+      </div>
 
-            {/* 输入框 */}
-            <div className="flex-1 min-w-0">
-              <textarea
-                ref={textareaRef}
-                className="w-full bg-transparent outline-none resize-none overflow-hidden text-sm text-neutral-700 placeholder:text-neutral-400"
-                placeholder={selectedType === 'circuit-analyze' ? "点击右侧按钮打开电路绘图工具" : "有问题尽管问我..."}
-                value={prompt}
-                onChange={handlePromptChange}
-                onKeyDown={handleKeyDown}
-                rows={1}
-                disabled={isProcessing || selectedType === 'circuit-analyze'}
-              />
-
-              {quoteText && (
-                <div className="quote-indicator mt-1 flex items-center gap-1">
-                  <div className="flex-1 text-xs text-neutral-500 truncate max-w-[300px]">
-                    引用：{quoteText}
-                  </div>
-                  <button 
-                    className="text-neutral-400 hover:text-neutral-600"
-                    onClick={() => setQuoteText(null)}
-                  >
-                    <XMarkIcon className="w-3 h-3" />
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* 模型选择器 - 仅对于general和knowledge模式显示 */}
-            {(selectedType === 'general' || selectedType === 'knowledge') && (
-              <div className="flex-none model-selector">
-                <SelectDropdown 
-                  options={modelOptions}
-                  selectedOption={modelOptions.find(model => model.type === selectedModel) || modelOptions[0]}
-                  onSelect={handleModelSelect}
-                  smaller
-                />
+      {/* 输入框 */}
+      <div className="relative flex flex-col items-center justify-center">
+        {/* 引用文本区域 */}
+        {quoteText && (
+          <div className={`quote-container ${
+              isExpanded 
+                ? isAnimating ? 'animate-expand-width expanded' : 'expanded' 
+                : isAnimating ? 'animate-shrink-width collapsed' : 'collapsed'
+              }`}
+          >
+            <div className="quote-bar"></div>
+            <div className="quote-text-wrapper">
+              <div className="quote-text text-ellipsis">
+                引用：{displayQuoteText(quoteText)}
               </div>
-            )}
-
-            {/* 发送按钮 */}
-            <button
-              className={`send-button ${isProcessing ? 'processing' : ''} ${prompt.trim() === '' && selectedType !== 'circuit-analyze' ? 'disabled' : ''}`}
-              onClick={handleSubmit}
-              disabled={isProcessing || (prompt.trim() === '' && selectedType !== 'circuit-analyze')}
-            >
-              {getSubmitButtonText()}
-            </button>
+              <button 
+                onClick={clearQuoteText}
+                className="quote-close"
+                title="清除引用"
+              >
+                <XMarkIcon className="w-5 h-5" />
+              </button>
+            </div>
           </div>
+        )}
+        
+        <div 
+          ref={inputContainerRef}
+          className={`input-container ${
+            isExpanded 
+              ? isAnimating ? 'animate-expand-width expanded' : 'expanded' 
+              : isAnimating ? 'animate-shrink-width collapsed' : 'collapsed'
+          } shadow-[0_0_0_1px_rgba(0,0,0,0.1)]`}
+        >
+          <textarea 
+            id="question-input"
+            ref={textareaRef}
+            value={prompt}
+            onChange={handlePromptChange}
+            onKeyDown={handleKeyDown}
+            className="input-textarea"
+            enterKeyHint="send"
+            placeholder={canInput ? "开启新的话题" : canNotInputReason as string}
+            style={{ height: '20px' }}
+            disabled={!canInput}
+          />
+          <button 
+            onClick={handleSubmit}
+            className={`input-send-button ${!canInput ? 'disabled' : ''}`}
+            disabled={!canInput || isProcessing}
+          >
+            {isProcessing ? (
+              <div className="animate-spin h-4 w-4 border-2 border-neutral-500 rounded-full border-t-transparent"></div>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="input-send-icon">
+                <path d="M22 2 11 13"></path>
+                <path d="m22 2-7 20-4-9-9-4 20-7z"></path>
+              </svg>
+            )}
+          </button>
         </div>
       </div>
-      
-      {/* 电路分析模态框 */}
-      <CircuitAnalysisModal 
-        isOpen={isCircuitModalOpen} 
-        onClose={() => setIsCircuitModalOpen(false)}
-        onSubmit={handleCircuitSubmit}
-      />
-    </>
+    </div>
   );
-} 
+});

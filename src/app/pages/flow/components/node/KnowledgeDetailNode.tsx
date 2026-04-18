@@ -14,4 +14,4 @@ const KnowledgeDetailNode = function KnowledgeDetailNode({
   );
 };
 
-export default KnowledgeDetailNode; 
+export default KnowledgeDetailNode;

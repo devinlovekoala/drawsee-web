@@ -1,6 +1,4 @@
-import { NodeData as FlowNodeData } from "@/app/pages/flow/components/node/types/node.types";
-
-export type NodeType = "root" | "query" | "answer" | "knowledge-head" | "knowledge-detail" | "resource";
+export type NodeType = "root" | "query" | "answer" | "answer-point" | "answer-detail" | "ANSWER_POINT" | "ANSWER_DETAIL" | "knowledge-head" | "knowledge-detail" | "resource" | "circuit-canvas" | "circuit-analyze" | "circuit-detail" | "PDF_DOCUMENT" | "PDF_ANALYSIS_POINT" | "PDF_ANALYSIS_DETAIL" | "pdf-circuit-point" | "pdf-circuit-detail";
 
 export interface ConversationVO {
   id: number;
@@ -8,6 +6,34 @@ export interface ConversationVO {
   userId: number;
   createdAt: number;
   updatedAt: number;
+}
+
+export interface ConversationShareVO {
+  id: number;
+  convId: number;
+  userId: number;
+  classId: number | null;
+  shareToken: string;
+  sharePath: string;
+  allowContinue: boolean;
+  viewCount: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface ShareConversationVO {
+  conversation: ConversationVO;
+  nodes: NodeVO[];
+  share: ConversationShareVO;
+}
+
+export interface ConversationForkVO {
+  conversation: ConversationVO;
+}
+
+export interface CreateConversationShareDTO {
+  classId?: string | null;
+  allowContinue?: boolean;
 }
 
 interface BaseNodeData {
@@ -27,9 +53,18 @@ interface QueryNodeData extends BaseNodeData {
   mode: AiTaskType;
 }
 
+export interface FollowUpSuggestionData {
+  title?: string;
+  hint?: string;
+  followUp?: string;
+  intent?: string;
+  confidence?: number;
+}
+
 interface AnswerNodeData extends BaseNodeData {
   subtype?: string;
   isDone?: boolean;
+  followUps?: FollowUpSuggestionData[];
 };
 
 type KnowledgeHeadNodeData = BaseNodeData;
@@ -38,7 +73,21 @@ type KnowledgeDetailNodeData = BaseNodeData;
 
 type AnimationNodeData = BaseNodeData;
 
-export type ResourceSubType = "bilibili" | "animation" | "generated-animation" | "word" | "pdf";
+// 新版电路节点数据类型
+interface CircuitCanvasNodeData extends BaseNodeData {
+  subtype: 'circuit-canvas';
+  circuitDesign?: any; // 电路设计数据
+  mode?: string;
+}
+
+interface CircuitAnalyzeNodeData extends BaseNodeData {
+  subtype: 'circuit-analyze';
+  contextTitle?: string;
+  followUp?: string;
+  followUps?: FollowUpSuggestionData[];
+}
+
+export type ResourceSubType = "bilibili" | "animation" | "generated-animation";
 
 interface BilibiliResourceNodeData extends BaseNodeData {
   subtype: "bilibili";
@@ -60,33 +109,43 @@ interface GeneratedAnimationResourceNodeData extends BaseNodeData {
   [key: string]: unknown;
 }
 
-interface WordDocResourceNodeData extends BaseNodeData {
-  subtype: "word";
-  urls: string[];
-  [key: string]: unknown;
+export type ResourceNodeData = BilibiliResourceNodeData | AnimationResourceNodeData | GeneratedAnimationResourceNodeData;
+
+// PDF相关节点数据类型
+interface PdfDocumentNodeData extends BaseNodeData {
+  fileUrl: string;
+  fileType: string;
 }
 
-interface PdfDocResourceNodeData extends BaseNodeData {
-  subtype: "pdf";
-  urls: string[];
-  [key: string]: unknown;
+interface PdfAnalysisPointNodeData extends BaseNodeData {
+  subtype: 'pdf-analysis-point';
 }
 
-export type ResourceNodeData = 
-  | BilibiliResourceNodeData 
-  | AnimationResourceNodeData 
-  | GeneratedAnimationResourceNodeData
-  | WordDocResourceNodeData
-  | PdfDocResourceNodeData;
+interface PdfAnalysisDetailNodeData extends BaseNodeData {
+  subtype: 'pdf-analysis-detail';
+  angle?: string; // 分析角度
+}
 
 export type NodeData = {
   root: RootNodeData;
   query: QueryNodeData;
   answer: AnswerNodeData;
+  'answer-point': AnswerNodeData;
+  'answer-detail': AnswerNodeData;
+  'ANSWER_POINT': AnswerNodeData;
+  'ANSWER_DETAIL': AnswerNodeData;
   'knowledge-head': KnowledgeHeadNodeData;
   'knowledge-detail': KnowledgeDetailNodeData;
   'animation': AnimationNodeData;
   'resource': ResourceNodeData;
+  'circuit-canvas': CircuitCanvasNodeData;
+  'circuit-analyze': CircuitAnalyzeNodeData;
+  'circuit-detail': AnswerNodeData;
+  'PDF_DOCUMENT': PdfDocumentNodeData;
+  'PDF_ANALYSIS_POINT': PdfAnalysisPointNodeData;
+  'PDF_ANALYSIS_DETAIL': PdfAnalysisDetailNodeData;
+  'pdf-circuit-point': PdfAnalysisPointNodeData;
+  'pdf-circuit-detail': PdfAnalysisDetailNodeData;
 }
 
 export interface NodeVO {
@@ -114,16 +173,21 @@ export interface XYPosition {
 }
 
 export type AiTaskType = 
-  | 'general'      // 常规问答模式
-  | 'knowledge'    // 知识问答模式
-  | 'knowledge-detail' // 知识详情
-  | 'animation'    // 动画模式
-  | 'solver-first'     // 开始解题模式
-  | 'solver-continue'      // 继续解题模式
-  | 'solver-summary'      // 总结解题模式
-  | 'planner' // 目标解析模式
-  | 'html-maker' // 网页生成模式
-  | 'circuit-analyze' // 电路分析模式
+  | "GENERAL" 
+  | "GENERAL_CONTINUE" 
+  | "GENERAL_DETAIL" 
+  | "KNOWLEDGE" 
+  | "KNOWLEDGE_DETAIL" 
+  | "ANIMATION" 
+  | "ANIMATION_DETAIL"
+  | "SOLVER_FIRST" 
+  | "SOLVER_CONTINUE" 
+  | "SOLVER_SUMMARY" 
+  | "CIRCUIT_ANALYSIS"
+  | "CIRCUIT_DETAIL"
+  | "PDF_CIRCUIT_ANALYSIS"        // 第一阶段：PDF电路实验文档分析生成分析点
+  | "PDF_CIRCUIT_ANALYSIS_DETAIL" // 第二阶段：展开PDF电路实验分析点的详情
+  | "PDF_CIRCUIT_DESIGN";         // 保留：通过电路实验pdf任务文档获取电路分析图AI任务
 
 export interface CreateAiTaskVO {
   taskId: number;
@@ -147,4 +211,5 @@ export interface CreateAiTaskDTO {
   convId: number | null;
   parentId: number | null;
   model: string | null;
+  classId: string | null;
 }

@@ -1,52 +1,33 @@
-import { createContext, useContext, type PropsWithChildren, useState, useMemo } from "react";
+import { createContext, useContext } from "react";
 import { ChatTask } from "../pages/flow/types/ChatTask.types";
 
 export interface FlowLocationState {
-  convId: number | null;
-  taskId?: number | null;
+  convId: number;
+  taskId?: number;
   from?: string;
+  classId?: string | null;
 }
 
-export interface FlowContextValue {
-  isChatting: boolean;
-  convId: number | null;
+export interface FlowContextType {
   chat: (taskId: number) => void;
-  addChatTask: (
-    convId: number, 
-    parentId: number | null, 
-    type: 'knowledge', 
-    question?: string, 
-    callback?: (taskId: number) => void
-  ) => Promise<void>;
+  convId: number | null;
+  isChatting: boolean;
+  addChatTask: (task: ChatTask) => void;
+  applySuggestion?: (text: string) => void;
 }
 
-export const FlowContext = createContext<FlowContextValue>({
-  isChatting: false,
-  convId: null,
+export const FlowContext = createContext<FlowContextType>({
   chat: () => {},
-  addChatTask: async () => {}
+  convId: null,
+  isChatting: false,
+  addChatTask: () => {},
+  applySuggestion: () => {},
 });
 
-export const useFlowContext = () => useContext(FlowContext);
-
-export interface FlowProviderProps extends PropsWithChildren {
-}
-
-export function FlowProvider({children}: FlowProviderProps) {
-  const [isChatting, setIsChatting] = useState(false);
-  
-  const contextValue = useMemo<FlowContextValue>(() => {
-    return {
-      isChatting,
-      convId: null,
-      chat: () => {},
-      addChatTask: async () => {}
-    };
-  }, [isChatting]);
-  
-  return (
-    <FlowContext.Provider value={contextValue}>
-      {children}
-    </FlowContext.Provider>
-  );
-} 
+export const useFlowContext = () => {
+  const context = useContext(FlowContext);
+  if (!context) {
+    throw new Error("useFlowContext must be used within a FlowContextProvider");
+  }
+  return context;
+}; 

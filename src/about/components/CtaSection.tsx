@@ -1,148 +1,23 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
-
-// 假设的登录状态检查和身份验证服务
-const checkLoginStatus = (): boolean => {
-  // 这里应该是实际的登录状态检查逻辑
-  // 例如：从localStorage或cookie中获取token，或者调用API验证登录状态
-  const token = localStorage.getItem('auth_token');
-  return !!token;
-};
-
-// 登录表单组件
-const LoginForm: React.FC<{ onSuccess: () => void, onCancel: () => void }> = ({ onSuccess, onCancel }) => {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-
-    try {
-      // 这里应该是实际的登录API调用
-      // 示例：模拟API调用
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
-      // 假设登录成功，存储token
-      localStorage.setItem('auth_token', 'example_token');
-      
-      // 通知父组件登录成功
-      onSuccess();
-    } catch (err) {
-      setError('登录失败，请检查用户名和密码');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 relative modal-enter">
-        <button 
-          onClick={onCancel}
-          className="absolute top-4 right-4 text-gray-500 hover:text-gray-700"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-        
-        <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center">登录 DrawSee</h2>
-        
-        {error && (
-          <div className="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm">
-            {error}
-          </div>
-        )}
-        
-        <form onSubmit={handleSubmit}>
-          <div className="mb-4">
-            <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-1">
-              用户名
-            </label>
-            <input
-              id="username"
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="请输入用户名"
-              required
-            />
-          </div>
-          
-          <div className="mb-6">
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-              密码
-            </label>
-            <input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="请输入密码"
-              required
-            />
-          </div>
-          
-          <button
-            type="submit"
-            disabled={loading}
-            className={`w-full py-3 rounded-lg font-medium text-white ${
-              loading ? 'bg-blue-400' : 'bg-blue-600 hover:bg-blue-700'
-            } transition-colors duration-200`}
-          >
-            {loading ? '登录中...' : '登录'}
-          </button>
-        </form>
-        
-        <div className="mt-4 text-center">
-          <button className="text-sm text-blue-600 hover:text-blue-800">
-            忘记密码?
-          </button>
-        </div>
-        
-        <div className="mt-6 text-center">
-          <p className="text-gray-600 text-sm">
-            还没有账号?{' '}
-            <button className="text-blue-600 hover:text-blue-800 font-medium">
-              立即注册
-            </button>
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-};
+import { LOGIN_FLAG_KEY } from '@/common/constant/storage-key.constant.ts';
 
 const CtaSection: React.FC = () => {
   const navigate = useNavigate();
-  const [showLoginForm, setShowLoginForm] = useState(false);
   
   const handleGetStarted = () => {
-    // 检查用户是否已登录
-    if (checkLoginStatus()) {
-      // 已登录，直接导航到课程页面
-      navigate('/courses', { state: { from: 'about' } });
+    // 检查用户是否已登出
+    const hasLoggedOut = localStorage.getItem('Auth:LoggedOut') === 'true';
+    const isLoggedIn = sessionStorage.getItem(LOGIN_FLAG_KEY) === 'true';
+    
+    // 如果已登出或未登录，则不跳转到应用页面，而是进入登录拦截模式
+    if (hasLoggedOut || !isLoggedIn) {
+      // 将状态设置为需要登录，App组件会检测并显示登录表单
+      navigate('/blank', { state: { requireLogin: true, loginRequestId: Date.now() } });
     } else {
-      // 未登录，显示登录表单
-      setShowLoginForm(true);
+      // 已登录用户直接跳转
+      navigate('/blank', { state: { from: '/about' } });
     }
-  };
-  
-  const handleLoginSuccess = () => {
-    // 登录成功后隐藏表单并导航
-    setShowLoginForm(false);
-    navigate('/courses', { state: { from: 'about' } });
-  };
-  
-  const handleCancelLogin = () => {
-    // 用户取消登录
-    setShowLoginForm(false);
   };
 
   return (
@@ -210,11 +85,12 @@ const CtaSection: React.FC = () => {
             {/* 内容区域 */}
             <div className="relative z-10 text-center">
               <h2 className="text-3xl md:text-5xl font-bold text-white mb-6 leading-tight">
-                重新定义你的AI对话体验
+                让班级答疑、实验任务与实时仿真真正连起来
               </h2>
               
               <p className="text-lg md:text-xl text-blue-100 mb-10 max-w-2xl mx-auto">
-                加入DrawSee，体验非线性思维的魅力，让AI交流变得更加高效、直观和富有创造力
+                从教师配置知识库到学生日常提问，再到电路实验任务解析、实时仿真与推理复盘，
+                DrawSee 用一套智能交互方案贯穿完整学习链路
               </p>
               
               <div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-6">
@@ -223,7 +99,7 @@ const CtaSection: React.FC = () => {
                   className="px-8 py-4 rounded-full bg-white text-blue-600 font-medium text-lg shadow-lg shadow-blue-600/20 hover:shadow-blue-500/30 transform hover:-translate-y-1 transition-all duration-300 group"
                 >
                   <span className="flex items-center">
-                    <span>立即体验</span>
+                      <span>进入平台开始体验</span>
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 ml-2 transition-transform duration-300 group-hover:translate-x-1" viewBox="0 0 20 20" fill="currentColor">
                       <path fillRule="evenodd" d="M10.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L12.586 11H5a1 1 0 110-2h7.586l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" />
                     </svg>
@@ -271,8 +147,8 @@ const CtaSection: React.FC = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
               </div>
-              <h3 className="text-xl font-bold text-gray-800 mb-2">快速上手</h3>
-              <p className="text-gray-600">无需复杂设置，简单注册即可开始使用，享受全新AI对话体验</p>
+              <h3 className="text-xl font-bold text-gray-800 mb-2">教学语境秒接入</h3>
+              <p className="text-gray-600">教师配置班级知识库后，学生提问可直接继承课程语境，减少重复解释成本</p>
             </div>
             
             <div className="text-center group">
@@ -281,8 +157,8 @@ const CtaSection: React.FC = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                 </svg>
               </div>
-              <h3 className="text-xl font-bold text-gray-800 mb-2">安全可靠</h3>
-              <p className="text-gray-600">所有对话内容加密存储，保护您的隐私和知识产权</p>
+              <h3 className="text-xl font-bold text-gray-800 mb-2">任务链路可追踪</h3>
+              <p className="text-gray-600">系统按任务类型自动编排并流式返回结果，让每一步分析过程都可追问、可复盘</p>
             </div>
             
             <div className="text-center group">
@@ -291,20 +167,12 @@ const CtaSection: React.FC = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
                 </svg>
               </div>
-              <h3 className="text-xl font-bold text-gray-800 mb-2">专业支持</h3>
-              <p className="text-gray-600">强大的技术团队提供持续更新和专业支持服务</p>
+              <h3 className="text-xl font-bold text-gray-800 mb-2">电路实践闭环</h3>
+              <p className="text-gray-600">覆盖实验任务解析、推理解题、分析点展开与课堂复盘，服务真实电路工程学习场景</p>
             </div>
           </div>
         </div>
       </div>
-      
-      {/* 登录表单模态框 */}
-      {showLoginForm && (
-        <LoginForm 
-          onSuccess={handleLoginSuccess} 
-          onCancel={handleCancelLogin} 
-        />
-      )}
     </section>
   );
 };

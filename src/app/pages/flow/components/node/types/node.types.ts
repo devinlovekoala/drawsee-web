@@ -4,6 +4,7 @@ import { NodeType, ResourceNodeData } from '@/api/types/flow.types';
 export interface BaseNodeData {
   title?: string;
   text?: string;
+  previewText?: string;
   parentId: number | null;
   convId: number;
   userId: number;
@@ -22,12 +23,26 @@ export interface QueryNodeData extends BaseNodeData {
   [key: string]: unknown;
 }
 
-type AnswerSubType = 'solver-first' | 'solver-continue' | 'solver-summary' | 'html-maker' | 'planner-first' | 'planner-split';
+type AnswerSubType = 
+  | 'solver-first' 
+  | 'solver-continue' 
+  | 'solver-summary' 
+  | 'html-maker' 
+  | 'planner-first' 
+  | 'planner-split' 
+  | 'animation' 
+  | 'ANSWER_POINT' 
+  | 'ANSWER_DETAIL'
+  | 'circuit-canvas'
+  | 'circuit-analyze'
+  | 'circuit-detail';
 
 export interface AnswerNodeData extends BaseNodeData {
   subtype?: AnswerSubType;
   isDone?: boolean;
   isGenerated?: boolean;
+  angle?: string;
+  progress?: string;
   [key: string]: unknown;
 }
 
@@ -44,19 +59,32 @@ export interface KnowledgeDetailNodeData extends BaseNodeData {
   [key: string]: unknown;
 }
 
-export type NodeData<T extends string> = 
+export type NodeData<T extends string> =
   T extends 'root' ? RootNodeData :
   T extends 'query' ? QueryNodeData :
   T extends 'answer' ? AnswerNodeData :
+  T extends 'answer-point' ? AnswerNodeData :
+  T extends 'answer-detail' ? AnswerNodeData :
   T extends 'knowledge-head' ? KnowledgeHeadNodeData :
   T extends 'knowledge-detail' ? KnowledgeDetailNodeData :
   T extends 'resource' ? ResourceNodeData :
+  T extends 'circuit-canvas' ? AnswerNodeData :
+  T extends 'circuit-analyze' ? AnswerNodeData :
+  T extends 'circuit-detail' ? AnswerNodeData :
+  T extends 'PDF_DOCUMENT' ? BaseNodeData :
+  T extends 'PDF_ANALYSIS_POINT' ? BaseNodeData :
+  T extends 'pdf-circuit-point' ? BaseNodeData :
+  T extends 'pdf-circuit-detail' ? BaseNodeData :
   BaseNodeData;
 
 export type FlowNode<T extends NodeType> = Node<NodeData<T>>;
 export type RootNode = FlowNode<'root'>;
 export type QueryNode = FlowNode<'query'>;
 export type AnswerNode = FlowNode<'answer'>;
+export type AnswerPointNode = FlowNode<'answer-point'>;
+export type AnswerDetailNode = FlowNode<'answer-detail'>;
 export type KnowledgeHeadNode = FlowNode<'knowledge-head'>;
 export type KnowledgeDetailNode = FlowNode<'knowledge-detail'>;
 export type ResourceNode = FlowNode<'resource'>;
+export type PdfDocumentNode = FlowNode<'PDF_DOCUMENT'>;
+export type PdfAnalysisPointNode = FlowNode<'PDF_ANALYSIS_POINT'>;

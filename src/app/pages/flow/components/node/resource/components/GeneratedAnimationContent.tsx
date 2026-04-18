@@ -13,18 +13,34 @@ function GeneratedAnimationContent({objectName, progress, frame}: GeneratedAnima
   const [isLoading, setIsLoading] = useState(false);
   const [videoError, setVideoError] = useState(false);
   const [displayMode, setDisplayMode] = useState<'native' | 'iframe'>('iframe');
+  const [retryCount, setRetryCount] = useState(0); // 添加重试计数器
+  const [lastError, setLastError] = useState<string | null>(null); // 添加错误信息存储
   
   // refs
   const isMountedRef = useRef(true);
   const frameRef = useRef<HTMLImageElement>(null);
+  const retryTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const prevObjectNameRef = useRef<string | undefined>(objectName);
   
   // 生命周期管理
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
+      // 清除定时器
+      if (retryTimerRef.current) {
+        clearTimeout(retryTimerRef.current);
+      }
     };
   }, []);
+  
+  // 监控objectName变化
+  useEffect(() => {
+    if (objectName !== prevObjectNameRef.current) {
+      console.log(`GeneratedAnimationContent: objectName从${prevObjectNameRef.current || 'undefined'}变为${objectName || 'undefined'}`);
+      prevObjectNameRef.current = objectName;
+    }
+  }, [objectName]);
   
   // 当有objectName时，获取视频资源URL
   useEffect(() => {
@@ -35,28 +51,69 @@ function GeneratedAnimationContent({objectName, progress, frame}: GeneratedAnima
       setVideoError(false);
       
       try {
+        console.log(`获取视频资源URL: ${objectName}, 第${retryCount+1}次尝试`);
         const response = await getResourceUrl(objectName).send();
         
         if (isMountedRef.current) {
+          console.log(`成功获取视频URL: ${response.url}`);
           setVideoUrl(response.url);
           setIsLoading(false);
+          setRetryCount(0); // 重置重试计数
+          setLastError(null); // 清除错误信息
         }
       } catch (error) {
-        console.error('获取视频URL失败:', error);
+        const errorMessage = error instanceof Error ? error.message : '未知错误';
+        console.error(`获取视频URL失败:`, error);
+        setLastError(errorMessage);
+        
         if (isMountedRef.current) {
           setIsLoading(false);
           setVideoError(true);
+          
+          // 如果重试次数小于3次，自动重试
+          if (retryCount < 3) {
+            console.log(`将在3秒后进行第${retryCount+2}次重试`);
+            if (retryTimerRef.current) {
+              clearTimeout(retryTimerRef.current);
+            }
+            
+            retryTimerRef.current = setTimeout(() => {
+              if (isMountedRef.current) {
+                setRetryCount(prev => prev + 1);
+              }
+            }, 3000);
+          }
         }
       }
     };
     
     fetchVideoUrl();
-  }, [objectName]);
+  }, [objectName, retryCount]); // 添加retryCount作为依赖，以便触发重试
   
   // 处理视频错误
   const handleVideoError = useCallback((event: React.SyntheticEvent<HTMLVideoElement, Event>) => {
     console.error(`视频加载失败:`, event);
+    setLastError('视频播放器加载失败');
     setVideoError(true);
+    
+    // 如果重试次数小于3次，自动重试
+    if (retryCount < 3) {
+      if (retryTimerRef.current) {
+        clearTimeout(retryTimerRef.current);
+      }
+      
+      retryTimerRef.current = setTimeout(() => {
+        if (isMountedRef.current) {
+          setRetryCount(prev => prev + 1);
+        }
+      }, 3000);
+    }
+  }, [retryCount]);
+  
+  // 手动重试
+  const handleRetry = useCallback(() => {
+    setVideoError(false);
+    setRetryCount(prev => prev + 1);
   }, []);
   
   // 切换显示模式
@@ -112,14 +169,17 @@ function GeneratedAnimationContent({objectName, progress, frame}: GeneratedAnima
     );
   }
   
-  // 视频渲染阶段 - 当有objectName时
+  // 视频渲染阶段 - 当有objectName时 - 注意：即使progress存在也优先显示视频
   if (objectName) {
     // 加载中状态
     if (isLoading) {
       return (
-        <div className="flex items-center justify-center p-8 rounded-lg bg-gradient-to-br from-purple-50 to-pink-50 border border-purple-200">
-          <div className="animation-loading-spinner"></div>
-          <span className="text-purple-700 ml-3">加载视频中...</span>
+        <div className="flex flex-col items-center justify-center p-8 rounded-lg bg-gradient-to-br from-purple-50 to-pink-50 border border-purple-200">
+          <div className="animation-loading-spinner mb-4"></div>
+          <span className="text-purple-700">加载视频中...</span>
+          {retryCount > 0 && (
+            <span className="text-purple-500 text-sm mt-2">第 {retryCount + 1} 次尝试</span>
+          )}
         </div>
       );
     }
@@ -142,6 +202,7 @@ function GeneratedAnimationContent({objectName, progress, frame}: GeneratedAnima
                 displayMode === 'native' ? (
                   // 原生视频播放器
                   <video
+                    key={`video-${retryCount}-${objectName}`} // 添加objectName确保在objectName更新时强制重新渲染
                     src={videoUrl}
                     controls
                     width="100%"
@@ -151,6 +212,7 @@ function GeneratedAnimationContent({objectName, progress, frame}: GeneratedAnima
                     crossOrigin="anonymous"
                     preload="metadata"
                     playsInline
+                    autoPlay
                   >
                     <source src={videoUrl} type="video/mp4" />
                     您的浏览器不支持视频播放
@@ -158,6 +220,7 @@ function GeneratedAnimationContent({objectName, progress, frame}: GeneratedAnima
                 ) : (
                   // iframe嵌入
                   <iframe
+                    key={`iframe-${retryCount}-${objectName}`} // 添加objectName确保在objectName更新时强制重新渲染
                     src={videoUrl}
                     width="100%"
                     height="200"
@@ -176,6 +239,9 @@ function GeneratedAnimationContent({objectName, progress, frame}: GeneratedAnima
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                   <p className="animation-error-text">视频加载失败</p>
+                  {lastError && (
+                    <p className="animation-error-detail text-xs mt-1 mb-2">{lastError}</p>
+                  )}
                   <div className="animation-error-actions">
                     {videoUrl && (
                       <button 
@@ -187,11 +253,14 @@ function GeneratedAnimationContent({objectName, progress, frame}: GeneratedAnima
                     )}
                     <button 
                       className="animation-error-btn"
-                      onClick={() => setVideoError(false)}
+                      onClick={handleRetry}
                     >
-                      重试
+                      {retryCount >= 3 ? "再次重试" : "重试"}
                     </button>
                   </div>
+                  {retryCount > 0 && (
+                    <div className="text-xs mt-2 text-red-300">已尝试 {retryCount} 次</div>
+                  )}
                 </div>
               )}
             </div>

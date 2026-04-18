@@ -1,48 +1,112 @@
-import React from "react";
-import ReactDOM from "react-dom/client";
-import {
-  createBrowserRouter,
-  Navigate,
-  RouterProvider,
-} from "react-router-dom";
-import App from "@/app/app.tsx";
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
+import './main.css';
+import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom';
+import App from './app/app.tsx';
+import Blank from "@/app/pages/blank/blank.tsx";
 import Flow from "@/app/pages/flow/flow.tsx";
-import "./main.css";
-import "@/styles/index.css";
-import About from "@/about/about.tsx";
-import CourseSelection from "@/app/pages/course/CourseSelection.tsx";
+import Course from "@/app/pages/course/course.tsx";
+import CourseDetail from "@/app/pages/course/course-detail.tsx";
+import { ReactFlowProvider } from '@xyflow/react';
+import About from './about/about.tsx';
+import Circuit from "@/app/pages/circuit/circuit.tsx";
+import CircuitListPage from "@/app/circuit/list/page.tsx";
+import CircuitViewPage from "@/app/circuit/view/[id]/page.tsx";
+import CircuitEditPage from "@/app/circuit/edit/[id]/page.tsx";
+import CircuitCreatePage from "@/app/circuit/create/page.tsx";
+import CircuitExperimentTask from "@/app/pages/circuit-experiment/CircuitExperimentTask";
+import DocumentLibrary from "@/app/pages/circuit-experiment/DocumentLibrary";
+import DocumentUpload from "@/app/pages/circuit-experiment/DocumentUpload";
+import DocumentAnalysis from "@/app/pages/circuit-experiment/DocumentAnalysis";
+import DigitalWorkbench from "@/app/pages/digital/DigitalWorkbench";
 
 const router = createBrowserRouter([
   {
-    path: "/",
-    element: <Navigate to="/about" replace />,
-  },
-  {
-    path: "/courses",
-    element: <CourseSelection />,
-  },
-  {
-    path: "/app",
-    element: <App />,
+    path: '/',
+    element: <App />, 
     children: [
       {
-        path: "flow",
-        element: <Flow />,
+        path: '/',
+        element: <Navigate to="/circuit" replace />
       },
       {
-        path: "blank",
-        element: <div>Blank Page</div>,
+        path: '/blank',
+        element: <Blank />
       },
-    ],
+      {
+        path: '/flow',
+        element: <Flow />
+      },
+      {
+        path: '/share/:shareToken',
+        element: <Flow />
+      },
+      {
+        path: '/course',
+        element: <Course />
+      },
+      {
+        path: '/course/:id',
+        element: <CourseDetail />
+      },
+      {
+        path: '/digital',
+        element: <DigitalWorkbench />
+      },
+      {
+        path: '/circuit',
+        element: <Circuit />
+      },
+      {
+        path: '/circuit/list',
+        element: <CircuitListPage />
+      },
+      {
+        path: '/circuit/create',
+        element: <CircuitCreatePage />
+      },
+      {
+        path: '/circuit/view/:id',
+        element: <CircuitViewPage />
+      },
+      {
+        path: '/circuit/edit/:id',
+        element: <CircuitEditPage />
+      },
+      {
+        path: '/circuit/list/*',
+        element: <Navigate to="/circuit/list" replace />
+      },
+      // 新增电路实验任务分析路由
+      {
+        path: '/circuit/experiment',
+        element: <CircuitExperimentTask />
+      },
+      // 电路实验文档库路由
+      {
+        path: '/circuit-experiment/documents',
+        element: <DocumentLibrary />
+      },
+      {
+        path: '/circuit-experiment/upload',
+        element: <DocumentUpload />
+      },
+      {
+        path: '/circuit-experiment/document/:id',
+        element: <DocumentAnalysis />
+      }
+    ]
   },
   {
-    path: "/about",
-    element: <About />,
-  },
+    path: '/about',
+    element: <About />
+  }
 ]);
 
-ReactDOM.createRoot(document.getElementById("root")!).render(
-  <React.StrictMode>
-    <RouterProvider router={router} />
-  </React.StrictMode>
+createRoot(document.getElementById('root')!).render(
+	<StrictMode>
+		<ReactFlowProvider>
+			<RouterProvider router={router} />
+		</ReactFlowProvider>
+	</StrictMode>
 );

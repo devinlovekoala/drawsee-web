@@ -8,38 +8,30 @@ export interface DropdownOption {
   type: string;
 }
 
-export interface SelectDropdownProps {
+interface SelectDropdownProps {
   options: DropdownOption[];
-  selectedType?: string;
-  selectedOption?: DropdownOption;
+  selectedType: string;
   onSelect: (option: DropdownOption) => void;
-  buttonLabel?: string;
-  dropdownTitle?: string;
+  buttonLabel: string;
+  dropdownTitle: string;
   buttonClassName?: string;
   dropdownClassName?: string;
-  smaller?: boolean;
 }
 
 export function SelectDropdown({
   options,
   selectedType,
-  selectedOption: propSelectedOption,
   onSelect,
   buttonLabel,
-  dropdownTitle = "选择选项",
+  dropdownTitle,
   buttonClassName = "mode-selector-button shadow-[0_0_0_1px_rgba(0,0,0,0.1)]",
-  dropdownClassName = "mode-dropdown animate-slide-in-bottom",
-  smaller = false
+  dropdownClassName = "mode-dropdown animate-slide-in-bottom"
 }: SelectDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   
-  // 优先使用selectedOption，其次使用selectedType查找option
-  const selectedOption = propSelectedOption || (selectedType ? options.find(option => option.type === selectedType) : null) || options[0];
-  
-  // 确定按钮显示文本
-  const displayLabel = buttonLabel || selectedOption.name;
+  const selectedOption = options.find(option => option.type === selectedType) || options[0];
 
   // 全局点击事件监听，用于关闭下拉菜单
   useEffect(() => {
@@ -73,7 +65,7 @@ export function SelectDropdown({
   };
 
   return (
-    <div className={`mode-selector-wrapper ${isOpen ? 'open' : 'closed'} ${smaller ? 'scale-90' : ''}`}>
+    <div className={`mode-selector-wrapper ${isOpen ? 'open' : 'closed'}`}>
       <button 
         ref={buttonRef}
         className={buttonClassName}
@@ -82,7 +74,7 @@ export function SelectDropdown({
         <div className="mode-selector-icon-wrapper">
           {selectedOption.icon && <selectedOption.icon className="w-5 h-5" />}
         </div>
-        <span className="mode-selector-text">{displayLabel}</span>
+        <span className="mode-selector-text">{buttonLabel}</span>
         <ChevronDownIcon 
           className={`mode-selector-chevron ${isOpen ? 'open' : ''}`}
         />
@@ -104,7 +96,7 @@ export function SelectDropdown({
                 <div
                   key={option.type}
                   onClick={() => handleOptionSelect(option)}
-                  className={`mode-option ${selectedOption.type === option.type ? 'selected' : ''}`}
+                  className={`mode-option ${selectedType === option.type ? 'selected' : ''}`}
                 >
                   <div className="mode-option-icon-wrapper">
                     {option.icon && <option.icon className="mode-option-icon" />}
@@ -113,7 +105,7 @@ export function SelectDropdown({
                     <p className="mode-option-name">{option.name}</p>
                     <p className="mode-option-description">{option.description}</p>
                   </div>
-                  {selectedOption.type === option.type && (
+                  {selectedType === option.type && (
                     <div className="mode-option-check">
                       <div className="mode-option-check-wrapper">
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mode-option-check-icon">
