@@ -105,6 +105,10 @@ function arePropsEqual<T extends NodeType>(
   // 检查关键属性
   if (prevData.title !== nextData.title) return false;
   if (prevData.text !== nextData.text) return false;
+  if (prevData.qaAnswerText !== nextData.qaAnswerText) return false;
+  if (prevData.qaAnswerNodeId !== nextData.qaAnswerNodeId) return false;
+  if (prevData.circuitCanvasNodeId !== nextData.circuitCanvasNodeId) return false;
+  if (prevData.circuitDesign !== nextData.circuitDesign) return false;
   if (prevData.updatedAt !== nextData.updatedAt) return false;
   if (prevData.height !== nextData.height) return false;
   if (prevData.mode !== nextData.mode) return false;

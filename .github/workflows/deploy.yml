@@ -30,26 +30,24 @@ jobs:
         env:
           VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
 
-      - name: Upload dist to cloud server via SCP
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
-          port: ${{ secrets.DEPLOY_PORT || '22' }}
-          source: 'dist/'
-          target: ${{ secrets.DEPLOY_TARGET_DIR }}
-          strip_components: 1
+      - name: Write SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p ${{ secrets.DEPLOY_PORT || '22' }} ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Upload dist via rsync
+        run: |
+          rsync -az --delete \
+            -e "ssh -i ~/.ssh/deploy_key -p ${{ secrets.DEPLOY_PORT || '22' }} -o StrictHostKeyChecking=no" \
+            dist/ \
+            ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:${{ secrets.DEPLOY_TARGET_DIR }}/
 
       - name: Reload web server
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
-          port: ${{ secrets.DEPLOY_PORT || '22' }}
-          script: |
-            if command -v nginx &>/dev/null; then
-              sudo nginx -s reload
-            fi
-            echo "Deploy finished at $(date)"
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+            -p ${{ secrets.DEPLOY_PORT || '22' }} \
+            -o StrictHostKeyChecking=no \
+            ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
+            'command -v nginx && sudo nginx -s reload; echo "Deploy finished at $(date)"'

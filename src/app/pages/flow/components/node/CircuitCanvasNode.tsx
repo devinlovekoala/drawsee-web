@@ -58,6 +58,8 @@ function CircuitCanvasNode({ data, ...props }: ExtendedNodeProps<'circuit-canvas
             selectedModel={nodeData.mode === 'qwen' ? 'qwen' : 'deepseekV3'}
             initialCircuitDesign={circuitDesign}
             isReadOnly={true}
+            showStatusBar={false}
+            enhanceInitialLayout={true}
           />
         </div>
       );

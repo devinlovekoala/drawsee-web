@@ -602,8 +602,14 @@ const analogLabelHints: Array<{ keywords: RegExp; type: CircuitElementType }> = 
 
 const analogVoltageAnnotationPattern = /(Ube|Vbe|Uce|Vce|Ucb|Vcb|Ubc|Vbc)/i;
 const resistorBasePattern = /(Rb|R_b|Rbase|BiasR|Rbias)/i;
-const resistorCollectorPattern = /(Rc|R_c|Rcol|Rload)/i;
+const resistorCollectorPattern = /(Rc|R_c|Rcol|collector)/i;
 const resistorEmitterPattern = /(Re|R_e|Remit|Ree)/i;
+const resistorLoadPattern = /(Rl|R_l|Rload|LoadR|负载)/i;
+const capacitorInputPattern = /(Cin|C_in|Cinput|input\s*cap|输入.*电容)/i;
+const capacitorOutputPattern = /(Cout|C_out|Coutput|output\s*cap|输出.*电容|耦合输出)/i;
+const capacitorCollectorBasePattern = /(Cmu|C_mu|Cbc|C_cb|Miller|密勒)/i;
+const capacitorBaseEmitterPattern = /(Cpi|C_pi|Cbe|C_be|π|pi)/i;
+const capacitorEmitterBypassPattern = /(Ce|C_e|bypass|旁路)/i;
 const supplyUccPattern = /(UCC|VCC|VDD|VSS|VBAT|SUPPLY)/i;
 
 const labelTypeHints: Array<{ keywords: RegExp; type: CircuitElementType }> = [
@@ -1011,15 +1017,16 @@ const applyBjtBiasLayout = (elements: CircuitElement[], connections: CircuitConn
   const rotationOverrides = new Map<string, number>();
   const elementById = new Map(elements.map((element) => [element.id, element]));
 
-  const baseColumnX = 180;
-  const collectorColumnX = 440;
-  const baseSupplyY = 80;
-  const baseResistorY = 240;
-  const collectorSupplyY = 80;
-  const collectorResistorY = 210;
-  const transistorY = 360;
-  const emitterResistorY = 520;
-  const groundY = 660;
+  const inputX = 100;
+  const biasX = 280;
+  const transistorX = 520;
+  const outputX = 700;
+  const loadX = 900;
+  const railY = 80;
+  const upperY = 200;
+  const signalY = 350;
+  const lowerY = 500;
+  const groundY = 650;
 
   const baseResistor = elements.find(
     (element) =>
@@ -1036,12 +1043,52 @@ const applyBjtBiasLayout = (elements: CircuitElement[], connections: CircuitConn
       element.type === CircuitElementType.RESISTOR &&
       resistorEmitterPattern.test(getElementResolvedLabel(element))
   );
+  const loadResistor = elements.find(
+    (element) =>
+      element.type === CircuitElementType.RESISTOR &&
+      resistorLoadPattern.test(getElementResolvedLabel(element))
+  );
   const transistor = elements.find(
     (element) =>
       element.type === CircuitElementType.TRANSISTOR_NPN ||
       element.type === CircuitElementType.TRANSISTOR_PNP
   );
-  const ground = elements.find((element) => element.type === CircuitElementType.GROUND);
+  const grounds = elements.filter((element) => element.type === CircuitElementType.GROUND);
+  const inputSource = elements.find((element) => {
+    if (!powerSourceElementTypes.has(element.type as CircuitElementType)) return false;
+    const label = getElementResolvedLabel(element);
+    return /(Vin|Vsig|signal|AC|输入|信号)/i.test(label) && !supplyUccPattern.test(label);
+  });
+  const inputCapacitor = elements.find(
+    (element) =>
+      element.type === CircuitElementType.CAPACITOR &&
+      capacitorInputPattern.test(getElementResolvedLabel(element))
+  );
+  const outputCapacitor = elements.find(
+    (element) =>
+      element.type === CircuitElementType.CAPACITOR &&
+      capacitorOutputPattern.test(getElementResolvedLabel(element))
+  );
+  const collectorBaseCapacitor = elements.find(
+    (element) =>
+      element.type === CircuitElementType.CAPACITOR &&
+      capacitorCollectorBasePattern.test(getElementResolvedLabel(element))
+  );
+  const baseEmitterCapacitor = elements.find(
+    (element) =>
+      element.type === CircuitElementType.CAPACITOR &&
+      capacitorBaseEmitterPattern.test(getElementResolvedLabel(element))
+  );
+  const emitterBypassCapacitor = elements.find(
+    (element) =>
+      element.type === CircuitElementType.CAPACITOR &&
+      capacitorEmitterBypassPattern.test(getElementResolvedLabel(element))
+  );
+  const measuringElements = elements.filter((element) =>
+    element.type === CircuitElementType.OSCILLOSCOPE ||
+    element.type === CircuitElementType.VOLTMETER ||
+    element.type === CircuitElementType.AMMETER
+  );
 
   const findConnectedPowerSource = (elementId?: string, portId?: string) => {
     if (!elementId) return undefined;
@@ -1069,7 +1116,8 @@ const applyBjtBiasLayout = (elements: CircuitElement[], connections: CircuitConn
   };
 
   const fallbackSupply = elements.find((element) =>
-    powerSourceElementTypes.has(element.type as CircuitElementType)
+    powerSourceElementTypes.has(element.type as CircuitElementType) &&
+    (!inputSource || element.id !== inputSource.id)
   );
   const baseSupply = findConnectedPowerSource(baseResistor?.id, 'port1') || fallbackSupply;
   const rawCollectorSupply = findConnectedPowerSource(collectorResistor?.id, 'port1');
@@ -1078,30 +1126,117 @@ const applyBjtBiasLayout = (elements: CircuitElement[], connections: CircuitConn
       ? rawCollectorSupply
       : undefined;
 
+  const baseDividerResistors = elements.filter((element) => {
+    if (element.type !== CircuitElementType.RESISTOR) return false;
+    if (element.id === baseResistor?.id || element.id === collectorResistor?.id || element.id === emitterResistor?.id || element.id === loadResistor?.id) {
+      return false;
+    }
+    const label = getElementResolvedLabel(element);
+    return /^R[12]\b/i.test(label) || /bias|base|分压|偏置/i.test(label);
+  });
+
+  const isConnectedTo = (elementId: string, candidateId: string) =>
+    connections.some((connection) =>
+      (connection.source.elementId === elementId && connection.target.elementId === candidateId) ||
+      (connection.target.elementId === elementId && connection.source.elementId === candidateId)
+    );
+
+  const setGroundNear = (anchorId: string | undefined, position: { x: number; y: number }) => {
+    if (!anchorId) return;
+    const ground = grounds.find((candidate) => isConnectedTo(candidate.id, anchorId));
+    if (ground && !layoutMap.has(ground.id)) {
+      layoutMap.set(ground.id, position);
+    }
+  };
+
+  if (inputSource) {
+    layoutMap.set(inputSource.id, { x: inputX, y: signalY });
+    rotationOverrides.set(inputSource.id, 0);
+    setGroundNear(inputSource.id, { x: inputX, y: groundY - 120 });
+  }
+
+  if (inputCapacitor) {
+    layoutMap.set(inputCapacitor.id, { x: biasX - 70, y: signalY });
+    rotationOverrides.set(inputCapacitor.id, 0);
+  }
+
   if (baseSupply) {
-    layoutMap.set(baseSupply.id, { x: baseColumnX, y: baseSupplyY });
+    layoutMap.set(baseSupply.id, { x: biasX, y: railY });
+    rotationOverrides.set(baseSupply.id, 0);
+    setGroundNear(baseSupply.id, { x: biasX, y: groundY });
   }
   if (baseResistor) {
-    layoutMap.set(baseResistor.id, { x: baseColumnX, y: baseResistorY });
-    rotationOverrides.set(baseResistor.id, 90);
+    layoutMap.set(baseResistor.id, { x: biasX, y: signalY });
+    rotationOverrides.set(baseResistor.id, 0);
+  }
+  baseDividerResistors.forEach((element, index) => {
+    layoutMap.set(element.id, {
+      x: biasX,
+      y: index === 0 ? upperY : lowerY,
+    });
+    rotationOverrides.set(element.id, 0);
+    if (index > 1) {
+      layoutMap.set(element.id, {
+        x: biasX - 120 + (index - 2) * 120,
+        y: lowerY,
+      });
+    }
+  });
+
+  if (transistor) {
+    layoutMap.set(transistor.id, { x: transistorX, y: signalY });
+    rotationOverrides.set(transistor.id, 0);
   }
   if (collectorSupply) {
-    layoutMap.set(collectorSupply.id, { x: collectorColumnX, y: collectorSupplyY });
+    layoutMap.set(collectorSupply.id, { x: transistorX, y: railY });
+    rotationOverrides.set(collectorSupply.id, 0);
+    setGroundNear(collectorSupply.id, { x: transistorX, y: groundY });
   }
   if (collectorResistor) {
-    layoutMap.set(collectorResistor.id, { x: collectorColumnX, y: collectorResistorY });
-    rotationOverrides.set(collectorResistor.id, 90);
-  }
-  if (transistor) {
-    layoutMap.set(transistor.id, { x: collectorColumnX, y: transistorY });
+    layoutMap.set(collectorResistor.id, { x: transistorX, y: upperY });
+    rotationOverrides.set(collectorResistor.id, 0);
   }
   if (emitterResistor) {
-    layoutMap.set(emitterResistor.id, { x: collectorColumnX, y: emitterResistorY });
-    rotationOverrides.set(emitterResistor.id, 90);
+    layoutMap.set(emitterResistor.id, { x: transistorX, y: lowerY });
+    rotationOverrides.set(emitterResistor.id, 0);
+    setGroundNear(emitterResistor.id, { x: transistorX, y: groundY });
   }
-  if (ground) {
-    layoutMap.set(ground.id, { x: collectorColumnX, y: groundY });
+  if (emitterBypassCapacitor) {
+    layoutMap.set(emitterBypassCapacitor.id, { x: transistorX + 130, y: lowerY });
+    rotationOverrides.set(emitterBypassCapacitor.id, 0);
+    setGroundNear(emitterBypassCapacitor.id, { x: transistorX + 130, y: groundY });
   }
+  if (collectorBaseCapacitor) {
+    layoutMap.set(collectorBaseCapacitor.id, { x: transistorX - 135, y: upperY + 10 });
+    rotationOverrides.set(collectorBaseCapacitor.id, 0);
+  }
+  if (baseEmitterCapacitor) {
+    layoutMap.set(baseEmitterCapacitor.id, { x: transistorX - 135, y: lowerY - 20 });
+    rotationOverrides.set(baseEmitterCapacitor.id, 0);
+  }
+  if (outputCapacitor) {
+    layoutMap.set(outputCapacitor.id, { x: outputX, y: upperY + 70 });
+    rotationOverrides.set(outputCapacitor.id, 0);
+  }
+  if (loadResistor) {
+    layoutMap.set(loadResistor.id, { x: loadX, y: upperY + 70 });
+    rotationOverrides.set(loadResistor.id, 0);
+    setGroundNear(loadResistor.id, { x: loadX, y: groundY - 120 });
+  }
+  measuringElements.forEach((element, index) => {
+    layoutMap.set(element.id, { x: loadX + 150, y: upperY + 40 + index * 110 });
+    rotationOverrides.set(element.id, 0);
+  });
+
+  let groundFallbackIndex = 0;
+  grounds.forEach((ground) => {
+    if (layoutMap.has(ground.id)) return;
+    layoutMap.set(ground.id, {
+      x: transistorX + groundFallbackIndex * 130,
+      y: groundY,
+    });
+    groundFallbackIndex += 1;
+  });
 
   return elements.map((element) => {
     const layout = layoutMap.get(element.id);
@@ -1540,9 +1675,11 @@ interface CircuitFlowProps {
   onModelChange?: (model: FlowModelType) => void; // 修改为使用 FlowModelType
   workspaceMode?: CircuitWorkspaceMode | 'auto';
   onUnsavedChange?: (hasUnsavedChanges: boolean) => void;
+  showStatusBar?: boolean;
+  enhanceInitialLayout?: boolean;
 }
 
-export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3', initialCircuitDesign, isReadOnly = false, classId = null, onModelChange, workspaceMode: workspaceModeProp = 'auto', onUnsavedChange }: CircuitFlowProps) => {
+export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3', initialCircuitDesign, isReadOnly = false, classId = null, onModelChange, workspaceMode: workspaceModeProp = 'auto', onUnsavedChange, showStatusBar = true, enhanceInitialLayout = false }: CircuitFlowProps) => {
   const normalizedInitialCircuitDesign = useMemo(
     () => normalizeCircuitDesignInput(initialCircuitDesign),
     [initialCircuitDesign]
@@ -2060,16 +2197,29 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
     }
   }, [classId]);
   
-  // 加载初始电路设计数据 - 使用 useRef 避免重复加载
-  const initialLoadRef = useRef(false);
+  // 加载初始电路设计数据：按设计快照去重，允许同一路由内接收新的预填设计。
+  const loadedInitialDesignKeyRef = useRef<string | null>(null);
+  const normalizedInitialDesignKey = useMemo(() => {
+    return normalizedInitialCircuitDesign
+      ? serializeCircuitDesignSnapshot(normalizedInitialCircuitDesign)
+      : '';
+  }, [normalizedInitialCircuitDesign]);
   
   useEffect(() => {
-    if (normalizedInitialCircuitDesign && normalizedInitialCircuitDesign.elements.length > 0 && !initialLoadRef.current) {
+    if (
+      normalizedInitialCircuitDesign &&
+      normalizedInitialCircuitDesign.elements.length > 0 &&
+      loadedInitialDesignKeyRef.current !== normalizedInitialDesignKey
+    ) {
       console.log('加载初始电路设计数据', normalizedInitialCircuitDesign);
-      initialLoadRef.current = true;
-      loadCircuitDesign(normalizedInitialCircuitDesign, { fitView: true, notifyChange: false });
+      loadedInitialDesignKeyRef.current = normalizedInitialDesignKey;
+      loadCircuitDesign(normalizedInitialCircuitDesign, {
+        fitView: true,
+        notifyChange: false,
+        enhanceLayout: enhanceInitialLayout,
+      });
     }
-  }, [normalizedInitialCircuitDesign, loadCircuitDesign]);
+  }, [enhanceInitialLayout, normalizedInitialCircuitDesign, normalizedInitialDesignKey, loadCircuitDesign]);
   
   // 监听节点旋转事件，更新连线
   useEffect(() => {
@@ -4044,6 +4194,10 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
 
   // 离开页面/导航拦截：在用户有未保存更改时给出提示
   useEffect(() => {
+    if (isReadOnly) {
+      return;
+    }
+
     const confirmMsg = '您有尚未保存的电路设计，确定要离开并放弃更改吗？';
 
     const beforeUnloadHandler = (e: BeforeUnloadEvent) => {
@@ -4150,7 +4304,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
         // ignore
       }
     };
-  }, []);
+  }, [isReadOnly]);
   return (
     <div ref={reactFlowWrapper} className="flex flex-row w-full h-full min-h-0 bg-white">
       {/* 左侧元件库面板 */}
@@ -4273,7 +4427,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
             <Background gap={20} size={1} color="#e5e7eb" />
             <Controls className="circuit-flow-controls" />
           </ReactFlow>
-          {workspaceMode !== 'digital' && analogSimulationMode === 'realtime' && (
+          {showStatusBar && workspaceMode !== 'digital' && analogSimulationMode === 'realtime' && (
             <>
               <CanvasOverlay
                 frameResult={realtimeFrameResult}
@@ -4296,6 +4450,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
         </div>
         
         {/* 状态信息栏 */}
+        {showStatusBar && (
         <div className="bg-gray-50 border-t border-gray-200 p-2 text-xs text-gray-600 flex justify-between items-center">
           <div>元件: {nodes.length} | 连接: {edges.length}</div>
           
@@ -4393,6 +4548,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
             )}
           </div>
         </div>
+        )}
       </div>
       
       {/* 使用优化后的组件配置面板 */}
@@ -4634,7 +4790,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
           <Spin size="large" spinning={true} />
         </div>
       )}
-      <style jsx global>{`
+      <style>{`
         .circuit-flow-canvas .react-flow__renderer {
           background:
             radial-gradient(circle at 20% 0%, rgba(255,255,255,0.88) 0, rgba(255,255,255,0) 34%),
@@ -4675,7 +4831,7 @@ export const CircuitFlow = ({ onCircuitDesignChange, selectedModel = 'deepseekV3
   );
 };
 
-export const CircuitFlowWithProvider = ({ onCircuitDesignChange, selectedModel, initialCircuitDesign, isReadOnly, classId, onModelChange, workspaceMode, onUnsavedChange }: CircuitFlowProps) => (
+export const CircuitFlowWithProvider = ({ onCircuitDesignChange, selectedModel, initialCircuitDesign, isReadOnly, classId, onModelChange, workspaceMode, onUnsavedChange, showStatusBar, enhanceInitialLayout }: CircuitFlowProps) => (
   <ReactFlowProvider>
     <CircuitFlow 
       onCircuitDesignChange={onCircuitDesignChange}
@@ -4686,6 +4842,8 @@ export const CircuitFlowWithProvider = ({ onCircuitDesignChange, selectedModel, 
       onModelChange={onModelChange}
       workspaceMode={workspaceMode}
       onUnsavedChange={onUnsavedChange}
+      showStatusBar={showStatusBar}
+      enhanceInitialLayout={enhanceInitialLayout}
     />
   </ReactFlowProvider>
 );

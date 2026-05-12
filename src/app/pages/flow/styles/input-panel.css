@@ -74,7 +74,7 @@
   will-change: content;
   transition-duration: 200ms;
   bottom: env(safe-area-inset-bottom);
-  transform: translateY(30%) translateX(-50%);
+  transform: translateY(0) translateX(-50%);
   pointer-events: all;
 }
 

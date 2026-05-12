@@ -132,7 +132,7 @@ function AnswerPointNode({ data, ...props }: ExtendedNodeProps<'answer-point' | 
     const originalQuestion = editedText || data.text || "请完成以该角度为切入点对用户提问的回答";
     
     const createAiTaskDTO: CreateAiTaskDTO = {
-      type: "GENERAL_DETAIL",
+      type: "GENERAL",
       prompt: originalQuestion,
       promptParams: null, // 修改为null以修复类型错误
       convId: convId,

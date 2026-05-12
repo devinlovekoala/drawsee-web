@@ -26,7 +26,7 @@ const modes = [
     name: '知识问答模式',
     description: '基于知识库的 AI 生成模式，能识别用户提问中的相关知识点。',
     icon: BookOpenIcon,
-    type: 'KNOWLEDGE' as AiTaskType
+    type: 'GENERAL' as AiTaskType
   },
   {
     name: '推理解题模式',

@@ -309,6 +309,7 @@ export function entitreeFlexLayout(nodes: Node[], edges: Edge[], shouldUpdateSer
       const isRootNode = node.type === 'root';
       const widthFromData = typeof node.data?.layoutWidth === 'number' ? node.data.layoutWidth : undefined;
       const width = isRootNode ? ROOT_NODE_SIZE : (widthFromData || NODE_WIDTH);
+      const heightFromData = typeof node.data?.layoutHeight === 'number' ? node.data.layoutHeight : undefined;
       const previousHeightValue = typeof node.data?.height === 'number' ? node.data.height as number : null;
       const previousHeightWidth = (node.data as any)?.__heightCalcWidth;
       let height: number;
@@ -317,6 +318,8 @@ export function entitreeFlexLayout(nodes: Node[], edges: Edge[], shouldUpdateSer
         height = ROOT_NODE_SIZE;
       } else if (node.id.startsWith(TEMP_QUERY_NODE_ID_PREFIX)) {
         height = TEMP_QUERY_NODE_HEIGHT;
+      } else if (heightFromData !== undefined) {
+        height = heightFromData;
       } else {
         const textLength = (node.data.text && typeof node.data.text === 'string') ? node.data.text.length : 0;
         const cacheKey = `${node.type}-${textLength}-${width}`;

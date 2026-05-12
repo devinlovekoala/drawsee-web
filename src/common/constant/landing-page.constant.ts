@@ -64,7 +64,7 @@ export const landingFeatures: LandingFeatureItem[] = [
   },
   {
     title: '多模型协同',
-    description: '支持 DeepSeekV3、豆包等模型，按任务语境协同调用，在推理、教学答疑和工程分析场景中保持质量稳定。'
+    description: '支持 DeepSeekV4、豆包等模型，按任务语境协同调用，在推理、教学答疑和工程分析场景中保持质量稳定。'
   },
   {
     title: '流式任务反馈',

@@ -7,6 +7,7 @@ type CircuitWorkbenchRoute = '/circuit' | '/digital';
 interface StoredCircuitPrefillPayload {
   design?: CircuitDesign;
   ts?: number;
+  convId?: number | null;
   source?: string;
   resourceId?: number;
   courseId?: string | number;

@@ -44,8 +44,8 @@ function Blank() {
       // 将小写连字符格式的类型转换为大写下划线格式
       const typeMap: {[key: string]: AiTaskType} = {
         'general': 'GENERAL',
-        'knowledge': 'KNOWLEDGE',
-        'knowledge-detail': 'KNOWLEDGE_DETAIL',
+        'knowledge': 'GENERAL',
+        'knowledge-detail': 'GENERAL',
         'animation': 'ANIMATION',
         'solver-first': 'SOLVER_FIRST',
         'solver-continue': 'SOLVER_CONTINUE',
@@ -166,7 +166,7 @@ function Blank() {
 
     try {
       // 确保任务类型是有效的
-      const validTaskTypes = ['GENERAL', 'KNOWLEDGE', 'KNOWLEDGE_DETAIL', 'ANIMATION', 
+      const validTaskTypes = ['GENERAL', 'ANIMATION', 
         'SOLVER_FIRST', 'SOLVER_CONTINUE', 'SOLVER_SUMMARY', 'CIRCUIT_ANALYSIS',
         'PDF_CIRCUIT_ANALYSIS', 'PDF_CIRCUIT_ANALYSIS_DETAIL', 'PDF_CIRCUIT_DESIGN'];
       
@@ -206,7 +206,7 @@ function Blank() {
         promptParams: promptParams,
         convId: null,
         parentId: null,
-        model: ["GENERAL", "KNOWLEDGE", "ANIMATION", "SOLVER_FIRST", "CIRCUIT_ANALYSIS", "PDF_CIRCUIT_ANALYSIS", "PDF_CIRCUIT_ANALYSIS_DETAIL", "PDF_CIRCUIT_DESIGN"].includes(queryForm.type) ? queryForm.model : null,
+        model: ["GENERAL", "ANIMATION", "SOLVER_FIRST", "CIRCUIT_ANALYSIS", "PDF_CIRCUIT_ANALYSIS", "PDF_CIRCUIT_ANALYSIS_DETAIL", "PDF_CIRCUIT_DESIGN"].includes(queryForm.type) ? queryForm.model : null,
         classId: classId // 添加班级ID
       };
 
@@ -482,7 +482,6 @@ function Blank() {
         <div className="flex items-center">
           <h1 className="text-xl font-semibold text-neutral-800">
             {queryForm.type === 'GENERAL' ? '通用对话' : 
-             queryForm.type === 'KNOWLEDGE' ? '知识问答' :
              queryForm.type === 'ANIMATION' ? '动画生成' :
              queryForm.type === 'SOLVER_FIRST' ? '解题推理' :
              queryForm.type === 'CIRCUIT_ANALYSIS' ? '电路分析' :
@@ -587,7 +586,6 @@ function Blank() {
                         onKeyUp={handleTextareaSelect}
                         placeholder={
                           queryForm.type === "GENERAL" ? "问 AI 任何问题..." : 
-                          queryForm.type === "KNOWLEDGE" ? "请输入知识性问题..." :
                           queryForm.type === "ANIMATION" ? "请输入你想制作动画的问题..." :
                           queryForm.type === "SOLVER_FIRST" ? "请输入需要解答的题目（可通过图片上传）..." :
                           queryForm.type === "CIRCUIT_ANALYSIS" ? "请上传电路图或描述电路问题..." :

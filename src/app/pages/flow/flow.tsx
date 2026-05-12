@@ -28,6 +28,7 @@ import { useAdaptiveZoom } from "./hooks/useAdaptiveZoom";
 import { toast } from "sonner";
 import { calculateNodeHeight } from './utils/calculateNodeHeight';
 import type { NodeData } from './components/node/types/node.types';
+import { buildPresentedFlowEdges, presentFollowUpAnswerNodes } from './utils/followUpAnswerNode';
 // 导入优化后的CSS样式
 import './styles/index.css';
 import { COMPACT_NODE_HEIGHT, COMPACT_NODE_WIDTH, TEMP_QUERY_NODE_ID_PREFIX } from "./constants";
@@ -114,8 +115,15 @@ function normalizeNodeType(apiType: string | undefined | null): string {
       return 'PDF_ANALYSIS_POINT';
     case 'PDF_ANALYSIS_DETAIL':
       return 'PDF_ANALYSIS_DETAIL';
+    case 'CIRCUIT_CANVAS':
+    case 'CIRCUIT-CANVAS':
+      return 'circuit-canvas';
+    case 'CIRCUIT_ANALYZE':
     case 'CIRCUIT-ANALYZE':
       return 'circuit-analyze';
+    case 'CIRCUIT_DETAIL':
+    case 'CIRCUIT-DETAIL':
+      return 'circuit-detail';
     default:
       // 对于已是前端支持的小写类型，原样返回，例如 answer / answer-point / knowledge-detail 等
       return apiTypeStr;
@@ -282,7 +290,7 @@ function Flow() {
   const parentIdOfTempQueryNodeForShare = isShareMode ? null : parentIdOfTempQueryNode;
 
   // 使用FlowTools Hook
-  const {executeLayout} = useFlowTools();
+  const {executeLayout, executeFitView} = useFlowTools();
   
   // 使用自适应缩放Hook
   const { smartFitView } = useAdaptiveZoom();
@@ -328,6 +336,12 @@ function Flow() {
 
   // 节点变化监听
   const onNodesChange: OnNodesChange = useCallback((changes) => {
+    const effectiveChanges = changes.map(change =>
+      change.type === 'select' && change.id.startsWith(TEMP_QUERY_NODE_ID_PREFIX)
+        ? { ...change, selected: false }
+        : change
+    );
+
     setElements(({nodes, edges}) => {
       let newNodes = nodes;
       let newEdges = edges;
@@ -348,7 +362,7 @@ function Flow() {
       // 跟踪被拖动的节点
       const draggedNodes: NodeToUpdate[] = [];
 
-      changes.forEach((change) => {
+      effectiveChanges.forEach((change) => {
         if (change.type === 'select') {
           selectionChanged = true;
           if (change.selected) {
@@ -444,7 +458,7 @@ function Flow() {
       }
 
       // 应用节点变化
-      newNodes = applyNodeChanges(changes, newNodes);
+      newNodes = applyNodeChanges(effectiveChanges, newNodes);
 
       // 同步更新selectedNode以支持流式内容更新
       if (selectedNode && !selectionChanged) {
@@ -610,7 +624,7 @@ function Flow() {
         return;
       }
       // 将apiNodes转换为flowNodes
-      const flowNodes = apiNodes.map((node) => {
+      const rawFlowNodes = apiNodes.map((node) => {
         const normalizedType = normalizeNodeType(node.type as unknown as string);
         const data = {
           parentId: node.parentId,
@@ -684,15 +698,9 @@ function Flow() {
           selectable: true, // 确保节点可选择
         } as any;
       });
+      const flowNodes = presentFollowUpAnswerNodes(rawFlowNodes);
       // 创建边
-      const flowEdges = flowNodes
-      .filter(node => node.data.parentId !== null)
-      .map(node => ({
-        id: `e${node.data.parentId!}-${node.id}`,
-        source: node.data.parentId!.toString(),
-        target: node.id,
-        type: 'smoothstep',
-      }));
+      const flowEdges = buildPresentedFlowEdges(flowNodes);
 
       // 执行布局 - 但不使用动画，提高性能
       const layoutedNodes = executeLayout(flowNodes, flowEdges, false);
@@ -769,7 +777,7 @@ function Flow() {
           setIsLoading(false);
           return;
         }
-        const flowNodes = apiNodes.map((node) => {
+        const rawFlowNodes = apiNodes.map((node) => {
           const normalizedType = normalizeNodeType(node.type as unknown as string);
           const data = {
             parentId: node.parentId,
@@ -803,14 +811,8 @@ function Flow() {
             selectable: true,
           } as any;
         });
-        const flowEdges = flowNodes
-          .filter(node => node.data.parentId !== null)
-          .map(node => ({
-            id: `e${node.data.parentId!}-${node.id}`,
-            source: node.data.parentId!.toString(),
-            target: node.id,
-            type: 'smoothstep',
-          }));
+        const flowNodes = presentFollowUpAnswerNodes(rawFlowNodes);
+        const flowEdges = buildPresentedFlowEdges(flowNodes);
         const layoutedNodes = executeLayout(flowNodes, flowEdges, false);
         setElements({ nodes: layoutedNodes, edges: flowEdges });
         setSelectedNode(null);
@@ -915,7 +917,7 @@ function Flow() {
   useEffect(() => {
     // 检查是否有正在生成的详情节点
     const hasGeneratingDetailNode = elements.nodes.some(node => {
-      const isDetailNode = node.type && ['answer-detail', 'ANSWER_DETAIL', 'circuit-analyze', 'circuit-detail', 'knowledge-detail', 'PDF_ANALYSIS_DETAIL'].includes(node.type);
+      const isDetailNode = node.type && ['answer', 'answer-detail', 'ANSWER_DETAIL', 'circuit-analyze', 'circuit-detail', 'knowledge-detail', 'PDF_ANALYSIS_DETAIL'].includes(node.type);
       const isGenerating = node.data?.process === 'generating';
       return isDetailNode && isGenerating;
     });
@@ -933,9 +935,8 @@ function Flow() {
     setElements(({nodes, edges}) => {
       const layoutedNodes = executeLayout(nodes, edges, false, resetHeight);
       
-      // 使用智能fitView进行重布局后的视图调整
       setTimeout(() => {
-        smartFitView(layoutedNodes.map(node => node.id), layoutedNodes, 100, 600);
+        executeFitView(layoutedNodes.map(node => node.id), 100, 600, 0.95, 0.42, 0.12);
       }, 50);
       
       return {
@@ -943,7 +944,7 @@ function Flow() {
         edges
       };
     });
-  }, [executeLayout, isChatting, setElements, smartFitView]);
+  }, [executeFitView, executeLayout, isChatting, setElements]);
 
   // 处理对话
   const flowChat = useCallback((taskId: number) => {
@@ -996,14 +997,8 @@ function Flow() {
     
     console.log(`智能初始化: 节点数量=${elements.nodes.length}`);
     
-    // 使用智能fitView进行初始化
-    smartFitView(
-      elements.nodes.map(node => node.id), 
-      elements.nodes,
-      250,
-      650
-    );
-  }, [elements.nodes, smartFitView]);
+    executeFitView(elements.nodes.map(node => node.id), 250, 650, 0.95, 0.42, 0.12);
+  }, [elements.nodes, executeFitView]);
 
   // 关闭详情面板
   const handleCloseDetailPanel = useCallback(() => {
@@ -1106,7 +1101,7 @@ function Flow() {
       addChatTask,
       applySuggestion: handleApplySuggestion
     }}>
-      <div className="flex w-full overflow-hidden" style={{ height: 'calc(100vh - 80px)' }}>
+      <div className="flex w-full overflow-hidden" style={{ height: 'calc(100svh - 16px)' }}>
         {/* 左侧React Flow区域 */}
         <div 
           className={`${showDetailPanel ? 'flex-1 transition-all duration-300 ease-in-out' : 'w-full'}`} 
@@ -1123,6 +1118,9 @@ function Flow() {
             onNodesChange={onNodesChange} // 节点变化监听
             onEdgesChange={onEdgesChange} // 边变化监听
             onNodeClick={(_event, node) => {
+              if (node.id.startsWith(TEMP_QUERY_NODE_ID_PREFIX)) {
+                return;
+              }
               // 🔥 用户点击任何节点就强制打开节点详情，并选中该节点
               console.log('直接点击节点:', node.id, '强制显示详情面板');
               protectedSetSelectedNode(node);

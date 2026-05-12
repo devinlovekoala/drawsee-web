@@ -9,8 +9,10 @@ import { BASE_URL } from "@/api";
 import {SSE} from "sse.js";
 import { TOKEN_KEY } from "@/common/constant/storage-key.constant";
 import useFlowTools from "./useFlowTools";
-import { COMPACT_NODE_HEIGHT, COMPACT_NODE_WIDTH, TEMP_QUERY_NODE_ID_PREFIX } from "../constants";
+import { COMPACT_NODE_HEIGHT, COMPACT_NODE_WIDTH, FLOW_HORIZONTAL_SPACING, FLOW_VERTICAL_SPACING, ROOT_NODE_SIZE, TEMP_QUERY_NODE_ID_PREFIX } from "../constants";
 import { processTextUpdate } from "../utils/sectionParser";
+import { buildPresentedFlowEdges, presentFollowUpAnswerNodes } from "../utils/followUpAnswerNode";
+import { resolveNonOverlappingNodePosition } from "../utils/nodePlacement";
 
 // 将后端节点类型归一化为前端可识别的类型
 const normalizeNodeType = (apiType: string | undefined | null): string => {
@@ -32,11 +34,61 @@ const normalizeNodeType = (apiType: string | undefined | null): string => {
       return 'PDF_ANALYSIS_POINT';
     case 'PDF_ANALYSIS_DETAIL':
       return 'PDF_ANALYSIS_DETAIL';
+    case 'CIRCUIT_CANVAS':
+    case 'CIRCUIT-CANVAS':
+      return 'circuit-canvas';
+    case 'CIRCUIT_ANALYZE':
     case 'CIRCUIT-ANALYZE':
       return 'circuit-analyze';
+    case 'CIRCUIT_DETAIL':
+    case 'CIRCUIT-DETAIL':
+      return 'circuit-detail';
     default:
       return String(apiType);
   }
+};
+
+const AUTO_FOCUS_GENERATING_NODE_TYPES = new Set([
+  'answer',
+  'answer-detail',
+  'ANSWER_DETAIL',
+  'circuit-canvas',
+  'circuit-analyze',
+  'circuit-detail',
+  'knowledge-detail',
+  'PDF_ANALYSIS_DETAIL',
+  'pdf-circuit-detail',
+]);
+
+const collectFocusContextNodeIds = (nodes: Node[], edges: Edge[], targetNodeId: string): string[] => {
+  if (nodes.length <= 10) {
+    return nodes.map(node => node.id);
+  }
+
+  const nodeMap = new Map(nodes.map(node => [node.id, node]));
+  const contextIds = new Set<string>([targetNodeId]);
+  const targetNode = nodeMap.get(targetNodeId);
+  const parentId = targetNode?.data?.parentId ? String(targetNode.data.parentId) : null;
+
+  if (parentId && nodeMap.has(parentId)) {
+    contextIds.add(parentId);
+    const grandParentId = nodeMap.get(parentId)?.data?.parentId;
+    if (grandParentId && nodeMap.has(String(grandParentId))) {
+      contextIds.add(String(grandParentId));
+    }
+  }
+
+  edges.forEach(edge => {
+    if (edge.source === targetNodeId || edge.target === targetNodeId) {
+      contextIds.add(edge.source);
+      contextIds.add(edge.target);
+    }
+    if (parentId && edge.source === parentId) {
+      contextIds.add(edge.target);
+    }
+  });
+
+  return Array.from(contextIds);
 };
 
 /**
@@ -67,6 +119,7 @@ function useFlowState(convId: number | null, selectedNode?: Node | null, setSele
   const isChatTaskProcessing = useRef(false);
   // 最后需要聚焦的节点id
   const lastFocusNodeId = useRef<string | null>(null);
+  const streamingFocusNodeId = useRef<string | null>(null);
   // 跟踪正在生成内容的节点
   const activeNodeIds = useRef<Set<string>>(new Set());
   // 限次补偿轮询（SSE遗漏时兜底）
@@ -96,52 +149,84 @@ function useFlowState(convId: number | null, selectedNode?: Node | null, setSele
     try {
       // 加入时间戳避免alova命中缓存
       const nodesFromApi = await getNodesByConvId(convId, { _ts: Date.now() });
-      setElements(({ nodes: currentNodes, edges }) => {
+      setElements(({ nodes: currentNodes }) => {
+        const currentNodeMap = new Map(currentNodes.map(node => [node.id, node]));
         // 将服务器节点转换为前端节点
-        const incomingNodes = nodesFromApi.map(node => ({
-          id: node.id.toString(),
-          type: normalizeNodeType(node.type),
-          position: node.position,
-          data: {
-            ...node.data,
-            parentId: node.parentId,
-            convId: node.convId,
-            userId: node.userId,
-            createdAt: node.createdAt,
-            updatedAt: node.updatedAt
-          }
-        })) as Node[];
+        const rawIncomingNodes = nodesFromApi.map(node => {
+          const id = node.id.toString();
+          const currentNode = currentNodeMap.get(id);
+          return {
+            id,
+            type: normalizeNodeType(node.type),
+            position: currentNode?.position || node.position,
+            selected: currentNode?.selected,
+            data: {
+              ...currentNode?.data,
+              ...node.data,
+              parentId: node.parentId,
+              convId: node.convId,
+              userId: node.userId,
+              createdAt: node.createdAt,
+              updatedAt: node.updatedAt
+            }
+          };
+        }) as Node[];
+        const incomingNodes = presentFollowUpAnswerNodes(rawIncomingNodes);
 
         // 合并：如果服务器返回的节点数更少，不删除本地已存在的节点（避免短暂空列表覆盖）
         const mergedMap = new Map<string, Node>();
-        currentNodes.forEach(n => mergedMap.put?.(n.id, n) || mergedMap.set(n.id, n));
+        currentNodes.forEach(n => mergedMap.set(n.id, n));
         incomingNodes.forEach(n => mergedMap.set(n.id, n));
         const flowNodes = Array.from(mergedMap.values());
 
-        const flowEdges = flowNodes
-          .filter(node => node.data.parentId !== null)
-          .map(node => ({
-            id: `e${node.data.parentId}-${node.id}`,
-            source: node.data.parentId!.toString(),
-            target: node.id,
-            type: 'smoothstep',
-          })) as Edge[];
+        const flowEdges = buildPresentedFlowEdges(flowNodes);
 
-        const layoutedNodes = executeLayout(flowNodes, flowEdges, false);
         lastNodeCount.current = flowNodes.length;
-        // 如果节点已达到3个及以上，停止补偿轮询
-        if (pollTimer.current && lastNodeCount.current >= 3) {
-          window.clearInterval(pollTimer.current);
-          pollTimer.current = null;
+
+        if (selectedNode && setSelectedNode) {
+          const selectedNodeId = selectedNode.id;
+          const refreshedSelectedNode = flowNodes.find(node => node.id === selectedNodeId) ||
+            flowNodes.find(node =>
+              node.data?.qaAnswerNodeId === selectedNodeId ||
+              node.data?.circuitAnalyzeNodeId === selectedNodeId ||
+              node.data?.circuitCanvasNodeId === selectedNodeId
+            );
+
+          if (refreshedSelectedNode) {
+            const previousData = selectedNode.data || {};
+            const refreshedData = refreshedSelectedNode.data || {};
+            const shouldSyncSelectedNode =
+              refreshedSelectedNode.id !== selectedNode.id ||
+              previousData.updatedAt !== refreshedData.updatedAt ||
+              previousData.process !== refreshedData.process ||
+              previousData.isGenerated !== refreshedData.isGenerated ||
+              previousData.qaAnswerText !== refreshedData.qaAnswerText ||
+              previousData.circuitAnalyzeText !== refreshedData.circuitAnalyzeText ||
+              previousData.circuitCanvasNodeId !== refreshedData.circuitCanvasNodeId ||
+              previousData.circuitDesign !== refreshedData.circuitDesign;
+
+            if (shouldSyncSelectedNode) {
+              setSelectedNode({
+                ...refreshedSelectedNode,
+                selected: true,
+                data: {
+                  ...refreshedSelectedNode.data,
+                  forceRefresh: Date.now(),
+                  updatedAt: refreshedSelectedNode.data?.updatedAt || Date.now(),
+                },
+              });
+            }
+          }
         }
-        return { nodes: layoutedNodes, edges: flowEdges };
+
+        return { nodes: flowNodes, edges: flowEdges };
       });
       return nodesFromApi;
     } catch (e) {
       console.error('刷新节点失败', e);
       return [] as NodeVO[];
     }
-  }, [convId, executeLayout, setElements]);
+  }, [convId, selectedNode, setElements, setSelectedNode]);
 
   /**
    * 处理聊天消息
@@ -168,11 +253,18 @@ function useFlowState(convId: number | null, selectedNode?: Node | null, setSele
           const normalizedType = normalizeNodeType(nodeVO.type as unknown as string);
           console.log(`[SSE] 接收到节点，ID: ${nodeVO.id}, 原始类型: ${nodeVO.type}, 归一化类型: ${normalizedType}, parentId: ${nodeVO.parentId}`);
 
+          const shouldAutoFocusGeneratingNode = AUTO_FOCUS_GENERATING_NODE_TYPES.has(normalizedType);
+
           // 设置节点为正在生成状态
-          if (normalizedType === 'answer' || normalizedType === 'knowledge-detail') {
+          if (shouldAutoFocusGeneratingNode) {
             lastFocusNodeId.current = nodeVO.id.toString();
+            streamingFocusNodeId.current = nodeVO.id.toString();
             // 添加到活跃节点跟踪列表
             activeNodeIds.current.add(nodeVO.id.toString());
+
+            if (!nodeVO.data) nodeVO.data = {};
+            nodeVO.data.process = 'generating';
+            nodeVO.data.isGenerated = false;
           }
           
           // 如果是详情节点，也添加到活跃节点列表，并准备自动选中
@@ -236,14 +328,41 @@ function useFlowState(convId: number | null, selectedNode?: Node | null, setSele
               ...(newEdge ? [newEdge] : [])
             ];
             
-            // 执行布局
-            const layoutedNodes = isUserQueryNode ? currentNodes : executeLayout(currentNodes, currentEdges, false);
+            const parentNodeId = nodeVO.parentId?.toString();
+            const parentNode = parentNodeId
+              ? currentNodes.find(node =>
+                  node.id === parentNodeId ||
+                  node.data?.qaAnswerNodeId === parentNodeId ||
+                  node.data?.circuitAnalyzeNodeId === parentNodeId ||
+                  node.data?.circuitCanvasNodeId === parentNodeId
+                )
+              : null;
+            const existingSiblingCount = nodeVO.parentId
+              ? currentEdges.filter(edge => edge.source === (parentNode?.id || nodeVO.parentId!.toString()) && edge.target !== newNode.id).length
+              : 0;
+            const parentWidth = parentNode?.type === 'root' ? ROOT_NODE_SIZE : COMPACT_NODE_WIDTH;
+            const locallyPlacedNodes = !isUserQueryNode && parentNode
+              ? currentNodes.map(node =>
+                  node.id === newNode.id
+                    ? {
+                        ...node,
+                        position: resolveNonOverlappingNodePosition({
+                          nodes: currentNodes,
+                          movingNodeId: newNode.id,
+                          basePosition: {
+                            x: parentNode.position.x + parentWidth + FLOW_HORIZONTAL_SPACING,
+                            y: parentNode.position.y + existingSiblingCount * (COMPACT_NODE_HEIGHT + FLOW_VERTICAL_SPACING)
+                          },
+                          anchorY: parentNode.position.y,
+                        })
+                      }
+                    : node
+                )
+              : currentNodes;
+            const layoutedNodes = presentFollowUpAnswerNodes(locallyPlacedNodes);
             // 获得新节点布局后的位置
             const newNodeLayoutedPosition = layoutedNodes.find(node => node.id === newNode.id)?.position;
             console.log('newNodeLayoutedPosition', newNodeLayoutedPosition);
-            // 调整视口以显示最新内容
-            executeFitView([newNode.id], 500);
-
             // 如果节点是knowledge-detail，则修改knowledge-head的isGenerated为true
             if (normalizedType === 'knowledge-detail') {
               const knowledgeHeadNode = layoutedNodes.find(node => 
@@ -280,33 +399,34 @@ function useFlowState(convId: number | null, selectedNode?: Node | null, setSele
               }
             }
 
-            // 如果是详情节点，自动选中该节点以便在右侧面板显示
-            if ((normalizedType === 'answer-detail' || normalizedType === 'ANSWER_DETAIL' || 
-                 normalizedType === 'circuit-analyze' || normalizedType === 'knowledge-detail' ||
-                 normalizedType === 'PDF_ANALYSIS_DETAIL') && 
-                setSelectedNode) {
-              const newDetailNode = layoutedNodes.find(node => node.id === newNode.id);
-              if (newDetailNode) {
-                console.log(`立即自动选中详情节点 ${newDetailNode.id}，类型: ${normalizedType}`);
-                // 立即选中，并确保详情面板显示流式内容
-                setSelectedNode(newDetailNode);
-                
-                // 确保节点在视图中正确选中状态
-                setTimeout(() => {
-                  const updatedNodes = layoutedNodes.map(node => ({
-                    ...node,
-                    selected: node.id === newDetailNode.id
-                  }));
-                  
-                  // 返回更新后的节点列表，确保选中状态正确
-                  setElements(prev => ({ ...prev, nodes: updatedNodes }));
-                }, 100);
-              }
+            const focusedNode = isUserQueryNode
+              ? layoutedNodes.find(node => node.id === newNode.id)
+              : shouldAutoFocusGeneratingNode
+                ? layoutedNodes.find(node =>
+                    node.id === newNode.id ||
+                    node.data?.qaAnswerNodeId === newNode.id ||
+                    node.data?.circuitAnalyzeNodeId === newNode.id ||
+                    node.data?.circuitCanvasNodeId === newNode.id
+                  )
+                : null;
+            const nodesWithSelection = focusedNode
+              ? layoutedNodes.map(node => ({
+                  ...node,
+                  selected: node.id === focusedNode.id
+                }))
+              : layoutedNodes;
+
+            if (focusedNode && setSelectedNode) {
+              console.log(`自动选中生成节点 ${focusedNode.id}，类型: ${normalizedType}`);
+              setSelectedNode(focusedNode);
+              const focusEdges = buildPresentedFlowEdges(nodesWithSelection);
+              const contextNodeIds = collectFocusContextNodeIds(nodesWithSelection, focusEdges, focusedNode.id);
+              executeFitView(contextNodeIds, 80, 450, 0.95, 0.42, 0.18);
             }
 
             return {
-              nodes: layoutedNodes,
-              edges: currentEdges,
+              nodes: nodesWithSelection,
+              edges: buildPresentedFlowEdges(nodesWithSelection),
             };
           });
           break;
@@ -326,18 +446,54 @@ function useFlowState(convId: number | null, selectedNode?: Node | null, setSele
           
           setElements(({nodes, edges}) => {
             // 使用processTextUpdate更新节点文本内容
-            const { nodes: updatedNodes, edges: updatedEdges } = 
+            let { nodes: updatedNodes, edges: updatedEdges } =
               processTextUpdate(textData, nodes, edges);
               
             // 找到更新的节点进行视图调整
             const nodeId = textData.nodeId.toString();
-            const targetNode = updatedNodes.find(node => node.id === nodeId);
+            let targetNode = updatedNodes.find(node => node.id === nodeId);
+
+            if (!targetNode) {
+              updatedNodes = updatedNodes.map(node => {
+                const isFoldedAnswerNode = node.data?.qaAnswerNodeId === nodeId;
+                const isFoldedCircuitAnalyzeNode = node.data?.circuitAnalyzeNodeId === nodeId;
+                const isFoldedCircuitCanvasNode = node.data?.circuitCanvasNodeId === nodeId;
+                if (!isFoldedAnswerNode && !isFoldedCircuitAnalyzeNode && !isFoldedCircuitCanvasNode) return node;
+
+                const textKey = isFoldedCircuitCanvasNode
+                  ? 'circuitCanvasText'
+                  : isFoldedCircuitAnalyzeNode ? 'circuitAnalyzeText' : 'qaAnswerText';
+                const currentText = typeof node.data?.[textKey] === 'string'
+                  ? node.data[textKey] as string
+                  : '';
+                return {
+                  ...node,
+                  data: {
+                    ...node.data,
+                    [textKey]: currentText + textData.content,
+                    process: 'generating',
+                    isGenerated: false,
+                    updatedAt: Date.now(),
+                    forceRefresh: Date.now(),
+                  },
+                };
+              });
+              targetNode = updatedNodes.find(node =>
+                node.data?.qaAnswerNodeId === nodeId ||
+                node.data?.circuitAnalyzeNodeId === nodeId ||
+                node.data?.circuitCanvasNodeId === nodeId
+              );
+            }
             
             if (targetNode) {
               console.log(`更新节点文本内容，ID: ${nodeId}，内容长度: ${textData.content.length}，时间戳: ${targetNode.data.updatedAt}`);
               
               // 立即同步更新selectedNode状态，确保右侧面板实时显示
-              if (selectedNode && selectedNode.id === nodeId && setSelectedNode) {
+              const shouldSyncSelectedNode = Boolean(
+                setSelectedNode &&
+                ((selectedNode && (selectedNode.id === targetNode.id || selectedNode.id === nodeId)) || streamingFocusNodeId.current === nodeId)
+              );
+              if (shouldSyncSelectedNode && setSelectedNode) {
                 console.log(`立即更新选中节点状态，确保右侧面板实时显示，文本长度: ${(targetNode.data.text as string || '').length}`);
                 // 强制触发状态更新 - 立即执行，不延迟
                 const updatedSelectedNode = {
@@ -359,6 +515,7 @@ function useFlowState(convId: number | null, selectedNode?: Node | null, setSele
             } else {
               // 数据可能先于节点到达，这是正常的
               console.log(`尚未找到节点ID: ${nodeId} 对应的节点，文本数据可能先于节点到达`);
+              void refreshNodesFromServer();
             }
             
             return {
@@ -405,36 +562,64 @@ function useFlowState(convId: number | null, selectedNode?: Node | null, setSele
           setElements(({nodes, edges}) => {
             // 尝试找到目标节点
             const targetNode = nodes.find(node => node.id === nodeId);
+            const foldedTargetNode = targetNode || nodes.find(node =>
+              node.data?.qaAnswerNodeId === nodeId ||
+              node.data?.circuitAnalyzeNodeId === nodeId ||
+              node.data?.circuitCanvasNodeId === nodeId
+            );
             
             // 如果找不到节点，不要显示警告，因为可能是数据先于节点到达
             // 这是正常的流程，节点可能尚未创建
-            if (!targetNode) {
+            if (!foldedTargetNode) {
               console.log(`尚未找到节点ID: ${nodeId} 对应的节点，数据可能先于节点到达`);
+              void refreshNodesFromServer();
               return {nodes, edges};
             }
             
             // 检查是否为动画渲染完成的更新
             const isAnimationCompleted = 
-              targetNode.type === 'resource' && 
-              targetNode.data.subtype === 'generated-animation' && 
+              foldedTargetNode.type === 'resource' &&
+              foldedTargetNode.data.subtype === 'generated-animation' &&
               'objectName' in data && 
               data.objectName;
             
             if (isAnimationCompleted) {
               console.log(`动画渲染已完成，节点ID: ${nodeId}，objectName: ${data.objectName}`);
             }
+
+            const isFoldedAnswerUpdate = !targetNode && foldedTargetNode.data?.qaAnswerNodeId === nodeId;
+            const isFoldedCircuitAnalyzeUpdate = !targetNode && foldedTargetNode.data?.circuitAnalyzeNodeId === nodeId;
+            const isFoldedCircuitCanvasUpdate = !targetNode && foldedTargetNode.data?.circuitCanvasNodeId === nodeId;
+            const dataUpdates = Object.fromEntries(
+              Object.entries(data)
+                .filter(([key]) => key !== 'nodeId')
+                .map(([key, value]) => {
+                  if (isFoldedCircuitCanvasUpdate) {
+                    if (key === 'text') return ['circuitCanvasText', value];
+                    if (key === 'title') return ['circuitCanvasTitle', value];
+                    return [key, value];
+                  }
+                  if (isFoldedCircuitAnalyzeUpdate) {
+                    if (key === 'text') return ['circuitAnalyzeText', value];
+                    if (key === 'title') return ['circuitAnalyzeTitle', value];
+                    return [key, value];
+                  }
+                  if (!isFoldedAnswerUpdate) return [key, value];
+                  if (key === 'text') return ['qaAnswerText', value];
+                  if (key === 'title') return ['qaAnswerTitle', value];
+                  return [key, value];
+                })
+            );
             
             // 更新节点数据
             const updatedNodes = nodes.map(node =>
-              node.id === nodeId ? 
+              node.id === foldedTargetNode.id ?
               {
                 ...node, 
                 data: {
                   ...node.data,
                   // 去除nodeId
-                  ...Object.fromEntries(
-                    Object.entries(data).filter(([key]) => key !== 'nodeId')
-                  ),
+                  ...dataUpdates,
                   // 如果是动画渲染完成，移除progress状态以强制组件显示视频
                   ...(isAnimationCompleted ? { progress: undefined } : {})
                 }
@@ -442,8 +627,8 @@ function useFlowState(convId: number | null, selectedNode?: Node | null, setSele
             );
             
             // 同步更新selectedNode状态 - 立即更新确保右侧面板实时显示
-            if (selectedNode && selectedNode.id === nodeId && setSelectedNode) {
-              const updatedSelectedNode = updatedNodes.find(node => node.id === nodeId);
+            if (selectedNode && (selectedNode.id === nodeId || selectedNode.id === foldedTargetNode.id) && setSelectedNode) {
+              const updatedSelectedNode = updatedNodes.find(node => node.id === foldedTargetNode.id);
               if (updatedSelectedNode) {
                 console.log(`立即同步更新选中节点数据，节点ID: ${nodeId}`);
                 setSelectedNode(updatedSelectedNode);
@@ -490,6 +675,9 @@ function useFlowState(convId: number | null, selectedNode?: Node | null, setSele
           
           // 兜底刷新，防止有延迟节点未到
           void refreshNodesFromServer();
+          window.setTimeout(() => void refreshNodesFromServer(), 300);
+          window.setTimeout(() => void refreshNodesFromServer(), 1200);
+          window.setTimeout(() => void refreshNodesFromServer(), 2500);
 
           // 将所有活跃节点状态设置为已完成
           setElements(({nodes, edges}) => {
@@ -497,6 +685,12 @@ function useFlowState(convId: number | null, selectedNode?: Node | null, setSele
               // 如果节点正在生成中或者是最后活跃的节点，设置为已完成
               if (activeNodeIds.current.has(node.id) || 
                   (lastFocusNodeId.current && node.id === lastFocusNodeId.current) ||
+                  (typeof node.data?.qaAnswerNodeId === 'string' && activeNodeIds.current.has(node.data.qaAnswerNodeId)) ||
+                  (typeof node.data?.circuitAnalyzeNodeId === 'string' && activeNodeIds.current.has(node.data.circuitAnalyzeNodeId)) ||
+                  (typeof node.data?.circuitCanvasNodeId === 'string' && activeNodeIds.current.has(node.data.circuitCanvasNodeId)) ||
+                  (lastFocusNodeId.current && node.data?.qaAnswerNodeId === lastFocusNodeId.current) ||
+                  (lastFocusNodeId.current && node.data?.circuitAnalyzeNodeId === lastFocusNodeId.current) ||
+                  (lastFocusNodeId.current && node.data?.circuitCanvasNodeId === lastFocusNodeId.current) ||
                   node.data.process === 'generating') {
                 console.log(`设置节点 ${node.id} 状态为已完成`);
                 return {
@@ -549,19 +743,9 @@ function useFlowState(convId: number | null, selectedNode?: Node | null, setSele
               // 保持节点高度和宽度不变，只调整位置
               const layoutedNodes = executeLayout(nodes, edges, false, false);
               
-              // 确保所有节点都能在视图中展现
               if (layoutedNodes.length > 0) {
                 console.log('最终布局调整，总节点数:', layoutedNodes.length);
-                // 添加一个小延迟以确保布局应用
-                setTimeout(() => {
-                  executeFitView(
-                    layoutedNodes.map(node => node.id),
-                    500,   // 动画时长
-                    200,   // 内边距
-                    0.9,   // 最大缩放
-                    0.1    // 最小缩放
-                  );
-                }, 50);
+                executeFitView(layoutedNodes.map(node => node.id), 100, 600, 0.95, 0.42, 0.12);
               }
               
               return {
@@ -574,13 +758,11 @@ function useFlowState(convId: number | null, selectedNode?: Node | null, setSele
             setIsChatting(false);
           }, 300);
           
-          // 执行fitView - 移除自动跳转到lastFocusNodeId的逻辑
-          // 详情节点生成完成后，保持在当前详情节点，不再自动跳转到父节点
-          // 这样用户可以继续查看刚完成生成的详情内容
-          console.log('流式生成完成，保持在当前节点，不自动跳转');
+          console.log('流式生成完成，最终布局后回到可读总览视角');
           
           // 清理lastFocusNodeId以避免后续误操作
           lastFocusNodeId.current = null;
+          streamingFocusNodeId.current = null;
           if (pollTimer.current) {
             window.clearInterval(pollTimer.current);
             pollTimer.current = null;
@@ -632,7 +814,8 @@ function useFlowState(convId: number | null, selectedNode?: Node | null, setSele
     activeNodeIds.current.clear();
     // 立即拉取一次节点，防止首帧只有ROOT
     void refreshNodesFromServer();
-    // 启动限次补偿轮询（最多15次或节点数>=3即停止）
+    // 启动限次补偿轮询。不要用节点总数作为停止条件：
+    // 已有多节点会话在新分支生成电路图时，节点数本来就大于3，过早停止会漏掉后续落库节点。
     if (pollTimer.current) {
       window.clearInterval(pollTimer.current);
     }
@@ -641,7 +824,7 @@ function useFlowState(convId: number | null, selectedNode?: Node | null, setSele
     pollTimer.current = window.setInterval(() => {
       pollAttempts.current += 1;
       void refreshNodesFromServer();
-      if (pollAttempts.current >= 15 || lastNodeCount.current >= 3) {
+      if (pollAttempts.current >= 60) {
         window.clearInterval(pollTimer.current!);
         pollTimer.current = null;
       }

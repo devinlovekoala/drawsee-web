@@ -3,13 +3,13 @@ import adapterFetch from 'alova/fetch';
 import ReactHook from 'alova/react';
 import {TOKEN_KEY} from "@/common/constant/storage-key.constant.ts";
 
-// export const BASE_URL = 'http://localhost:6868';
-// export const NGSPICE_SIM_API_URL = 'http://localhost:3001/simulate';
-// export const DIGITAL_SIM_API_URL = 'http://localhost:3002/simulate/digital';
+export const BASE_URL = 'http://localhost:6868';
+export const NGSPICE_SIM_API_URL = 'http://localhost:3001/simulate';
+export const DIGITAL_SIM_API_URL = 'http://localhost:3002/simulate/digital';
 
-export const BASE_URL = 'http://8.141.25.20:6868';
-export const NGSPICE_SIM_API_URL = 'http://8.141.25.20:3001/simulate';
-export const DIGITAL_SIM_API_URL = 'http://8.141.25.20:3002/simulate/digital';
+// export const BASE_URL = 'http://8.141.25.20:6868';
+// export const NGSPICE_SIM_API_URL = 'http://8.141.25.20:3001/simulate';
+// export const DIGITAL_SIM_API_URL = 'http://8.141.25.20:3002/simulate/digital';
 
 // 导出所有API方法
 export * from './methods/auth.methods';
