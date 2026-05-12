@@ -1,8 +1,9 @@
 import { useMemo, useRef, useCallback, useState, useEffect } from "react";
 import { Node, Edge } from "@xyflow/react";
 import { AiTaskType, NodeType } from "@/api/types/flow.types";
+import { COMPACT_NODE_HEIGHT, COMPACT_NODE_WIDTH, FLOW_HORIZONTAL_SPACING, FLOW_VERTICAL_SPACING, ROOT_NODE_SIZE, TEMP_QUERY_NODE_ID_PREFIX } from "../constants";
 import useFlowTools from "./useFlowTools";
-import { COMPACT_NODE_HEIGHT, COMPACT_NODE_WIDTH, TEMP_QUERY_NODE_ID_PREFIX } from "../constants";
+import { resolveNonOverlappingNodePosition } from "../utils/nodePlacement";
 
 // 定义临时节点任务数据类型
 export type TempQueryNodeTask = { 
@@ -52,8 +53,8 @@ function useTempQueryNode(
     edges: Edge[];
   }>>
 ) {
+  const { focusNodeInView } = useFlowTools();
 
-	const { executeFitView, executeLayout } = useFlowTools();
 	// 临时查询节点ID
 	const tempQueryNodeId = useRef<string | null>(null);
 	// 没有临时查询节点的节点和边
@@ -115,7 +116,6 @@ function useTempQueryNode(
     
     // 明确拒绝的节点类型
     if (
-      (nodeType === 'answer' && nodeSubtype !== 'circuit-analyze') || 
       nodeType === 'knowledge-head' || 
       nodeType === 'answer-point' || 
       nodeType === 'ANSWER_POINT'
@@ -144,6 +144,11 @@ function useTempQueryNode(
   // 获取临时查询节点的父节点ID
   const parentIdOfTempQueryNode = useMemo(() => {
     if (!selectedNode) return rootNodeId;
+
+    if (selectedNode.id.startsWith(TEMP_QUERY_NODE_ID_PREFIX)) {
+      const realParentId = selectedNode.data?.parentId;
+      return realParentId === null || realParentId === undefined ? rootNodeId : String(realParentId);
+    }
     
     const nodeType = selectedNode.type as NodeType;
     const nodeSubtype = selectedNode.data?.subtype as string | undefined;
@@ -183,8 +188,7 @@ function useTempQueryNode(
     parentId: string | null, 
     canInputValue: boolean, 
     elementsValue: {nodes: Node[], edges: Edge[]},
-    convIdValue: number,
-    executeLayoutFn: typeof executeLayout
+    convIdValue: number | null
   ) => void;
   
   // 创建更新函数
@@ -192,8 +196,7 @@ function useTempQueryNode(
     parentId, 
     canInputValue, 
     elementsValue,
-    convIdValue,
-    executeLayoutFn
+    convIdValue
   ) => {
     if (!convIdValue) {
       latestNodesAndEdgesWithTempQueryNode.current = elementsValue;
@@ -234,8 +237,23 @@ function useTempQueryNode(
     // 如果已有临时节点，先将其移除       
     const updatedNodes = [...elementsValue.nodes.filter(n => n.id !== tempQueryNodeId.current), newTempNode];
     const updatedEdges = [...elementsValue.edges.filter(e => e.target !== tempQueryNodeId.current), newTempEdge];
-    // 执行布局
-    const layoutedNodes = executeLayoutFn(updatedNodes, updatedEdges, false);
+    const parentNode = elementsValue.nodes.find(node => node.id === parentId);
+    const existingSiblingCount = updatedEdges.filter(edge => edge.source === parentId && edge.target !== newTempNode.id).length;
+    const parentWidth = parentNode?.type === 'root' ? ROOT_NODE_SIZE : COMPACT_NODE_WIDTH;
+    const tempPosition = parentNode
+      ? resolveNonOverlappingNodePosition({
+          nodes: updatedNodes,
+          movingNodeId: newTempNode.id,
+          basePosition: {
+            x: parentNode.position.x + parentWidth + FLOW_HORIZONTAL_SPACING,
+            y: parentNode.position.y + existingSiblingCount * (COMPACT_NODE_HEIGHT + FLOW_VERTICAL_SPACING)
+          },
+          anchorY: parentNode.position.y,
+        })
+      : newTempNode.position;
+    const layoutedNodes = updatedNodes.map(node =>
+      node.id === newTempNode.id ? { ...node, position: tempPosition } : node
+    );
     
     latestNodesAndEdgesWithTempQueryNode.current = { nodes: layoutedNodes, edges: updatedEdges };
     setUpdateCounter(prev => prev + 1); // 触发重新渲染
@@ -252,10 +270,9 @@ function useTempQueryNode(
       parentIdOfTempQueryNode, 
       canInput, 
       elements,
-      convId,
-      executeLayout
+      convId
     );
-  }, [parentIdOfTempQueryNode, canInput, elements, convId, executeLayout, debouncedUpdateNodesAndEdges]);
+  }, [parentIdOfTempQueryNode, canInput, elements, convId, debouncedUpdateNodesAndEdges]);
 
   // 有临时查询节点的节点和边 - 使用最新计算结果
   const nodesAndEdgesWithTempQueryNode = useMemo(() => {
@@ -304,8 +321,10 @@ function useTempQueryNode(
             );
             // 更新临时节点引用
             tempQueryNodeId.current = newTempQueryNodeId;
-            // 延迟执行fitView，确保节点已更新
-            executeFitView([newTempQueryNodeId], 300);
+            const createdTempNode = updatedNodes.find(node => node.id === newTempQueryNodeId);
+            if (createdTempNode) {
+              focusNodeInView(createdTempNode, 80, 350);
+            }
             
             return { nodes: updatedNodes, edges: updatedEdges };
           });
@@ -330,10 +349,6 @@ function useTempQueryNode(
           setElements(({nodes, edges}) => {
             // 清除临时节点引用
             tempQueryNodeId.current = null;
-            // 执行fitView
-            const fitViewNodeIds = task.fitViewNodeIds || [parentIdOfTempQueryNode].filter(Boolean) as string[];
-            executeFitView(fitViewNodeIds, 100);
-            
             if (nodesAndEdgesNoneTempQueryNode.current) {
               return nodesAndEdgesNoneTempQueryNode.current;
             }
@@ -346,7 +361,7 @@ function useTempQueryNode(
     }
     // 释放锁
     isProcessingTempQueryNodeTask.current = false;
-  }, [canInput, parentIdOfTempQueryNode, setElements, nodesAndEdgesWithTempQueryNode, executeFitView]);
+  }, [canInput, parentIdOfTempQueryNode, setElements, nodesAndEdgesWithTempQueryNode, focusNodeInView]);
 
   /**
    * 添加临时查询节点任务

@@ -14,8 +14,8 @@ interface ModelSelectorProps {
 // 模型选项
 const modelOptions = [
   {
-    name: 'DeepSeekV3',
-    description: 'DeepSeekV3大语言模型',
+    name: 'DeepSeekV4',
+    description: 'DeepSeekV4大语言模型',
     icon: DeepSeek.Color,
     type: 'deepseekV3' satisfies ModelType
   },

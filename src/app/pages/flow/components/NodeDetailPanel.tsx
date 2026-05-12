@@ -1,8 +1,9 @@
 import React, { useMemo, useEffect, useState, useRef, useCallback } from 'react';
 import { Node } from '@xyflow/react';
 import { format } from 'date-fns';
-import { X, Clock, Tag, Circle, FileText, Zap, Sparkles, Eye } from 'lucide-react';
+import { X, Clock, Tag, Circle, FileText, Zap, Sparkles, Eye, Loader2 } from 'lucide-react';
 import { Button, message } from 'antd';
+import { useNavigate } from 'react-router-dom';
 import MarkdownWithLatex from './markdown/MarkdownWithLatex';
 import { NodeData } from './node/types/node.types';
 import { NodeType, FollowUpSuggestionData, CreateAiTaskDTO } from '@/api/types/flow.types';
@@ -11,8 +12,11 @@ import { useAppContext } from '@/app/contexts/AppContext';
 import { useFlowContext } from '@/app/contexts/FlowContext';
 import { createAiTask } from '@/api/methods/flow.methods';
 import type { CircuitDesign } from '@/api/types/circuit.types';
-
-const CIRCUIT_PREFILL_STORAGE_KEY = 'flow_prefill_circuit_design';
+import {
+  resolveWorkbenchRouteFromDesign,
+  writeCircuitPrefill,
+} from '@/app/pages/circuit/utils/circuitPrefill';
+import { isCircuitDiagramIntent } from '@/app/pages/flow/utils/circuitIntent';
 
 // 动态导入电路组件，避免循环依赖
 const CircuitFlowWithProvider = React.lazy(() => 
@@ -97,8 +101,19 @@ const extractCircuitWarmupIntro = (rawText?: string): string => {
   return stripMarkdownText(normalized);
 };
 
+const stripFollowupReferenceSections = (rawText?: string): string => {
+  if (!rawText) return '';
+  return rawText
+    .replace(/\r\n/g, '\n')
+    .replace(/\n{0,2}#{1,6}\s*(智推参考方向|追问方向概览|AI\s*追问推荐)\s*\n[\s\S]*?(?=\n\s*#{1,6}\s+|$)/g, '')
+    .trim();
+};
+
 export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeData, onApplySuggestion }: NodeDetailPanelProps) {
-  const nodeData = selectedNode?.data as NodeData<NodeType>;
+  const latestSelectedNode = selectedNode?.id && getLatestNodeData
+    ? getLatestNodeData(selectedNode.id) || selectedNode
+    : selectedNode;
+  const nodeData = latestSelectedNode?.data as NodeData<NodeType>;
   const [nodeContentKey, setNodeContentKey] = useState(0); // 用于强制重新渲染
   const [lastTextContent, setLastTextContent] = useState<string>(''); // 跟踪上次的文本内容
   const [forceRefresh, setForceRefresh] = useState(0); // 添加强制刷新状态
@@ -108,6 +123,7 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
   const autoScrollThreshold = 80;
   const { handleAiTaskCountPlus } = useAppContext();
   const { convId, chat } = useFlowContext();
+  const navigate = useNavigate();
   const [pdfDetailLoading, setPdfDetailLoading] = useState(false);
   const nodeTypeValue = selectedNode?.type ? String(selectedNode.type) : '';
   const isPdfAnalysisPointNode = nodeTypeValue === 'PDF_ANALYSIS_POINT' || nodeTypeValue === 'pdf-circuit-point';
@@ -466,8 +482,11 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
 
   // 检查是否为电路节点类型
   const isCircuitNode = useMemo(() => {
-    return nodeTypeValue === 'circuit-canvas' || nodeTypeValue === 'circuit-analyze' || nodeTypeValue === 'circuit-detail';
-  }, [nodeTypeValue]);
+    return Boolean(circuitInfo?.circuitDesign) ||
+      nodeTypeValue === 'circuit-canvas' ||
+      nodeTypeValue === 'circuit-analyze' ||
+      nodeTypeValue === 'circuit-detail';
+  }, [nodeTypeValue, circuitInfo?.circuitDesign]);
 
   // 获取文本内容和其他字段信息 - 使用最新的节点数据
   const nodeFields = useMemo(() => {
@@ -582,33 +601,109 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
     const circuitDesign = circuitInfo?.circuitDesign as CircuitDesign | undefined;
     const normalizedDesign = ensureCircuitMetadata(circuitDesign);
     if (normalizedDesign) {
-      sessionStorage.setItem(
-        CIRCUIT_PREFILL_STORAGE_KEY,
-        JSON.stringify({
-          design: normalizedDesign,
-          ts: Date.now(),
-          convId
-        })
-      );
+      writeCircuitPrefill({
+        design: normalizedDesign,
+        ts: Date.now(),
+        convId,
+        source: 'flow',
+      });
     }
-    const targetPath = circuitDesign?.id ? `/circuit/edit/${circuitDesign.id}` : '/circuit';
+    const targetPath = resolveWorkbenchRouteFromDesign(normalizedDesign);
     if (convId) {
       sessionStorage.setItem(
         `circuit_return_info_${convId}`,
         JSON.stringify({
-          designId: circuitDesign?.id,
+          designId: normalizedDesign?.id,
           path: targetPath,
           from: 'flow',
           ts: Date.now()
         })
       );
     }
-    window.location.href = targetPath;
-  }, [circuitInfo?.circuitDesign, convId, ensureCircuitMetadata]);
+    try {
+      (window as any).drawsee_suppressBeforeUnload = true;
+      (window as any).drawsee_preConfirmedNavigation = true;
+    } catch (error) {
+      console.warn('设置画布跳转保护标记失败', error);
+    }
+    navigate(targetPath, {
+      state: {
+        prefillCircuitDesign: normalizedDesign,
+        convId,
+        fromFlow: true,
+      },
+    });
+  }, [circuitInfo?.circuitDesign, convId, ensureCircuitMetadata, navigate]);
+
+  const followUpInfo = useMemo(() => {
+    const latestNode = selectedNode?.id && getLatestNodeData ? 
+      getLatestNodeData(selectedNode.id) : selectedNode;
+    const currentNodeData = latestNode?.data as NodeData<NodeType> | undefined;
+    if (!currentNodeData) {
+      return { suggestions: [] as FollowUpSuggestionData[], contextTitle: undefined as string | undefined };
+    }
+    const rawFollowUps = getArrayField(currentNodeData, 'followUps') as FollowUpSuggestionData[] | undefined;
+    const suggestions = rawFollowUps?.filter((item) => {
+      if (!item) return false;
+      const source = (typeof item.followUp === 'string' && item.followUp.trim().length > 0 && item.followUp) ||
+        (typeof item.hint === 'string' && item.hint.trim().length > 0 && item.hint) ||
+        (typeof item.title === 'string' && item.title.trim().length > 0 && item.title) ||
+        '';
+      return source.trim().length > 0;
+    }) ?? [];
+    const contextTitle = getStringField(currentNodeData, 'contextTitle');
+    return { suggestions, contextTitle };
+  }, [selectedNode?.id, nodeData, getLatestNodeData, forceRefresh, lastUpdatedAt]);
+
+  const { title, text, angle, objectName, urls, fileUrl, fileType } = nodeFields;
+  const qaAnswerNodeId = getStringField(nodeData, 'qaAnswerNodeId');
+  const qaAnswerText = getStringField(nodeData, 'qaAnswerText');
+  const qaAnswerTitle = getStringField(nodeData, 'qaAnswerTitle');
+  const hasFollowupSuggestions = followUpInfo.suggestions.length > 0;
+  const displayText = useMemo(() => {
+    return hasFollowupSuggestions ? stripFollowupReferenceSections(text) : text;
+  }, [hasFollowupSuggestions, text]);
+  const qaAnswerDisplayText = useMemo(() => {
+    return hasFollowupSuggestions ? stripFollowupReferenceSections(qaAnswerText) : qaAnswerText;
+  }, [hasFollowupSuggestions, qaAnswerText]);
+  const shouldShowQaAnswerTitle = useMemo(() => {
+    const normalized = qaAnswerTitle?.trim();
+    return Boolean(normalized && !['AI解析', 'AI回答', '回答'].includes(normalized));
+  }, [qaAnswerTitle]);
+  const circuitWarmupIntro = useMemo(() => extractCircuitWarmupIntro(text), [text]);
+  const isWaitingForCircuitCanvas = useMemo(() => {
+    return Boolean(
+      !circuitInfo?.circuitDesign &&
+      isGenerating &&
+      isCircuitDiagramIntent(title, text, qaAnswerTitle, qaAnswerText)
+    );
+  }, [circuitInfo?.circuitDesign, isGenerating, title, text, qaAnswerTitle, qaAnswerText]);
 
   // 渲染电路内容
   const renderCircuitContent = useMemo(() => {
-    if (!isCircuitNode || !circuitInfo?.circuitDesign) return null;
+    if (!circuitInfo?.circuitDesign) {
+      if (!isWaitingForCircuitCanvas) return null;
+
+      return (
+        <div className="border-t border-gray-100 pt-4">
+          <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-blue-600 shadow-sm">
+                <Loader2 className="h-5 w-5 animate-spin" />
+              </div>
+              <div>
+                <h4 className="text-sm font-semibold text-blue-900">正在生成电路图</h4>
+                <p className="mt-1 text-xs leading-relaxed text-blue-700">
+                  AI 回答已开始返回，电路画布会在后端完成结构化生成后自动出现在这里。
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (!isCircuitNode) return null;
     
     return (
       <div className="border-t border-gray-100 pt-4">
@@ -637,35 +732,15 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
               selectedModel={getStringField(nodeData, 'mode') === 'qwen' ? 'qwen' : 'deepseekV3'}
               initialCircuitDesign={circuitInfo.circuitDesign}
               isReadOnly={true}
+              showStatusBar={false}
+              enhanceInitialLayout={true}
             />
           </React.Suspense>
         </div>
       </div>
     );
-  }, [isCircuitNode, circuitInfo?.circuitDesign, nodeData, handleOpenCircuitPage]);
+  }, [isCircuitNode, circuitInfo?.circuitDesign, isWaitingForCircuitCanvas, nodeData, handleOpenCircuitPage]);
 
-  const followUpInfo = useMemo(() => {
-    const latestNode = selectedNode?.id && getLatestNodeData ? 
-      getLatestNodeData(selectedNode.id) : selectedNode;
-    const currentNodeData = latestNode?.data as NodeData<NodeType> | undefined;
-    if (!currentNodeData) {
-      return { suggestions: [] as FollowUpSuggestionData[], contextTitle: undefined as string | undefined };
-    }
-    const rawFollowUps = getArrayField(currentNodeData, 'followUps') as FollowUpSuggestionData[] | undefined;
-    const suggestions = rawFollowUps?.filter((item) => {
-      if (!item) return false;
-      const source = (typeof item.followUp === 'string' && item.followUp.trim().length > 0 && item.followUp) ||
-        (typeof item.hint === 'string' && item.hint.trim().length > 0 && item.hint) ||
-        (typeof item.title === 'string' && item.title.trim().length > 0 && item.title) ||
-        '';
-      return source.trim().length > 0;
-    }) ?? [];
-    const contextTitle = getStringField(currentNodeData, 'contextTitle');
-    return { suggestions, contextTitle };
-  }, [selectedNode?.id, nodeData, getLatestNodeData, forceRefresh, lastUpdatedAt]);
-
-  const { title, text, angle, objectName, urls, fileUrl, fileType } = nodeFields;
-  const circuitWarmupIntro = useMemo(() => extractCircuitWarmupIntro(text), [text]);
   const shouldRenderCircuitWarmupOnly = useMemo(() => {
     if (nodeTypeValue !== 'circuit-analyze') return false;
     const raw = typeof text === 'string' ? text : '';
@@ -745,12 +820,12 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
   }
 
   const renderStreamContent = () => {
-    return text ? (
+    return displayText ? (
       <div className="relative">
         <MarkdownWithLatex
-          text={text}
+          text={displayText}
           isStreaming={Boolean(isGenerating)}
-          key={`markdown-${selectedNode?.id}-${forceRefresh}-${text.length}-${lastUpdatedAt}`}
+          key={`markdown-${selectedNode?.id}-${forceRefresh}-${displayText.length}-${lastUpdatedAt}`}
         />
         {isGenerating && (
           <span className="inline-block w-2 h-4 bg-blue-500 animate-pulse ml-1 align-text-bottom"></span>
@@ -884,6 +959,44 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
                       <p className="mt-2 text-sm text-gray-700 leading-relaxed whitespace-pre-line">
                         {circuitWarmupIntro || '模型正在分析该电路，请稍候...'}
                       </p>
+                    </div>
+                  </div>
+                );
+              }
+
+              if (qaAnswerNodeId) {
+                return (
+                  <div className="space-y-3">
+                    <div className="p-4 rounded-2xl border border-blue-100 bg-blue-50/60 shadow-sm">
+                      <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide">
+                        用户提问
+                      </p>
+                      <p className="mt-2 text-sm text-gray-800 leading-relaxed whitespace-pre-line">
+                        {text || '追问内容为空'}
+                      </p>
+                    </div>
+                    <div className="p-4 rounded-2xl border border-emerald-100 bg-emerald-50/20 shadow-sm">
+                      <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wide">
+                        AI 回答
+                      </p>
+                      {shouldShowQaAnswerTitle && qaAnswerTitle && (
+                        <p className="mt-1 text-base font-semibold text-gray-900">
+                          {qaAnswerTitle}
+                        </p>
+                      )}
+                      <div className="mt-3 prose prose-sm max-w-none">
+                        {qaAnswerDisplayText ? (
+                          <MarkdownWithLatex
+                            text={qaAnswerDisplayText}
+                            isStreaming={Boolean(isGenerating)}
+                            key={`qa-answer-${qaAnswerNodeId}-${forceRefresh}-${qaAnswerDisplayText.length}-${lastUpdatedAt}`}
+                          />
+                        ) : (
+                          <div className="text-sm text-gray-400 py-3">
+                            AI 回答生成中...
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 );

@@ -10,14 +10,21 @@ const DigitalWorkbench = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const classId = location.state?.classId as string || null;
-  const [circuitDesign, setCircuitDesign] = useState<CircuitDesign | null>(null);
+  const statePrefillDesign = location.state?.prefillCircuitDesign as CircuitDesign | undefined;
+  const [initialCircuitDesign, setInitialCircuitDesign] = useState<CircuitDesign | null>(() => {
+    return statePrefillDesign || consumeCircuitPrefill();
+  });
 
   useEffect(() => {
+    if (statePrefillDesign) {
+      setInitialCircuitDesign(statePrefillDesign);
+      return;
+    }
     const prefillDesign = consumeCircuitPrefill();
     if (prefillDesign) {
-      setCircuitDesign(prefillDesign);
+      setInitialCircuitDesign(prefillDesign);
     }
-  }, []);
+  }, [statePrefillDesign]);
 
   return (
     <div className="flex h-full flex-col bg-slate-50">
@@ -45,7 +52,7 @@ const DigitalWorkbench = () => {
       <main className="flex flex-1 overflow-hidden">
         <CircuitFlowWithProvider
           workspaceMode="digital"
-          initialCircuitDesign={circuitDesign || undefined}
+          initialCircuitDesign={initialCircuitDesign || undefined}
           classId={classId}
         />
       </main>

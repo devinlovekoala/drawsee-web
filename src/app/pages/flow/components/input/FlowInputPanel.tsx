@@ -12,6 +12,7 @@ import { Node as FlowNode } from "@xyflow/react";
 import { DeepSeek, Qwen } from "./ModelIcons";
 import { DropdownOption, SelectDropdown } from "./SelectDropdown";
 import { useLocation } from 'react-router-dom';
+import { TEMP_QUERY_NODE_ID_PREFIX } from "../../constants";
 
 interface FlowInputPanelProps {
   prompt: string;
@@ -72,8 +73,8 @@ ref) {
       type: 'qwen' satisfies ModelType
     },
     {
-      name: 'DeepSeekV3',
-      description: 'DeepSeekV3大语言模型',
+      name: 'DeepSeekV4',
+      description: 'DeepSeekV4大语言模型',
       icon: DeepSeek.Color,
       type: 'deepseekV3' satisfies ModelType
     }
@@ -98,30 +99,48 @@ ref) {
   
   const determineTaskType = useCallback((): AiTaskType => {
     if (!selectedNode) return 'GENERAL';
+
     const nodeType = selectedNode.type as string | undefined;
-    const nodeSubtype = (selectedNode.data as Record<string, unknown> | undefined)?.subtype as string | undefined;
+    const nodeData = selectedNode.data as Record<string, unknown> | undefined;
+    const nodeSubtype = typeof nodeData?.subtype === 'string' ? nodeData.subtype : undefined;
+    const originalType = typeof nodeData?.originalType === 'string' ? nodeData.originalType : undefined;
+    const nodeMode = typeof nodeData?.mode === 'string' ? nodeData.mode : undefined;
+    const typeHints = new Set([nodeType, nodeSubtype, originalType, nodeMode].filter(Boolean));
 
-    const isCircuitNode = (nodeType === 'answer' && nodeSubtype === 'circuit-analyze') ||
-      nodeSubtype === 'circuit-canvas' ||
-      nodeSubtype === 'circuit-analyze' ||
-      nodeType === 'circuit-canvas' ||
-      nodeType === 'circuit-analyze';
+    if (
+      typeHints.has('pdf-circuit-point') ||
+      typeHints.has('PDF_ANALYSIS_POINT')
+    ) {
+      return 'PDF_CIRCUIT_ANALYSIS_DETAIL';
+    }
 
-    if (isCircuitNode) {
+    if (
+      typeHints.has('PDF_DOCUMENT') ||
+      typeHints.has('PDF_CIRCUIT_ANALYSIS')
+    ) {
+      return 'PDF_CIRCUIT_ANALYSIS';
+    }
+
+    const hasFoldedCircuitCanvas = Boolean(nodeData?.circuitCanvasNodeId || nodeData?.circuitDesign);
+    const isCircuitCanvas = typeHints.has('circuit-canvas') || hasFoldedCircuitCanvas;
+    const isCircuitAnalyzeResult =
+      typeHints.has('circuit-analyze') ||
+      typeHints.has('circuit-detail');
+
+    if (isCircuitAnalyzeResult) {
       return 'CIRCUIT_DETAIL';
     }
 
-    const isPdfNode = nodeType === 'PDF_ANALYSIS_POINT' ||
-      nodeType === 'PDF_ANALYSIS_DETAIL' ||
-      nodeType === 'pdf-circuit-point' ||
-      nodeType === 'pdf-circuit-detail' ||
-      nodeSubtype === 'PDF_ANALYSIS_POINT' ||
-      nodeSubtype === 'PDF_ANALYSIS_DETAIL' ||
-      nodeSubtype === 'pdf-circuit-point' ||
-      nodeSubtype === 'pdf-circuit-detail';
+    if (isCircuitCanvas) {
+      const text = typeof nodeData?.text === 'string' ? nodeData.text.trim() : '';
+      const followUps = Array.isArray(nodeData?.followUps) ? nodeData.followUps : [];
+      const hasAnalysisContent =
+        text.length > 0 ||
+        followUps.length > 0 ||
+        nodeData?.isGenerated === true ||
+        nodeData?.process === 'completed';
 
-    if (isPdfNode) {
-      return 'PDF_CIRCUIT_ANALYSIS_DETAIL';
+      return hasAnalysisContent ? 'CIRCUIT_DETAIL' : 'CIRCUIT_ANALYSIS';
     }
 
     return 'GENERAL';
@@ -136,7 +155,9 @@ ref) {
     const rawSubtype = typeof nodeData?.subtype === 'string' ? nodeData.subtype : undefined;
     const displayTitle = nodeTitle || (rawText ? rawText.slice(0, 30) : '');
     const circuitDesign = nodeData?.circuitDesign as CircuitDesign | undefined;
-    const isCircuitCanvas = nodeType === 'circuit-canvas' || rawSubtype === 'circuit-canvas';
+    const isCircuitCanvas = nodeType === 'circuit-canvas' ||
+      rawSubtype === 'circuit-canvas' ||
+      Boolean(nodeData?.circuitCanvasNodeId || circuitDesign);
     const isCircuitAnalyze = nodeType === 'circuit-analyze' || rawSubtype === 'circuit-analyze';
     const isCircuitDetail = nodeType === 'circuit-detail' || rawSubtype === 'circuit-detail';
 
@@ -209,6 +230,12 @@ ref) {
 
   const submitWithParentId = useCallback((parentId: string) => {
     setIsProcessing(true);
+    const parsedParentId = Number.parseInt(parentId, 10);
+    if (parentId.startsWith(TEMP_QUERY_NODE_ID_PREFIX) || !Number.isFinite(parsedParentId)) {
+      setIsProcessing(false);
+      toast.error('请求失败, 父节点异常，请重新选择要追问的节点');
+      return;
+    }
     
     // 构建最终提交的问题文本，如果有引用则包含引用内容，并叠加节点上下文
     let finalPrompt = prompt;
@@ -221,13 +248,27 @@ ref) {
     
     // 最终选择的模型
     const finalModel = selectedModel; // 所有模式都使用选择的模型
+    const selectedNodeData = selectedNode?.data as Record<string, unknown> | undefined;
+    const foldedCircuitCanvasNodeId = selectedNodeData?.circuitCanvasNodeId;
+    const submitParentId = taskType === 'CIRCUIT_DETAIL' &&
+      foldedCircuitCanvasNodeId !== undefined &&
+      foldedCircuitCanvasNodeId !== null &&
+      String(foldedCircuitCanvasNodeId).trim().length > 0
+        ? Number.parseInt(String(foldedCircuitCanvasNodeId), 10)
+        : parsedParentId;
+
+    if (!Number.isFinite(submitParentId)) {
+      setIsProcessing(false);
+      toast.error('请求失败, 电路节点异常，请重新选择要追问的节点');
+      return;
+    }
 
     const createAiTaskDTO = {
       type: taskType,
       prompt: finalPrompt,
       promptParams: {},
       convId: convId,
-      parentId: parseInt(parentId, 10),
+      parentId: submitParentId,
       model: finalModel, // 使用选择的模型
       classId: classId // 传递班级ID
     } as CreateAiTaskDTO;
@@ -264,7 +305,7 @@ ref) {
       setIsProcessing(false);
     });
   }, [
-    prompt, quoteText, selectedModel, convId, classId, buildPromptWithNodeContext,
+    prompt, quoteText, selectedModel, selectedNode, convId, classId, buildPromptWithNodeContext,
     determineTaskType, handleAiTaskCountPlus, setQuoteText, setPrompt, setIsExpanded,
     setIsAnimating, handleNewChat, chat
   ]);
@@ -348,7 +389,7 @@ ref) {
   return (
     <div ref={containerRef} className="input-panel-container"
       style={quoteText ? {
-        transform: "translateY(15%) translateX(-50%)"
+        transform: "translateY(0) translateX(-50%)"
       } : {}}
     >
       {/* 选择器按钮区域 */}

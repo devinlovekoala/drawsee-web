@@ -19,26 +19,35 @@ function Circuit() {
   const location = useLocation();
   const navigate = useNavigate();
   const classId = location.state?.classId as string || null;
+  const statePrefillDesign = location.state?.prefillCircuitDesign as CircuitDesign | undefined;
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [circuitDesign, setCircuitDesign] = useState<CircuitDesign | null>(null);
+  const [initialCircuitDesign, setInitialCircuitDesign] = useState<CircuitDesign | null>(() => {
+    return statePrefillDesign || consumeCircuitPrefill();
+  });
+  const [, setCurrentCircuitDesign] = useState<CircuitDesign | null>(initialCircuitDesign);
   const [selectedModel, setSelectedModel] = useState<ModelType>('deepseekV3'); // 默认使用DeepSeekV3模型
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [pendingNavigation, setPendingNavigation] = useState<NavigationEvent | null>(null);
   const [unsavedModalVisible, setUnsavedModalVisible] = useState(false);
   
-  // 更新电路设计数据
+  // 记录画布实时设计，但不再回写 initialCircuitDesign，避免触发初始数据反复加载。
   const handleCircuitDesignChange = useCallback((design: CircuitDesign) => {
-    setCircuitDesign(design);
+    setCurrentCircuitDesign(design);
   }, []);
 
   // 从Flow预填电路设计（无ID时也能直接带入）
   useEffect(() => {
+    if (statePrefillDesign) {
+      setInitialCircuitDesign(statePrefillDesign);
+      setCurrentCircuitDesign(statePrefillDesign);
+      return;
+    }
     const prefillDesign = consumeCircuitPrefill();
     if (prefillDesign) {
-      setCircuitDesign(prefillDesign);
+      setInitialCircuitDesign(prefillDesign);
+      setCurrentCircuitDesign(prefillDesign);
     }
-  }, []);
+  }, [statePrefillDesign]);
   
   // 处理模型切换
   const handleModelChange = useCallback((model: ModelType) => {
@@ -162,10 +171,11 @@ function Circuit() {
         <CircuitFlowWithProvider 
           onCircuitDesignChange={handleCircuitDesignChange}
           selectedModel={selectedModel}
-          initialCircuitDesign={circuitDesign || undefined}
+          initialCircuitDesign={initialCircuitDesign || undefined}
           classId={classId}
           onModelChange={handleModelChange}
           onUnsavedChange={setHasUnsavedChanges}
+          enhanceInitialLayout={true}
         />
       </div>
       

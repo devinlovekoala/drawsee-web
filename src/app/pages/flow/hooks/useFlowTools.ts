@@ -12,7 +12,7 @@ const DEFAULT_FIT_VIEW_CONFIG = {
 
 function useFlowTools() {
 
-	const { fitView, getViewport, setViewport } = useReactFlow();
+	const { fitView, getViewport, setViewport, setCenter } = useReactFlow();
   
   const lastLayoutCallRef = useRef<number>(0);
 
@@ -63,6 +63,31 @@ function useFlowTools() {
     }
   }, [getViewport, setViewport]);
 
+  const focusNodeInView = useCallback((
+    node: Node,
+    delay: number = 0,
+    duration: number = 450
+  ) => {
+    setTimeout(() => {
+      const viewport = getViewport();
+      const nodeWidth =
+        (typeof node.measured?.width === 'number' && node.measured.width > 0)
+          ? node.measured.width
+          : (typeof node.width === 'number' && node.width > 0 ? node.width : 380);
+      const nodeHeight =
+        (typeof node.measured?.height === 'number' && node.measured.height > 0)
+          ? node.measured.height
+          : (typeof node.height === 'number' && node.height > 0 ? node.height : 180);
+      const targetZoom = Math.min(0.95, Math.max(0.68, viewport.zoom || 0.8));
+
+      setCenter(
+        node.position.x + nodeWidth / 2,
+        node.position.y + nodeHeight / 2,
+        { zoom: targetZoom, duration }
+      );
+    }, delay);
+  }, [getViewport, setCenter]);
+
   const executeLayout = useCallback((nodes: Node[], edges: Edge[], updateServer: boolean = false, resetHeight: boolean = false) => {
     // 立即执行布局，确保新增节点位置不会落在默认坐标
     lastLayoutCallRef.current = Date.now();
@@ -74,6 +99,7 @@ function useFlowTools() {
   return {
     executeFitView,
     adjustViewportToShowLatestContent,
+    focusNodeInView,
     executeLayout
   }
 

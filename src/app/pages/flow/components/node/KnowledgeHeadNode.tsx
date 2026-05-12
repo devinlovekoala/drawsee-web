@@ -50,7 +50,7 @@ function KnowledgeHeadNode({ showSourceHandle, showTargetHandle, data, ...props 
     }
     setIsGenerated(true);
     const createAiTaskDTO: CreateAiTaskDTO = {
-      type: "KNOWLEDGE_DETAIL",
+      type: "GENERAL",
       prompt: "请详细解析该知识点",
       promptParams: null,
       convId: convId,

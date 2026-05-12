@@ -3,6 +3,7 @@ import React, { useMemo } from 'react';
 import { Button } from 'antd';
 import { FileTextOutlined, EyeOutlined } from '@ant-design/icons';
 import { extractFileNameFromUrl, isHttpUrl } from '@/app/pages/flow/utils/document';
+import { isCircuitDiagramIntent } from '@/app/pages/flow/utils/circuitIntent';
 
 const chatTypeMap: Record<string, string> = {
   'general': '常规问答',
@@ -35,6 +36,11 @@ function arePropsEqual(
   // 检查关键属性
   if (prevData.title !== nextData.title) return false;
   if (prevData.text !== nextData.text) return false;
+  if (prevData.qaAnswerText !== nextData.qaAnswerText) return false;
+  if (prevData.qaAnswerNodeId !== nextData.qaAnswerNodeId) return false;
+  if (prevData.circuitCanvasNodeId !== nextData.circuitCanvasNodeId) return false;
+  if (prevData.circuitDesign !== nextData.circuitDesign) return false;
+  if (prevData.process !== nextData.process) return false;
   if (prevData.updatedAt !== nextData.updatedAt) return false;
   if (prevData.mode !== nextData.mode) return false;
   
@@ -166,15 +172,34 @@ const QueryNode = React.memo(function QueryNode({
 
   // 使用useMemo缓存footerContent
   const footerContent = useMemo(() => {
-    if (!data.mode) return <></>;
     const key = String(data.mode);
     const label = chatTypeMap[key] || chatTypeMap[key.toUpperCase()] || chatTypeMap[key.toLowerCase()];
+    const hasCircuitCanvas = Boolean((data as Record<string, unknown>).circuitCanvasNodeId || (data as Record<string, unknown>).circuitDesign);
+    const isWaitingForCircuitCanvas = !hasCircuitCanvas &&
+      data.process === 'generating' &&
+      isCircuitDiagramIntent(data.text, data.qaAnswerText, data.title);
+    if (!data.mode && !hasCircuitCanvas && !isWaitingForCircuitCanvas) return <></>;
     return (
-      <span className="inline-flex items-center px-5 py-1 rounded-full font-medium bg-blue-100 text-blue-800">
-        {label || key}
-      </span>
+      <div className="flex items-center justify-center gap-2">
+        {data.mode && (
+          <span className="inline-flex items-center px-5 py-1 rounded-full font-medium bg-blue-100 text-blue-800">
+            {label || key}
+          </span>
+        )}
+        {hasCircuitCanvas && (
+          <span className="inline-flex items-center px-4 py-1 rounded-full font-medium bg-pink-100 text-pink-700">
+            电路图
+          </span>
+        )}
+        {isWaitingForCircuitCanvas && (
+          <span className="inline-flex items-center px-4 py-1 rounded-full font-medium bg-blue-100 text-blue-700">
+            <span className="mr-1 h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
+            生成电路图中
+          </span>
+        )}
+      </div>
     );
-  }, [data.mode]);
+  }, [data]);
 
   return (
     <BaseNode

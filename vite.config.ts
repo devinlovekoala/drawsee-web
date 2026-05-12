@@ -10,6 +10,11 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  server: {
+    watch: {
+      ignored: ['**/.idea/**'],
+    },
+  },
   optimizeDeps: {
     include: ['elkjs/lib/elk-api']
   },

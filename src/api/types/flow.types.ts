@@ -175,9 +175,6 @@ export interface XYPosition {
 export type AiTaskType = 
   | "GENERAL" 
   | "GENERAL_CONTINUE" 
-  | "GENERAL_DETAIL" 
-  | "KNOWLEDGE" 
-  | "KNOWLEDGE_DETAIL" 
   | "ANIMATION" 
   | "ANIMATION_DETAIL"
   | "SOLVER_FIRST" 
