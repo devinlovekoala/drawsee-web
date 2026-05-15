@@ -14,6 +14,7 @@ export interface FlowContextType {
   isChatting: boolean;
   addChatTask: (task: ChatTask) => void;
   applySuggestion?: (text: string) => void;
+  classId: string | null;
 }
 
 export const FlowContext = createContext<FlowContextType>({
@@ -22,6 +23,7 @@ export const FlowContext = createContext<FlowContextType>({
   isChatting: false,
   addChatTask: () => {},
   applySuggestion: () => {},
+  classId: null,
 });
 
 export const useFlowContext = () => {

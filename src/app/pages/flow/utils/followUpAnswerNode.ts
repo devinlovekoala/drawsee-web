@@ -1,6 +1,6 @@
 import type { Edge, Node } from '@xyflow/react';
 
-const FOLLOW_UP_RESPONSE_TYPES = new Set([
+export const FOLLOW_UP_RESPONSE_TYPES = new Set([
   'answer',
   'answer-detail',
   'ANSWER_DETAIL',
@@ -81,16 +81,14 @@ export const presentFollowUpAnswerNodes = (nodes: Node[]): Node[] => {
     });
   });
 
+  // 第一遍：处理 answer/circuit-analyze/knowledge-detail 等折叠响应节点，建立 hiddenNodeToVisibleParentId 映射
+  // circuit-canvas 单独在第二遍处理，因为它由后端异步生成，可能比 answer 父节点迟到
   nodes.forEach(node => {
     const nodeType = typeof node.type === 'string' ? node.type : '';
     const parentId = getNodeParentId(node);
     const parentNode = parentId ? nodeMap.get(parentId) : null;
 
-    if (isFoldableCircuitCanvasNode(node, parentNode)) {
-      circuitCanvasByParentId.set(parentNode!.id, node);
-      hiddenNodeToVisibleParentId.set(node.id, parentNode!.id);
-      return;
-    }
+    if (node.type === 'circuit-canvas') return;
 
     if (isRedundantCircuitCompanionNode(node, parentNode)) {
       circuitCompanionByOwnerId.set(parentNode!.id, node);
@@ -104,6 +102,36 @@ export const presentFollowUpAnswerNodes = (nodes: Node[]): Node[] => {
 
     responseByQueryId.set(parentNode!.id, node);
     hiddenNodeToVisibleParentId.set(node.id, parentNode!.id);
+  });
+
+  // 第二遍：处理 circuit-canvas，此时映射已完整，可以沿链找到最终可见节点
+  // 解决电路图比 answer 父节点迟到时无法自动折叠的问题
+  nodes.forEach(node => {
+    if (node.type !== 'circuit-canvas') return;
+    const parentId = getNodeParentId(node);
+    if (!parentId) return;
+    const parentNode = nodeMap.get(parentId);
+
+    if (isFoldableCircuitCanvasNode(node, parentNode)) {
+      circuitCanvasByParentId.set(parentNode!.id, node);
+      hiddenNodeToVisibleParentId.set(node.id, parentNode!.id);
+      return;
+    }
+
+    // 父节点已被折叠（迟到情况）：沿链追到最终可见节点
+    if (hiddenNodeToVisibleParentId.has(parentId)) {
+      let visibleId = parentId;
+      const visited = new Set<string>();
+      while (hiddenNodeToVisibleParentId.has(visibleId) && !visited.has(visibleId)) {
+        visited.add(visibleId);
+        visibleId = hiddenNodeToVisibleParentId.get(visibleId)!;
+      }
+      const visibleNode = nodeMap.get(visibleId);
+      if (visibleNode && !isRootNode(visibleNode)) {
+        circuitCanvasByParentId.set(visibleId, node);
+        hiddenNodeToVisibleParentId.set(node.id, visibleId);
+      }
+    }
   });
 
   const resolveVisibleOwnerId = (nodeId: string): string => {
@@ -150,6 +178,11 @@ export const presentFollowUpAnswerNodes = (nodes: Node[]): Node[] => {
             qaAnswerText: responseNode.data?.text,
             qaAnswerTitle: responseNode.data?.title,
             qaAnswerOriginalType: responseNode.type,
+            qaRagSources: responseNode.data?.ragSources,
+            qaRagStatus: responseNode.data?.ragStatus,
+            qaRagEnhanced: responseNode.data?.ragEnhanced,
+            qaRagCitationStyle: responseNode.data?.ragCitationStyle,
+            qaRagReferencePlacement: responseNode.data?.ragReferencePlacement,
             followUps: responseNode.data?.followUps || node.data?.followUps,
             isGenerated: responseNode.data?.isGenerated ?? node.data?.isGenerated,
             process: responseNode.data?.process || node.data?.process,
@@ -162,6 +195,7 @@ export const presentFollowUpAnswerNodes = (nodes: Node[]): Node[] => {
             circuitCanvasText: circuitCanvasNode.data?.text,
             circuitCanvasTitle: circuitCanvasNode.data?.title,
             circuitCanvasOriginalType: circuitCanvasNode.type,
+            circuitCanvasRagSources: circuitCanvasNode.data?.ragSources,
             followUps: circuitCanvasNode.data?.followUps || node.data?.followUps,
             isGenerated: circuitCanvasNode.data?.isGenerated ?? node.data?.isGenerated,
             process: circuitCanvasNode.data?.process || node.data?.process,
@@ -173,6 +207,7 @@ export const presentFollowUpAnswerNodes = (nodes: Node[]): Node[] => {
             circuitAnalyzeText: circuitCompanionNode.data?.text,
             circuitAnalyzeTitle: circuitCompanionNode.data?.title,
             circuitAnalyzeOriginalType: circuitCompanionNode.type,
+            circuitAnalyzeRagSources: circuitCompanionNode.data?.ragSources,
             followUps: circuitCompanionNode.data?.followUps || node.data?.followUps,
             allowFollowup: true,
             updatedAt: circuitCompanionNode.data?.updatedAt || node.data?.updatedAt,

@@ -217,7 +217,7 @@ function Blank() {
           console.log('AI任务响应', response);
           toast.success("问题已发送");
           handleAiTaskCountPlus();
-          handleBlankQuery(response);
+          handleBlankQuery(response, classId);
         })
         .catch((error: Error) => {
           console.error('AI任务失败', error);

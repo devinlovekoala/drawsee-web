@@ -7,15 +7,11 @@ import { useState, useCallback, useEffect } from 'react';
 import { useAppContext } from '@/app/contexts/AppContext';
 import { ModelType } from '../input/FlowInputPanel';
 import { ModelSelector } from '../../../blank/components/ModelSelector';
-import { useLocation } from 'react-router-dom';
 
 function KnowledgeHeadNode({ showSourceHandle, showTargetHandle, data, ...props }: ExtendedNodeProps<'knowledge-head'>) {
   
-  const {chat, convId, isChatting, addChatTask} = useFlowContext();
+  const {chat, convId, isChatting, addChatTask, classId} = useFlowContext();
   const {handleAiTaskCountPlus} = useAppContext();
-  
-  const location = useLocation();
-  const classId = location.state?.classId as string || null;
 
   const [isGenerated, setIsGenerated] = useState(data.isGenerated || false);
   const initialModel = (data as { mode?: ModelType })?.mode;

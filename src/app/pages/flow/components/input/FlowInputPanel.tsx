@@ -11,7 +11,6 @@ import '@/app/components/text-selection/TextSelectionToolbar.css';
 import { Node as FlowNode } from "@xyflow/react";
 import { DeepSeek, Qwen } from "./ModelIcons";
 import { DropdownOption, SelectDropdown } from "./SelectDropdown";
-import { useLocation } from 'react-router-dom';
 import { TEMP_QUERY_NODE_ID_PREFIX } from "../../constants";
 
 interface FlowInputPanelProps {
@@ -22,6 +21,7 @@ interface FlowInputPanelProps {
   addTempQueryNodeTask: (task: TempQueryNodeTask, sessionId?: string | null) => void;
   parentIdOfTempQueryNode: string | null;
   selectedNode: FlowNode | null;
+  classId?: string | null;
 }
 
 export type ModelType = 'deepseekV3' | 'qwen';
@@ -60,7 +60,8 @@ export const FlowInputPanel = forwardRef<FlowInputPanelHandle, FlowInputPanelPro
   canNotInputReason,
   addTempQueryNodeTask,
   parentIdOfTempQueryNode,
-  selectedNode
+  selectedNode,
+  classId = null
 }: FlowInputPanelProps,
 ref) {
 
@@ -90,9 +91,6 @@ ref) {
   const {chat, convId} = useFlowContext();
   
   const {handleNewChat, quoteText, setQuoteText, handleAiTaskCountPlus} = useAppContext();
-  
-  const location = useLocation();
-  const classId = location.state?.classId as string || null;
   
   const [isProcessing, setIsProcessing] = useState(false);
   const [pendingSubmit, setPendingSubmit] = useState(false);

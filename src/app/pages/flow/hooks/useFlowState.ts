@@ -11,7 +11,7 @@ import { TOKEN_KEY } from "@/common/constant/storage-key.constant";
 import useFlowTools from "./useFlowTools";
 import { COMPACT_NODE_HEIGHT, COMPACT_NODE_WIDTH, FLOW_HORIZONTAL_SPACING, FLOW_VERTICAL_SPACING, ROOT_NODE_SIZE, TEMP_QUERY_NODE_ID_PREFIX } from "../constants";
 import { processTextUpdate } from "../utils/sectionParser";
-import { buildPresentedFlowEdges, presentFollowUpAnswerNodes } from "../utils/followUpAnswerNode";
+import { buildPresentedFlowEdges, presentFollowUpAnswerNodes, FOLLOW_UP_RESPONSE_TYPES } from "../utils/followUpAnswerNode";
 import { resolveNonOverlappingNodePosition } from "../utils/nodePlacement";
 
 // 将后端节点类型归一化为前端可识别的类型
@@ -173,10 +173,45 @@ function useFlowState(convId: number | null, selectedNode?: Node | null, setSele
         }) as Node[];
         const incomingNodes = presentFollowUpAnswerNodes(rawIncomingNodes);
 
-        // 合并：如果服务器返回的节点数更少，不删除本地已存在的节点（避免短暂空列表覆盖）
+        // 合并：服务端数据优先，但保留本地节点中服务端尚未持久化的折叠字段
+        // circuit-canvas 由后端异步生成，done 后的 refresh 可能拿不到它，
+        // 此时不能用服务端版本覆盖本地已折叠好的 circuitCanvasNodeId 等字段
+        const LOCALLY_OWNED_FOLDED_FIELDS = [
+          'circuitCanvasNodeId', 'circuitDesign', 'circuitCanvasText',
+          'circuitCanvasTitle', 'circuitCanvasOriginalType', 'circuitCanvasRagSources',
+        ] as const;
+        // rawIncomingNodes 包含服务端所有节点（折叠前），用它判断"服务端已知哪些 ID"。
+        // incomingNodes 是折叠后的展示节点，其中被折叠的 answer 等节点 ID 已消失，
+        // 不能用它做权威 ID 集合，否则会把本地的 answer 节点误判为"服务端未返回"而重复保留。
+        const rawIncomingIdSet = new Set(rawIncomingNodes.map(n => n.id));
         const mergedMap = new Map<string, Node>();
-        currentNodes.forEach(n => mergedMap.set(n.id, n));
-        incomingNodes.forEach(n => mergedMap.set(n.id, n));
+        // 优先写入折叠后的服务端节点，保留本地持有的折叠字段
+        incomingNodes.forEach(n => {
+          const local = currentNodes.find(cn => cn.id === n.id);
+          if (local) {
+            const preservedData: Record<string, unknown> = {};
+            for (const field of LOCALLY_OWNED_FOLDED_FIELDS) {
+              if (local.data?.[field] != null && n.data?.[field] == null) {
+                preservedData[field] = local.data[field];
+              }
+            }
+            mergedMap.set(n.id, {
+              ...n,
+              data: { ...n.data, ...preservedData },
+            });
+          } else {
+            mergedMap.set(n.id, n);
+          }
+        });
+        // 保留本地持有的、服务端原始列表中完全没有的节点（SSE 先于 DB 落库到达的节点）
+        // 被折叠掉的 answer 节点在 rawIncomingIdSet 里，不会被误保留
+        currentNodes
+          .filter(n => !rawIncomingIdSet.has(n.id) && !n.id.startsWith(TEMP_QUERY_NODE_ID_PREFIX))
+          .forEach(n => { if (!mergedMap.has(n.id)) mergedMap.set(n.id, n); });
+        // 保留本地临时 query 节点（TEMP_QUERY_NODE_ID_PREFIX 前缀），避免闪烁
+        currentNodes
+          .filter(n => n.id.startsWith(TEMP_QUERY_NODE_ID_PREFIX))
+          .forEach(n => mergedMap.set(n.id, n));
         const flowNodes = Array.from(mergedMap.values());
 
         const flowEdges = buildPresentedFlowEdges(flowNodes);
@@ -359,7 +394,17 @@ function useFlowState(convId: number | null, selectedNode?: Node | null, setSele
                     : node
                 )
               : currentNodes;
-            const layoutedNodes = presentFollowUpAnswerNodes(locallyPlacedNodes);
+            // 响应类型节点（answer/circuit-analyze 等）需要 query 父节点已存在才能正确折叠；
+            // 若父节点尚未出现（SSE 乱序），跳过 presentFollowUpAnswerNodes 避免节点被误过滤，
+            // 等父节点到来后下一次渲染会自动完成折叠。
+            const isFollowUpResponse = FOLLOW_UP_RESPONSE_TYPES.has(normalizedType);
+            const parentQueryId = nodeVO.parentId?.toString();
+            const parentQueryExists = parentQueryId
+              ? locallyPlacedNodes.some(n => n.id === parentQueryId)
+              : true;
+            const layoutedNodes = (!isFollowUpResponse || parentQueryExists)
+              ? presentFollowUpAnswerNodes(locallyPlacedNodes)
+              : locallyPlacedNodes;
             // 获得新节点布局后的位置
             const newNodeLayoutedPosition = layoutedNodes.find(node => node.id === newNode.id)?.position;
             console.log('newNodeLayoutedPosition', newNodeLayoutedPosition);
@@ -843,9 +888,18 @@ function useFlowState(convId: number | null, selectedNode?: Node | null, setSele
     );
     
     let hasReceivedMessage = false;
+    let hasReceivedRenderableContent = false;
     let hasCompleted = false;
     let isClosingIntentionally = false;
     let idleTimeout: number | null = null;
+
+    const isRenderableChatTask = (task: ChatTask) => {
+      return task.type === 'node' ||
+        task.type === 'text' ||
+        task.type === 'title' ||
+        task.type === 'done' ||
+        task.type === 'error';
+    };
 
     const clearIdleTimeout = () => {
       if (idleTimeout !== null) {
@@ -862,10 +916,11 @@ function useFlowState(convId: number | null, selectedNode?: Node | null, setSele
         const hasServerProgress = hasMeaningfulFlowProgress(latestNodes);
         const hasEnoughNodes = latestNodes.length >= 3;
 
+        const idleSeconds = hasReceivedRenderableContent ? 90 : 150;
         console.warn(
           hasReceivedMessage
-            ? 'SSE连接长时间空闲（45秒），强制关闭'
-            : 'SSE连接首包等待超时（90秒），强制关闭'
+            ? `SSE连接长时间空闲（${idleSeconds}秒），强制关闭`
+            : `SSE连接首包等待超时（${idleSeconds}秒），强制关闭`
         );
         source.close();
 
@@ -884,7 +939,7 @@ function useFlowState(convId: number | null, selectedNode?: Node | null, setSele
           window.clearInterval(pollTimer.current);
           pollTimer.current = null;
         }
-      }, hasReceivedMessage ? 45000 : 90000);
+      }, hasReceivedRenderableContent ? 90000 : 150000);
     };
 
     resetIdleTimeout();
@@ -893,8 +948,11 @@ function useFlowState(convId: number | null, selectedNode?: Node | null, setSele
     source.addEventListener("message", async (event: MessageEvent<string>) => {
       try {
         hasReceivedMessage = true;
-        resetIdleTimeout();
         const task = JSON.parse(event.data) as ChatTask;
+        if (isRenderableChatTask(task)) {
+          hasReceivedRenderableContent = true;
+        }
+        resetIdleTimeout();
         // 添加消息到队列
         addChatTask(task);
         
@@ -912,6 +970,11 @@ function useFlowState(convId: number | null, selectedNode?: Node | null, setSele
         toast.error('处理响应数据时出错');
         setIsChatting(false);
       }
+    });
+
+    source.addEventListener("heartbeat", () => {
+      hasReceivedMessage = true;
+      resetIdleTimeout();
     });
     
     // 处理错误情况

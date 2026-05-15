@@ -340,14 +340,23 @@ function App() {
   }, []);
 
   // /blank页面触发对话
-  const handleBlankQuery = useCallback((data: CreateAiTaskVO) => {
+  const handleBlankQuery = useCallback((data: CreateAiTaskVO, classId?: string | null) => {
     setConversations((prev) => {
       const newConversations = [{...data.conversation}, ...prev];
       console.log('handleBlankQuery, newConversations', newConversations);
       return newConversations;
     });
     setActiveConversationId(data.conversation.id);
-    navigate('/flow', {state: {convId: data.conversation.id, taskId: data.taskId} as FlowLocationState});
+    if (classId) {
+      sessionStorage.setItem(`flow_class_id_${data.conversation.id}`, classId);
+    }
+    navigate('/flow', {
+      state: {
+        convId: data.conversation.id,
+        taskId: data.taskId,
+        classId: classId ?? null
+      } as FlowLocationState
+    });
   }, [navigate, setActiveConversationId]);
 
   // 触发新对话时，把对应的conversation移动到最前面

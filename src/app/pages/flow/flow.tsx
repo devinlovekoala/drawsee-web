@@ -161,7 +161,8 @@ function Flow() {
   const convId = locationState?.convId;
   const convIdSafe = convId ?? 0;
   const taskIdFromLocation = locationState?.taskId;
-  const classId = locationState?.classId || 
+  const classId = locationState?.classId ||
+    (convId ? sessionStorage.getItem(`flow_class_id_${convId}`) : null) ||
     (convId ? sessionStorage.getItem(`circuit_class_id_${convId}`) : null); // 从sessionStorage获取班级ID
   
     // 防护包装的setSelectedNode函数 - 防止用户在详情节点生成完毕后误切换
@@ -1099,7 +1100,8 @@ function Flow() {
       convId,
       chat: flowChat,
       addChatTask,
-      applySuggestion: handleApplySuggestion
+      applySuggestion: handleApplySuggestion,
+      classId: classId ?? null
     }}>
       <div className="flex w-full overflow-hidden" style={{ height: 'calc(100svh - 16px)' }}>
         {/* 左侧React Flow区域 */}
@@ -1175,6 +1177,7 @@ function Flow() {
                 canNotInputReason={canNotInputReasonForShare}
                 addTempQueryNodeTask={addTempQueryNodeTaskForShare}
                 parentIdOfTempQueryNode={parentIdOfTempQueryNodeForShare}
+                classId={classId}
               />
             </Panel>
             {isShareMode && (
