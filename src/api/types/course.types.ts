@@ -32,6 +32,7 @@ export interface CourseVO {
     knowledgeBaseIds: string[];
     knowledgeBases: KnowledgeBaseVO[];
     isPublished: boolean;
+    isDeleted?: boolean;
 }
 
 export interface CourseStatsVO {

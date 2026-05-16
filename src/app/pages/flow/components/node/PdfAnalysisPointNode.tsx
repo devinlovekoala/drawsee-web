@@ -23,7 +23,7 @@ export default function PdfAnalysisPointNode(props: ExtendedNodeProps<'PDF_ANALY
   const [editText, setEditText] = useState(data.text || '');
   
   const { handleAiTaskCountPlus } = useAppContext();
-  const { convId, addChatTask } = useFlowContext();
+  const { convId, addChatTask, classId } = useFlowContext();
   
   // 检查是否已生成详情
   const isGenerated = (data as any).isGenerated || false;
@@ -68,7 +68,7 @@ export default function PdfAnalysisPointNode(props: ExtendedNodeProps<'PDF_ANALY
         convId: typeof convId === 'number' ? convId : null,
         parentId: Number(id),
         model: selectedModel,
-        classId: null
+        classId: classId
       };
 
       await createAiTask(dto);

@@ -19,6 +19,7 @@ import DocumentLibrary from "@/app/pages/circuit-experiment/DocumentLibrary";
 import DocumentUpload from "@/app/pages/circuit-experiment/DocumentUpload";
 import DocumentAnalysis from "@/app/pages/circuit-experiment/DocumentAnalysis";
 import DigitalWorkbench from "@/app/pages/digital/DigitalWorkbench";
+import VisualizerPage from "@/app/pages/visualizer";
 
 const router = createBrowserRouter([
   {
@@ -52,6 +53,10 @@ const router = createBrowserRouter([
       {
         path: '/digital',
         element: <DigitalWorkbench />
+      },
+      {
+        path: '/visualizer',
+        element: <VisualizerPage />
       },
       {
         path: '/circuit',

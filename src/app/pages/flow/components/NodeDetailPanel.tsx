@@ -4,7 +4,7 @@ import { format } from 'date-fns';
 import { X, Clock, Tag, Circle, FileText, Zap, Sparkles, Eye, Loader2 } from 'lucide-react';
 import { Button, message } from 'antd';
 import { useNavigate } from 'react-router-dom';
-import MarkdownWithLatex from './markdown/MarkdownWithLatex';
+import MarkdownWithLatex, { type RagSource } from './markdown/MarkdownWithLatex';
 import { NodeData } from './node/types/node.types';
 import { NodeType, FollowUpSuggestionData, CreateAiTaskDTO } from '@/api/types/flow.types';
 import { extractFileNameFromUrl, isHttpUrl } from '@/app/pages/flow/utils/document';
@@ -122,7 +122,7 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
   const [autoScrollEnabled, setAutoScrollEnabled] = useState(true);
   const autoScrollThreshold = 80;
   const { handleAiTaskCountPlus } = useAppContext();
-  const { convId, chat } = useFlowContext();
+  const { convId, chat, classId } = useFlowContext();
   const navigate = useNavigate();
   const [pdfDetailLoading, setPdfDetailLoading] = useState(false);
   const nodeTypeValue = selectedNode?.type ? String(selectedNode.type) : '';
@@ -659,6 +659,12 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
   const qaAnswerNodeId = getStringField(nodeData, 'qaAnswerNodeId');
   const qaAnswerText = getStringField(nodeData, 'qaAnswerText');
   const qaAnswerTitle = getStringField(nodeData, 'qaAnswerTitle');
+  const ragSources = useMemo(() => {
+    return (getArrayField(nodeData, 'ragSources') || []) as RagSource[];
+  }, [nodeData]);
+  const qaRagSources = useMemo(() => {
+    return (getArrayField(nodeData, 'qaRagSources') || ragSources) as RagSource[];
+  }, [nodeData, ragSources]);
   const hasFollowupSuggestions = followUpInfo.suggestions.length > 0;
   const displayText = useMemo(() => {
     return hasFollowupSuggestions ? stripFollowupReferenceSections(text) : text;
@@ -783,7 +789,7 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
         convId: typeof convId === 'number' ? convId : null,
         parentId: parentNodeId,
         model: resolveSelectedModel(),
-        classId: null
+        classId: classId
       };
       const response = await createAiTask(dto);
       handleAiTaskCountPlus();
@@ -825,6 +831,7 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
         <MarkdownWithLatex
           text={displayText}
           isStreaming={Boolean(isGenerating)}
+          ragSources={ragSources}
           key={`markdown-${selectedNode?.id}-${forceRefresh}-${displayText.length}-${lastUpdatedAt}`}
         />
         {isGenerating && (
@@ -989,6 +996,7 @@ export default function NodeDetailPanel({ selectedNode, onClose, getLatestNodeDa
                           <MarkdownWithLatex
                             text={qaAnswerDisplayText}
                             isStreaming={Boolean(isGenerating)}
+                            ragSources={qaRagSources}
                             key={`qa-answer-${qaAnswerNodeId}-${forceRefresh}-${qaAnswerDisplayText.length}-${lastUpdatedAt}`}
                           />
                         ) : (

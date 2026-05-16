@@ -1,4 +1,4 @@
-import { SparklesIcon, Cog, Wand2, GraduationCap, MessageCircle, FileText } from 'lucide-react';
+import { SparklesIcon, Cog, Zap, GraduationCap, MessageCircle, FileText } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useState } from 'react';
@@ -23,11 +23,11 @@ const agents = [
     isActive: true,
   },
   {
-    id: 'ai-animation',
-    name: 'AI动画生成',
-    description: '将复杂概念转换为生动直观的动画形式',
-    icon: Wand2,
-    type: 'ANIMATION',
+    id: 'circuit-visualizer',
+    name: '电路动画生成',
+    description: '交互式电路动画，直观演示工作原理与参数变化',
+    icon: Zap,
+    type: 'CIRCUIT_VISUALIZER',
     isActive: true,
   }
 ];
@@ -63,8 +63,12 @@ export function AgentMenu() {
       return;
     }
     // 根据不同的agent类型导航到相应页面，并携带参数
-    const targetPath = agent.type === 'CIRCUIT_ANALYSIS' ? '/circuit' : '/blank';
-    const targetState = agent.type === 'CIRCUIT_ANALYSIS' ? undefined : { agentType: agent.type, agentName: agent.name };
+    const targetPath = agent.type === 'CIRCUIT_ANALYSIS' ? '/circuit'
+      : agent.type === 'CIRCUIT_VISUALIZER' ? '/visualizer'
+      : '/blank';
+    const targetState = (agent.type === 'CIRCUIT_ANALYSIS' || agent.type === 'CIRCUIT_VISUALIZER')
+      ? undefined
+      : { agentType: agent.type, agentName: agent.name };
 
     // 优先做同步的全局检查，避免在事件监听器尚未就绪时跳转丢失更改
     let preConfirmed = false;

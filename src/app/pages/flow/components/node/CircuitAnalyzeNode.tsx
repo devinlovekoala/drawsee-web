@@ -123,7 +123,11 @@ function CircuitAnalyzeNode({ data, ...props }: ExtendedNodeProps<'circuit-analy
       <div className="rounded-xl border border-rose-50 bg-rose-50/40 relative">
         <div className="max-h-32 overflow-hidden p-2 text-sm text-gray-700">
           {nodeData.text ? (
-            <MarkdownWithLatex text={nodeData.text} />
+            <MarkdownWithLatex
+              text={nodeData.text}
+              ragSources={Array.isArray((nodeData as any).ragSources) ? (nodeData as any).ragSources : []}
+              showRagReferences={false}
+            />
           ) : (
             <div className="text-gray-400">模型正在分析该电路，请稍候...</div>
           )}

@@ -9,7 +9,6 @@ import { ModelSelector } from '../../../blank/components/ModelSelector';
 import { ModelType } from '../../../flow/components/input/FlowInputPanel';
 import AnswerPointNode from './AnswerPointNode';
 import AnswerDetailNode from './AnswerDetailNode';
-import { useLocation } from 'react-router-dom';
 
 function AnswerNode({ data, ...props }: ExtendedNodeProps<'answer'>) {
   // 根据subtype渲染不同的节点组件
@@ -21,14 +20,12 @@ function AnswerNode({ data, ...props }: ExtendedNodeProps<'answer'>) {
     return <AnswerDetailNode data={data} {...props} />;
   }
   
-  const {chat, convId, isChatting, addChatTask} = useFlowContext();
+  const {chat, convId, isChatting, addChatTask, classId} = useFlowContext();
   const {handleAiTaskCountPlus} = useAppContext();
   const { subtype, isDone } = data;
   const [isGenerated, setIsGenerated] = useState(data.isGenerated || false);
   const initialModel = (data as { mode?: ModelType })?.mode;
   const [selectedModel, setSelectedModel] = useState<ModelType>(initialModel || 'deepseekV3'); // 默认使用DeepSeekV3模型
-  const location = useLocation();
-  const classId = location.state?.classId as string || null;
 
   const handleSolverChat = useCallback((taskType: AiTaskType) => {
     if (isChatting) {

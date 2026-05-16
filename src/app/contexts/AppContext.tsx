@@ -34,7 +34,7 @@ export interface AppContextType {
   closeDeleteDialog: () => void;
   confirmDelete: () => void;
   
-  handleBlankQuery: (data: CreateAiTaskVO) => void;
+  handleBlankQuery: (data: CreateAiTaskVO, classId?: string | null) => void;
   handleTitleUpdate: (convId: number, title: string) => void;
   handleNewChat: (convId: number) => void;
   handleLogout: () => void;

@@ -1,6 +1,9 @@
 import { CourseVO } from '@/api/types/course.types';
-import { Users, Book, Clock, ArrowUpRight, CircuitBoard } from 'lucide-react';
+import { getCourseStats, leaveCourse } from '@/api/methods/course.methods';
+import { Users, Book, Clock, ArrowUpRight, CircuitBoard, LogOut, Loader2 } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 
 // 根据课程主题生成颜色
 const getColorsBySubject = (subject?: string) => {
@@ -75,41 +78,65 @@ const getColorsBySubject = (subject?: string) => {
   };
 };
 
-// 判断是否为电路分析课程的多种方式
 const isCircuitAnalysisCourse = (course: CourseVO): boolean => {
-  // 判断课程学科是否为电路分析（多种可能的表示方式）
   const subjectCheck = [
-    'CIRCUIT_ANALYSIS', 
-    'circuit_analysis', 
-    'CircuitAnalysis', 
-    '电路分析', 
+    'CIRCUIT_ANALYSIS',
+    'circuit_analysis',
+    'CircuitAnalysis',
+    '电路分析',
     '电子电路分析'
   ].includes(course.subject || "");
-  
-  // 判断课程名称是否包含电路分析相关词汇
+
   const nameCheck = [
-    '电路分析', 
-    '电子电路', 
-    'circuit', 
-    'Circuit', 
+    '电路分析',
+    '电子电路',
+    'circuit',
+    'Circuit',
     'CIRCUIT'
   ].some(keyword => course.name?.includes(keyword));
-  
+
   return subjectCheck || nameCheck;
 };
 
 interface CourseCardProps {
   course: CourseVO;
+  onLeave?: (courseId: string) => void;
 }
 
-export function CourseCard({ course }: CourseCardProps) {
+export function CourseCard({ course, onLeave }: CourseCardProps) {
   const navigate = useNavigate();
   const colors = getColorsBySubject(course.subject);
-  
-  // 判断是否为电路分析课程
+  const [kbCount, setKbCount] = useState<number>(
+    course.knowledgeBases?.length || course.knowledgeBaseIds?.length || 0
+  );
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+  const confirmRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const fromVO = course.knowledgeBases?.length || course.knowledgeBaseIds?.length || 0;
+    if (fromVO > 0) {
+      setKbCount(fromVO);
+      return;
+    }
+    getCourseStats(course.id)
+      .then(s => setKbCount(s?.knowledgeBaseCount ?? 0))
+      .catch(() => {});
+  }, [course.id, course.knowledgeBases, course.knowledgeBaseIds]);
+
+  useEffect(() => {
+    if (!showConfirm) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (confirmRef.current && !confirmRef.current.contains(e.target as Node)) {
+        setShowConfirm(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showConfirm]);
+
   const isCircuitAnalysis = isCircuitAnalysisCourse(course);
-  
-  // 格式化日期
+
   const formatDate = (date: Date) => {
     return new Date(date).toLocaleDateString('zh-CN', {
       year: 'numeric',
@@ -122,15 +149,48 @@ export function CourseCard({ course }: CourseCardProps) {
     navigate(`/course/${course.id}`);
   };
 
+  const handleLeaveClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowConfirm(true);
+  };
+
+  const handleConfirmLeave = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setLeaving(true);
+    try {
+      await leaveCourse(course.id);
+      toast.success(`已退出班级「${course.name}」`);
+      onLeave?.(course.id);
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : '退出失败，请稍后再试';
+      toast.error(msg);
+    } finally {
+      setLeaving(false);
+      setShowConfirm(false);
+    }
+  };
+
+  const handleCancelLeave = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowConfirm(false);
+  };
+
   return (
-    <div 
+    <div
       onClick={handleCourseClick}
       className={`group relative p-5 rounded-xl ${colors.bg} border ${colors.border} cursor-pointer transition-all duration-300 hover:shadow-md hover:scale-[1.01]`}
     >
-      <div className="absolute top-3 right-3">
+      <div className="absolute top-3 right-3 flex items-center gap-1.5">
+        <button
+          onClick={handleLeaveClick}
+          title="退出班级"
+          className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md hover:bg-red-100 text-neutral-400 hover:text-red-500"
+        >
+          <LogOut className="w-3.5 h-3.5" />
+        </button>
         <ArrowUpRight className={`w-4 h-4 ${colors.icon} opacity-70 transition-all duration-300 group-hover:opacity-100 group-hover:translate-x-0.5 group-hover:-translate-y-0.5`} />
       </div>
-      
+
       <div className="flex items-start space-x-2 mb-2">
         <div className={`p-2 rounded-lg ${colors.bg} border ${colors.border}`}>
           {isCircuitAnalysis ? (
@@ -152,10 +212,10 @@ export function CourseCard({ course }: CourseCardProps) {
         </div>
         <div className="flex items-center">
           <Book className="w-3.5 h-3.5 text-neutral-500 mr-1" />
-          <span className="text-neutral-600">{course.knowledgeBases?.length || 0}个知识库</span>
+          <span className="text-neutral-600">{kbCount}个知识库</span>
         </div>
       </div>
-      
+
       <div className="mt-3 pt-3 border-t border-neutral-200 flex justify-between items-center">
         <div className="text-xs text-neutral-500 flex items-center">
           <Clock className="w-3.5 h-3.5 mr-1" />
@@ -165,6 +225,36 @@ export function CourseCard({ course }: CourseCardProps) {
           {isCircuitAnalysis ? '电路分析' : (course.subject || '未设置')}
         </div>
       </div>
+
+      {showConfirm && (
+        <div
+          ref={confirmRef}
+          onClick={e => e.stopPropagation()}
+          className="absolute inset-0 rounded-xl bg-white/95 backdrop-blur-sm flex flex-col items-center justify-center gap-4 p-6 z-10"
+        >
+          <LogOut className="w-8 h-8 text-red-400" />
+          <div className="text-center">
+            <p className="font-medium text-neutral-800">退出班级</p>
+            <p className="text-sm text-neutral-500 mt-1">确认退出「{course.name}」？退出后需重新加入。</p>
+          </div>
+          <div className="flex gap-3 w-full">
+            <button
+              onClick={handleCancelLeave}
+              className="flex-1 py-2 rounded-lg border border-neutral-200 text-sm text-neutral-600 hover:bg-neutral-50"
+            >
+              取消
+            </button>
+            <button
+              onClick={handleConfirmLeave}
+              disabled={leaving}
+              className="flex-1 py-2 rounded-lg bg-red-500 text-sm text-white hover:bg-red-600 disabled:opacity-60 flex items-center justify-center gap-1.5"
+            >
+              {leaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+              确认退出
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

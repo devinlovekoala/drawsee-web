@@ -344,6 +344,8 @@ export const BaseNode = React.memo(function BaseNode<T extends NodeType>({
                 <MarkdownWithLatex 
                   className="scrollbar-hide" 
                   text={nodeData.text || ''} 
+                  ragSources={Array.isArray((nodeData as any).ragSources) ? (nodeData as any).ragSources : []}
+                  showRagReferences={false}
                 />
               </article>
             )
