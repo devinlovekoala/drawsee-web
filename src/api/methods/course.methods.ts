@@ -26,16 +26,16 @@ export const getSystemCourses =
 /**
  * 获取用户已加入的课程列表
  */
-export const getUserCourses = 
+export const getUserCourses =
   (params: PaginationParams) =>
-    alova.Get<PaginatedResponse<CourseVO>>('/courses/user', { params });
+    alova.Get<PaginatedResponse<CourseVO>>('/courses/user', { params, cacheFor: 0 });
 
 /**
  * 获取用户创建的课程列表
  */
-export const getCreatedCourses = 
+export const getCreatedCourses =
   (params: PaginationParams) =>
-    alova.Get<PaginatedResponse<CourseVO>>('/courses/created', { params });
+    alova.Get<PaginatedResponse<CourseVO>>('/courses/created', { params, cacheFor: 0 });
 
 /**
  * 创建课程
@@ -47,16 +47,23 @@ export const createCourse =
 /**
  * 加入课程
  */
-export const joinCourse = 
+export const joinCourse =
   (joinCourseDTO: JoinCourseDTO) =>
     alova.Post<string>('/courses/join', joinCourseDTO);
 
 /**
+ * 退出课程（学生离开班级）
+ */
+export const leaveCourse =
+  (id: string) =>
+    alova.Delete<boolean>(`/courses/${id}/members/me`);
+
+/**
  * 获取课程详情
  */
-export const getCourseDetail = 
+export const getCourseDetail =
   (id: string) =>
-    alova.Get<CourseVO>(`/courses/${id}`);
+    alova.Get<CourseVO>(`/courses/${id}`, { cacheFor: 0 });
 
 /**
  * 更新课程
@@ -75,9 +82,9 @@ export const deleteCourse =
 /**
  * 获取课程统计信息
  */
-export const getCourseStats = 
+export const getCourseStats =
   (id: string) =>
-    alova.Get<CourseStatsVO>(`/courses/${id}/stats`);
+    alova.Get<CourseStatsVO>(`/courses/${id}/stats`, { cacheFor: 0 });
 
 /**
  * 获取课程学习进度

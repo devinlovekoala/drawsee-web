@@ -18,13 +18,17 @@ export function CourseList({ refreshTrigger = 0 }: CourseListProps) {
   });
   const [totalPages, setTotalPages] = useState(0);
 
+  const handleLeave = (courseId: string) => {
+    setCourses(prev => prev.filter(c => c.id !== courseId));
+  };
+
   // 获取课程列表
   const fetchCourses = async () => {
     setIsLoading(true);
     try {
       // 获取所有已加入的班级课程
       const result = await getUserCourses(pagination);
-      setCourses(result.items);
+      setCourses(result.items.filter(c => !c.isDeleted));
       setTotalPages(result.totalPages);
     } catch (error) {
       toast.error('获取班级列表失败');
@@ -63,7 +67,7 @@ export function CourseList({ refreshTrigger = 0 }: CourseListProps) {
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {courses.map(course => (
-              <CourseCard key={course.id} course={course} />
+              <CourseCard key={course.id} course={course} onLeave={handleLeave} />
             ))}
           </div>
           

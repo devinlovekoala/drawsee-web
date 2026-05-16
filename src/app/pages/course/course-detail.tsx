@@ -15,9 +15,9 @@ import {
   Sparkles,
   Users
 } from 'lucide-react';
-import { getCourseDetail, getCourseResources } from '@/api/methods/course.methods';
+import { getCourseDetail, getCourseResources, getCourseStats } from '@/api/methods/course.methods';
 import { recognizeCircuitDesignFromImage } from '@/api/methods/tool.methods';
-import { CourseResourceType, CourseResourceVO, CourseVO } from '@/api/types/course.types';
+import { CourseResourceType, CourseResourceVO, CourseStatsVO, CourseVO } from '@/api/types/course.types';
 import {
   resolveWorkbenchRouteFromDesign,
   writeCircuitPrefill,
@@ -65,6 +65,7 @@ function CourseDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [course, setCourse] = useState<CourseVO | null>(null);
+  const [stats, setStats] = useState<CourseStatsVO | null>(null);
   const [resources, setResources] = useState<CourseResourceVO[]>([]);
   const [activeType, setActiveType] = useState<CourseResourceType>('COURSEWARE');
   const [loading, setLoading] = useState(true);
@@ -72,19 +73,29 @@ function CourseDetail() {
 
   const headerStats = useMemo(() => {
     if (!course) return [] as { label: string; value: string }[];
+    const kbCount = course.knowledgeBases?.length || course.knowledgeBaseIds?.length || stats?.knowledgeBaseCount || 0;
     return [
       { label: '学生人数', value: `${course.studentCount ?? 0}` },
-      { label: '知识库', value: `${course.knowledgeBases?.length ?? 0}` },
+      { label: '知识库', value: `${kbCount}` },
       { label: '课程科目', value: course.subject || '-' }
     ];
-  }, [course]);
+  }, [course, stats]);
 
   useEffect(() => {
     if (!id) return;
     const loadDetail = async () => {
       try {
-        const detail = await getCourseDetail(id);
+        const [detail, courseStats] = await Promise.all([
+          getCourseDetail(id),
+          getCourseStats(id).catch(() => null)
+        ]);
+        if (detail.isDeleted) {
+          toast.error('该班级已被删除');
+          navigate('/course');
+          return;
+        }
         setCourse(detail);
+        setStats(courseStats);
       } catch (error) {
         console.error('获取班级详情失败:', error);
         toast.error('获取班级详情失败');
